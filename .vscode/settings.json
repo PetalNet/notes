@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "svelte.enable-ts-plugin": true,
+  "svelte.language-server.runtime": "node",
+  "eslint.validate": ["svelte"]
+}

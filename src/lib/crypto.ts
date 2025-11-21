@@ -2,6 +2,8 @@
  * WebCrypto utilities for E2EE
  */
 
+import { Either, Encoding } from "effect";
+
 export async function generateUserKeys(): Promise<{
   publicKey: string;
   privateKey: string;
@@ -27,8 +29,8 @@ export async function generateUserKeys(): Promise<{
   );
 
   return {
-    publicKey: arrayBufferToBase64(publicKeyData),
-    privateKey: arrayBufferToBase64(privateKeyData),
+    publicKey: Encoding.encodeBase64(new Uint8Array(publicKeyData)),
+    privateKey: Encoding.encodeBase64(new Uint8Array(privateKeyData)),
   };
 }
 
@@ -43,15 +45,19 @@ export async function generateNoteKey(): Promise<string> {
   );
 
   const keyData = await crypto.subtle.exportKey("raw", key);
-  return arrayBufferToBase64(keyData);
+  return Encoding.encodeBase64(new Uint8Array(keyData));
 }
 
 export async function encryptKeyForUser(
   noteKey: string,
   recipientPublicKey: string,
 ): Promise<string> {
-  const keyBuffer = base64ToArrayBuffer(noteKey);
-  const publicKeyBuffer = base64ToArrayBuffer(recipientPublicKey);
+  const keyBuffer = Encoding.decodeBase64(noteKey).pipe(
+    Either.getOrThrow,
+  ) as Uint8Array<ArrayBuffer>;
+  const publicKeyBuffer = Encoding.decodeBase64(recipientPublicKey).pipe(
+    Either.getOrThrow,
+  ) as Uint8Array<ArrayBuffer>;
 
   const publicKey = await crypto.subtle.importKey(
     "spki",
@@ -72,15 +78,19 @@ export async function encryptKeyForUser(
     keyBuffer,
   );
 
-  return arrayBufferToBase64(encrypted);
+  return Encoding.encodeBase64(new Uint8Array(encrypted));
 }
 
 export async function decryptKey(
   encryptedKey: string,
   privateKey: string,
 ): Promise<string> {
-  const encryptedBuffer = base64ToArrayBuffer(encryptedKey);
-  const privateKeyBuffer = base64ToArrayBuffer(privateKey);
+  const encryptedBuffer = Encoding.decodeBase64(encryptedKey).pipe(
+    Either.getOrThrow,
+  ) as Uint8Array<ArrayBuffer>;
+  const privateKeyBuffer = Encoding.decodeBase64(privateKey).pipe(
+    Either.getOrThrow,
+  ) as Uint8Array<ArrayBuffer>;
 
   const key = await crypto.subtle.importKey(
     "pkcs8",
@@ -101,14 +111,16 @@ export async function decryptKey(
     encryptedBuffer,
   );
 
-  return arrayBufferToBase64(decrypted);
+  return Encoding.encodeBase64(new Uint8Array(decrypted));
 }
 
 export async function encryptData(
   data: Uint8Array<ArrayBuffer>,
   noteKey: string,
 ): Promise<Uint8Array> {
-  const keyBuffer = base64ToArrayBuffer(noteKey);
+  const keyBuffer = Encoding.decodeBase64(noteKey).pipe(
+    Either.getOrThrow,
+  ) as Uint8Array<ArrayBuffer>;
   const key = await crypto.subtle.importKey(
     "raw",
     keyBuffer,
@@ -141,7 +153,9 @@ export async function decryptData(
   encrypted: Uint8Array,
   noteKey: string,
 ): Promise<Uint8Array> {
-  const keyBuffer = base64ToArrayBuffer(noteKey);
+  const keyBuffer = Encoding.decodeBase64(noteKey).pipe(
+    Either.getOrThrow,
+  ) as Uint8Array<ArrayBuffer>;
   const key = await crypto.subtle.importKey(
     "raw",
     keyBuffer,
@@ -166,23 +180,4 @@ export async function decryptData(
   );
 
   return new Uint8Array(decrypted);
-}
-
-// Utility functions
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let i = 0; i < bytes.byteLength; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
 }

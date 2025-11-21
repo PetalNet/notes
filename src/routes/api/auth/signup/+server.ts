@@ -3,6 +3,7 @@ import { db } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
+import * as auth from "$lib/server/auth";
 
 export const POST = async ({ request, cookies }) => {
   try {
@@ -37,10 +38,8 @@ export const POST = async ({ request, cookies }) => {
     });
 
     // Create session using auth module
-    const token = (await import("$lib/server/auth")).generateSessionToken();
-    const session = await (
-      await import("$lib/server/auth")
-    ).createSession(token, id);
+    const token = auth.generateSessionToken();
+    const session = await auth.createSession(token, id);
 
     // Set session cookie
     cookies.set("auth-session", token, {

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
 
   let username = $state("");
   let password = $state("");
@@ -27,7 +28,7 @@
         throw new Error(data.error || "Login failed");
       }
 
-      goto("/");
+      goto(resolve("/"));
     } catch (e) {
       error = (e as Error).message;
     } finally {
@@ -48,9 +49,9 @@
       {/if}
 
       <form
-        onsubmit={(e) => {
+        onsubmit={async (e) => {
           e.preventDefault();
-          handleLogin();
+          await handleLogin();
         }}
       >
         <div class="form-control">
@@ -87,7 +88,9 @@
       </form>
 
       <div class="divider">OR</div>
-      <a href="/signup" class="btn btn-ghost">Don't have an account? Sign up</a>
+      <a href={resolve("/signup")} class="btn btn-ghost"
+        >Don't have an account? Sign up</a
+      >
     </div>
   </div>
 </div>

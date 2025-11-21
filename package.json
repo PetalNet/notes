@@ -12,8 +12,6 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "format": "prettier --write .",
     "lint": "prettier --check . && eslint .",
-    "test:unit": "vitest",
-    "test": "npm run test:unit -- --run",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -32,7 +30,6 @@
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.14",
     "@types/node": "^22",
-    "@vitest/browser-playwright": "^4.0.5",
     "drizzle-kit": "^0.31.7",
     "drizzle-orm": "^0.44.7",
     "eslint": "^9.38.0",
@@ -51,9 +48,7 @@
     "vite": "^7.1.10",
     "vite-plugin-devtools-json": "^1.0.0",
     "vite-plugin-top-level-await": "^1.6.0",
-    "vite-plugin-wasm": "^3.5.0",
-    "vitest": "^4.0.5",
-    "vitest-browser-svelte": "^2.0.1"
+    "vite-plugin-wasm": "^3.5.0"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.7",

@@ -8,7 +8,6 @@
     notes,
     selectedNoteId,
     loadNotes,
-    createNote,
     getLoroManager,
   } from "$lib/store.svelte.ts";
   import type { LoroNoteManager } from "$lib/loro.js";
@@ -83,14 +82,6 @@
       unsubscribeContent();
     }
   });
-
-  async function handleNewNote() {
-    try {
-      await createNote("Untitled Note");
-    } catch (error) {
-      console.error("Failed to create note:", error);
-    }
-  }
 </script>
 
 <div class="flex h-screen overflow-hidden bg-white">

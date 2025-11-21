@@ -6,7 +6,6 @@
     setCurrentUser,
     setUserPrivateKey,
     notes,
-    selectedNoteId,
     loadNotes,
     getLoroManager,
   } from "$lib/store.svelte.ts";
@@ -29,25 +28,33 @@
     }
   });
 
-  let selectedNote = $derived(notes.find((n) => n.id === selectedNoteId));
+  let selectedNote = $derived(
+    notes.notes.find((n) => n.id === notes.selectedNoteId),
+  );
   let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
-  let unsubscribeContent: (() => void) | null = null;
+  let unsubscribeContent: (() => void) | undefined = undefined;
 
   // Load Loro manager when note is selected
   $effect(() => {
-    console.log("[Page] Effect triggered. SelectedNoteId:", selectedNoteId);
+    console.log(
+      "[Page] Effect triggered. SelectedNoteId:",
+      notes.selectedNoteId,
+    );
 
     // Cleanup previous subscription
     if (unsubscribeContent) {
       console.log("[Page] Cleaning up previous subscription");
       unsubscribeContent();
-      unsubscribeContent = null;
+      unsubscribeContent = undefined;
     }
 
-    if (selectedNoteId && selectedNote && !selectedNote.isFolder) {
-      console.log("[Page] Loading Loro manager for note:", selectedNoteId);
-      getLoroManager(selectedNoteId).then((manager) => {
+    if (notes.selectedNoteId && selectedNote && !selectedNote.isFolder) {
+      console.log(
+        "[Page] Loading Loro manager for note:",
+        notes.selectedNoteId,
+      );
+      void getLoroManager(notes.selectedNoteId).then((manager) => {
         console.log(
           "[Page] Loro manager loaded:",
           manager ? "Success" : "Failed",
@@ -145,7 +152,7 @@
   <div
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
-    <p>Selected Note: {selectedNoteId}</p>
+    <p>Selected Note: {notes.selectedNoteId}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>

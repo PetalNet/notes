@@ -30,7 +30,11 @@ export default defineConfig(
     },
   },
   {
-    files: ["**/*.svelte", "**/*.svelte.ts", "**/*.svelte.js"],
+    files: [
+      "**/*.svelte",
+      "**/*+{layout,page}.ts",
+      "**/*+{layout,page}.server.ts",
+    ],
     languageOptions: {
       parserOptions: {
         extraFileExtensions: [".svelte"],
@@ -39,10 +43,19 @@ export default defineConfig(
       },
     },
     rules: {
-      "@typescript-eslint/no-confusing-void-expression": off,
-      "@typescript-eslint/no-unsafe-argument": off,
-      "@typescript-eslint/no-unsafe-assignment": off,
-      "@typescript-eslint/no-unsafe-call": off,
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-floating-promises": [
+        "error",
+        {
+          allowForKnownSafeCalls: [
+            { from: "file", name: "goto", path: "$app/navigation" },
+          ],
+        },
+      ],
     },
   },
 );

@@ -1,5 +1,6 @@
 import { generateNoteKey, encryptKeyForUser, decryptKey } from "$lib/crypto";
 import { LoroNoteManager } from "$lib/loro";
+import { getNotes } from "./remote/notes.remote.ts";
 import type { NoteOrFolder } from "./schema.ts";
 
 export interface User {
@@ -9,41 +10,51 @@ export interface User {
   privateKeyEncrypted?: string;
 }
 
-export function selectNote(noteId: string) {
-  selectedNoteId = noteId;
+//#region Auth
+interface AuthStore {
+  currentUser?: User | undefined;
+  userPrivateKey?: string | undefined;
 }
 
+export let auth = $state<AuthStore>({});
+
 export function setCurrentUser(user: User) {
-  currentUser = user;
+  auth.currentUser = user;
 }
 
 export function setUserPrivateKey(privateKey: string) {
-  userPrivateKey = privateKey;
+  auth.userPrivateKey = privateKey;
 }
+//#endregion
 
-// Auth state
-export let currentUser = $state<User | null>(null);
-export let userPrivateKey = $state<string | null>(null);
+//#region Notes
+interface NotesStore {
+  notes: NoteOrFolder[];
+  selectedNoteId: string | undefined;
+}
+//#endregion
 
-// Notes state
-export let notes = $state<NoteOrFolder[]>([]);
-export let selectedNoteId = $state<string | null>(null);
+export let notes = $state<NotesStore>({ notes: [], selectedNoteId: undefined });
+
+export function selectNote(noteId: string) {
+  notes.selectedNoteId = noteId;
+}
 
 // Loro managers per note
 const loroManagers = new Map<string, LoroNoteManager>();
 
 // Derived note tree for sidebar
-export const noteTree = $derived.by(() => {
+let noteTree = $derived.by(() => {
   const map = new Map();
   const roots: NoteOrFolder[] = [];
 
   // First pass: create map entries
-  notes.forEach((note) => {
+  notes.notes.forEach((note) => {
     map.set(note.id, { ...note, children: [] });
   });
 
   // Second pass: build tree
-  notes.forEach((note) => {
+  notes.notes.forEach((note) => {
     if (note.parentId) {
       const parent = map.get(note.parentId);
       if (parent) {
@@ -57,37 +68,25 @@ export const noteTree = $derived.by(() => {
     }
   });
 
-  // Recursive function to sort children at all levels
-  const sortChildren = (items: NoteOrFolder[]) => {
-    items.sort((a, b) => a.order - b.order);
-    items.forEach((item) => {
-      if (item.isFolder && item.children.length > 0) {
-        sortChildren(item.children);
-      }
-    });
-  };
-
-  sortChildren(roots);
-  return roots;
+  return treeToSorted(roots);
 });
+
+// Recursive function to sort children at all levels
+function treeToSorted(tree: readonly NoteOrFolder[]): NoteOrFolder[] {
+  return tree
+    .toSorted((a, b) => a.order - b.order)
+    .map((node) =>
+      node.isFolder ? { ...node, children: treeToSorted(node.children) } : node,
+    );
+}
+
+export function getNoteTree() {
+  return noteTree;
+}
 
 // Load user notes from API
 export async function loadNotes() {
-  try {
-    const res = await fetch("/api/notes", { cache: "no-store" });
-    if (!res.ok) throw new Error("Failed to load notes");
-
-    const data = await res.json();
-    notes = data.notes.map((n) => ({
-      ...n,
-      content: "", // Will be decrypted when selected
-      order: n.order ?? 0,
-      createdAt: new Date(n.createdAt),
-      updatedAt: new Date(n.updatedAt),
-    }));
-  } catch (error) {
-    console.error("Load notes error:", error);
-  }
+  notes.notes = await getNotes();
 }
 
 // Decrypt note key with user's private key
@@ -108,10 +107,10 @@ export async function getLoroManager(
   }
 
   // Find the note
-  const note = notes.find((n) => n.id === noteId);
+  const note = notes.notes.find((n) => n.id === noteId);
   if (!note) return undefined;
 
-  const privateKey = userPrivateKey;
+  const privateKey = auth.userPrivateKey;
   if (!privateKey) {
     console.error("No private key available");
     return undefined;
@@ -135,14 +134,14 @@ export async function getLoroManager(
 
     // Update note content
     const content = manager.getContent();
-    notes = notes.map((note) =>
+    notes.notes = notes.notes.map((note) =>
       note.id === noteId ? { ...note, content } : note,
     );
 
     loroManagers.set(noteId, manager);
 
     // Start sync if this is the selected note
-    if (selectedNoteId === noteId) {
+    if (notes.selectedNoteId === noteId) {
       manager.startSync();
     }
 
@@ -153,26 +152,26 @@ export async function getLoroManager(
   }
 }
 
-// Subscribe to selected note changes to manage sync
-$effect(() => {
-  // Stop sync for all other managers
-  loroManagers.forEach((manager, id) => {
-    if (id !== selectedNoteId) {
-      manager.stopSync();
-    }
-  });
-
-  // Start sync for selected note
-  if (selectedNoteId) {
-    const manager = loroManagers.get(selectedNoteId);
-    if (manager) {
-      manager.startSync();
-    } else {
-      // Manager might not be created yet, getLoroManager will handle it
-      getLoroManager(selectedNoteId);
-    }
-  }
-});
+// // Subscribe to selected note changes to manage sync
+// $effect(() => {
+//   // Stop sync for all other managers
+//   loroManagers.forEach((manager, id) => {
+//     if (id !== notes.selectedNoteId) {
+//       manager.stopSync();
+//     }
+//   });
+//
+//   // Start sync for selected note
+//   if (notes.selectedNoteId) {
+//     const manager = loroManagers.get(notes.selectedNoteId);
+//     if (manager) {
+//       manager.startSync();
+//     } else {
+//       // Manager might not be created yet, getLoroManager will handle it
+//       getLoroManager(notes.selectedNoteId);
+//     }
+//   }
+// });
 
 // Create new note with encryption
 export async function createNote(
@@ -181,8 +180,8 @@ export async function createNote(
   isFolder = false,
 ) {
   try {
-    const user = currentUser;
-    console.log("createNote called, user:", user);
+    const user = auth.currentUser;
+    console.log("createNote called, user:", $state.snapshot(user));
 
     if (!user) {
       throw new Error("No user logged in");
@@ -218,8 +217,8 @@ export async function createNote(
       updatedAt: new Date(data.note.updatedAt),
     };
 
-    notes = [...notes, newNote];
-    selectedNoteId = newNote.id;
+    notes.notes = [...notes.notes, newNote];
+    notes.selectedNoteId = newNote.id;
 
     // Create Loro manager for the new note
     if (!isFolder) {
@@ -250,11 +249,11 @@ export async function deleteNote(noteId: string) {
 
     if (!res.ok) throw new Error("Failed to delete note");
 
-    notes = notes.filter((note) => note.id !== noteId);
+    notes.notes = notes.notes.filter((note) => note.id !== noteId);
 
     // Clear selection if deleted note was selected
-    if (selectedNoteId === noteId) {
-      selectedNoteId = null;
+    if (notes.selectedNoteId === noteId) {
+      notes.selectedNoteId = undefined;
     }
 
     // Clean up Loro manager
@@ -297,7 +296,7 @@ export async function updateNoteTitle(noteId: string, title: string) {
 
     if (!res.ok) throw new Error("Failed to update note");
 
-    notes = notes.map((note) =>
+    notes.notes = notes.notes.map((note) =>
       note.id === noteId ? { ...note, title } : note,
     );
   } catch (error) {
@@ -320,7 +319,7 @@ export async function moveNoteToFolder(
 
     if (!res.ok) throw new Error("Failed to move note");
 
-    notes = notes.map((note) =>
+    notes.notes = notes.notes.map((note) =>
       note.id === noteId ? { ...note, parentId: newParentId } : note,
     );
   } catch (error) {
@@ -356,7 +355,7 @@ export async function reorderNotes(
     if (!res.ok) throw new Error("Failed to reorder notes");
 
     // Update local state
-    notes = notes.map((note) => {
+    notes.notes = notes.notes.map((note) => {
       const update = updates.find((u) => u.id === note.id);
       return update ? { ...note, order: update.order } : note;
     });

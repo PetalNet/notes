@@ -10,12 +10,7 @@
     extractClosestEdge,
     type Edge,
   } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-  import {
-    selectedNoteId,
-    moveNoteToFolder,
-    reorderNotes,
-    notes,
-  } from "$lib/store.svelte.ts";
+  import { moveNoteToFolder, reorderNotes, notes } from "$lib/store.svelte.ts";
   import Self from "./TreeItem.svelte";
   import type { NoteOrFolder } from "$lib/schema.ts";
 
@@ -148,13 +143,13 @@
           if (sourceParentId === parentId) {
             const currentList =
               parentId === null
-                ? notes
+                ? notes.notes
                 : ((note) => {
                     if (note?.isFolder) {
                       return note.children;
                     }
                     return [];
-                  })(notes.find((f) => f.id === parentId));
+                  })(notes.notes.find((f) => f.id === parentId));
             const sourceIndex = currentList.findIndex((n) => n.id === sourceId);
             if (sourceIndex !== -1 && sourceIndex < targetIndex) {
               targetIndex -= 1;
@@ -248,7 +243,7 @@
       <!-- Nested Items -->
       {#if expandedFolders.has(item.id)}
         <div
-          class="mt-0.5 ml-4 min-h-[10px] space-y-0.5 border-l border-slate-200 pl-2"
+          class="mt-0.5 ml-4 min-h-2.5 space-y-0.5 border-l border-slate-200 pl-2"
           transition:slide|local={{ duration: 200 }}
         >
           {#each item.children ?? [] as child, idx (child.id)}
@@ -297,9 +292,9 @@
       onclick={() => selectNote(item.id)}
       class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-slate-600 transition-all hover:bg-white hover:text-indigo-600 hover:shadow-sm"
       oncontextmenu={(e) => handleContextMenu(e, item.id, false)}
-      class:bg-white={selectedNoteId === item.id}
-      class:shadow-sm={selectedNoteId === item.id}
-      class:text-indigo-600={selectedNoteId === item.id}
+      class:bg-white={notes.selectedNoteId === item.id}
+      class:shadow-sm={notes.selectedNoteId === item.id}
+      class:text-indigo-600={notes.selectedNoteId === item.id}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

@@ -3,9 +3,8 @@ import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
 import { addClient, removeClient } from "$lib/server/realTime";
-import type { RequestHandler } from "./$types";
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET = async ({ params, locals }) => {
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }

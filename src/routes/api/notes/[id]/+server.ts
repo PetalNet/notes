@@ -2,9 +2,8 @@ import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
-import type { RequestHandler } from "./$types";
 
-export const PATCH: RequestHandler = async ({ params, request, locals }) => {
+export const PATCH = async ({ params, request, locals }) => {
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -46,7 +45,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
   }
 };
 
-export const DELETE: RequestHandler = async ({ params, locals }) => {
+export const DELETE = async ({ params, locals }) => {
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }

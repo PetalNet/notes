@@ -188,7 +188,9 @@ export class LoroNoteManager {
    * Get encrypted snapshot for storage
    */
   async getEncryptedSnapshot(): Promise<string> {
-    const snapshot = this.doc.export({ mode: "snapshot" });
+    const snapshot = this.doc.export({
+      mode: "snapshot",
+    }) as Uint8Array<ArrayBuffer>;
     const encrypted = await encryptData(snapshot, this.noteKey);
     return this.bytesToBase64(encrypted);
   }

@@ -1,23 +1,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import {
-    notes,
     createNote,
     createFolder,
     updateNoteTitle,
     deleteNote,
-    selectedNoteId,
     reorderNotes,
     moveNoteToFolder,
-    noteTree,
+    getNoteTree,
     selectNote,
+    notes,
   } from "$lib/store.svelte.ts";
   import { fade } from "svelte/transition";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
+  import { SvelteSet } from "svelte/reactivity";
 
   let { user } = $props();
-  let expandedFolders = $state(new Set<string>());
+  let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<{
@@ -25,15 +25,14 @@
     y: number;
     noteId: string;
     isFolder: boolean;
-  } | null>(null);
+  }>();
+  let noteTree = $state(getNoteTree());
 
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
 
   // Set up root drop target
   onMount(() => {
-    if (!rootContainer) return;
-
     const cleanup = dropTargetForElements({
       element: rootContainer,
       onDragEnter: () => {
@@ -42,14 +41,14 @@
       onDragLeave: () => {
         isRootDropTarget = false;
       },
-      onDrop: async ({ source }) => {
+      onDrop: ({ source }) => {
         isRootDropTarget = false;
         const sourceId = source.data.id as string;
         const sourceParentId = source.data.parentId as string | null;
 
         // Move to root if it's not already there
         if (sourceParentId !== null) {
-          await moveNoteToFolder(sourceId, null);
+          void moveNoteToFolder(sourceId, null);
         }
       },
     });
@@ -58,13 +57,11 @@
   });
 
   function toggleFolder(folderId: string) {
-    const newSet = new Set(expandedFolders);
-    if (newSet.has(folderId)) {
-      newSet.delete(folderId);
+    if (expandedFolders.has(folderId)) {
+      expandedFolders.delete(folderId);
     } else {
-      newSet.add(folderId);
+      expandedFolders.add(folderId);
     }
-    expandedFolders = newSet;
   }
 
   function handleContextMenu(e: MouseEvent, noteId: string, isFolder: boolean) {
@@ -73,7 +70,7 @@
   }
 
   function closeContextMenu() {
-    contextMenu = null;
+    contextMenu = undefined;
   }
 
   async function handleRename() {
@@ -103,7 +100,7 @@
 
   // Handle reordering at root level
   async function handleRootReorder(sourceId: string, targetIndex: number) {
-    const rootItems = noteTree;
+    const rootItems = getNoteTree();
     const sourceIndex = rootItems.findIndex((item) => item.id === sourceId);
 
     let adjustedTargetIndex = targetIndex;
@@ -260,7 +257,7 @@
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
         onclick={() => {
-          createNote(contextMenu!.noteId);
+          void createNote(contextMenu?.noteId);
           closeContextMenu();
         }}
       >
@@ -285,7 +282,9 @@
     <button
       class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
       onclick={() => {
-        const noteToRename = notes.find((n) => n.id === contextMenu!.noteId);
+        const noteToRename = notes.notes.find(
+          (n) => n.id === contextMenu!.noteId,
+        );
         if (noteToRename) {
           startRename(noteToRename.id, noteToRename.title);
         }

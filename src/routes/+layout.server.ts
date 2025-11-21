@@ -1,8 +1,7 @@
-import type { LayoutServerLoad } from "./$types";
 import { eq } from "drizzle-orm";
 import { db } from "$lib/server/db";
 
-export const load: LayoutServerLoad = async ({ locals }) => {
+export const load = async ({ locals }) => {
   const localUser = locals.user;
 
   if (!localUser) {

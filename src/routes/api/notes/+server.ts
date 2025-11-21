@@ -1,21 +1,9 @@
 import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
-import type { RequestHandler } from "./$types";
+import { eq } from "drizzle-orm";
 
-export const GET: RequestHandler = async ({ locals }) => {
-  if (!locals.user) {
-    return json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const userNotes = await db.query.notes.findMany({
-    where: (notes, { eq }) => eq(notes.ownerId, locals.user.id),
-  });
-
-  return json({ notes: userNotes });
-};
-
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST = async ({ request, locals }) => {
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -42,7 +30,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     });
 
     const note = await db.query.notes.findFirst({
-      where: (notes, { eq }) => eq(notes.id, id),
+      where: (notes) => eq(notes.id, id),
     });
 
     return json({ note });

@@ -3,6 +3,9 @@
     "*.css": "tailwindcss"
   },
   "svelte.enable-ts-plugin": true,
+  "svelte.ask-to-enable-ts-plugin": false,
   "svelte.language-server.runtime": "node",
-  "eslint.validate": ["svelte"]
+  "eslint.validate": ["svelte"],
+  "typescript.tsdk": "./node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
 }

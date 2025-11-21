@@ -1,11 +1,10 @@
 import { json, error } from "@sveltejs/kit";
-import type { RequestHandler } from "./$types";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 // Batch reorder notes
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST = async ({ request, locals }) => {
   if (!locals.user) {
     return error(401, "Unauthorized");
   }
@@ -24,7 +23,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
     for (const { id, order: newOrder } of updates) {
       // Verify the note belongs to the user
       const note = await db.query.notes.findFirst({
-        where: (notes, { eq, and }) =>
+        where: (notes) =>
           and(eq(notes.id, id), eq(notes.ownerId, locals.user!.id)),
       });
 

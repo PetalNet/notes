@@ -105,7 +105,7 @@ export async function decryptKey(
 }
 
 export async function encryptData(
-  data: Uint8Array,
+  data: Uint8Array<ArrayBuffer>,
   noteKey: string,
 ): Promise<Uint8Array> {
   const keyBuffer = base64ToArrayBuffer(noteKey);

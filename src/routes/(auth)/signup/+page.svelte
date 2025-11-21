@@ -1,6 +1,7 @@
 <script lang="ts">
   import { generateUserKeys } from "$lib/crypto";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
 
   let username = $state("");
   let password = $state("");
@@ -40,7 +41,7 @@
         throw new Error(data.error || "Signup failed");
       }
 
-      goto("/");
+      goto(resolve("/"));
     } catch (e) {
       error = (e as Error).message;
     } finally {
@@ -61,9 +62,9 @@
       {/if}
 
       <form
-        onsubmit={(e) => {
+        onsubmit={async (e) => {
           e.preventDefault();
-          handleSignup();
+          await handleSignup();
         }}
       >
         <div class="form-control">
@@ -100,7 +101,9 @@
       </form>
 
       <div class="divider">OR</div>
-      <a href="/login" class="btn btn-ghost">Already have an account? Log in</a>
+      <a href={resolve("/login")} class="btn btn-ghost"
+        >Already have an account? Log in</a
+      >
     </div>
   </div>
 </div>

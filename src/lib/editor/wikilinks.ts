@@ -21,7 +21,7 @@ class WikilinkWidget extends WidgetType {
     span.onclick = (e) => {
       e.preventDefault();
       const allNotes = notes;
-      const targetNote = allNotes.find((n) => n.title === this.title);
+      const targetNote = allNotes.notes.find((n) => n.title === this.title);
       if (targetNote) {
         selectNote(targetNote.id);
       } else {

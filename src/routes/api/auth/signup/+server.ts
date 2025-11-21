@@ -1,10 +1,10 @@
 import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
-import { users, sessions } from "$lib/server/db/schema";
+import { users } from "$lib/server/db/schema";
 import bcrypt from "bcryptjs";
-import type { RequestHandler } from "./$types";
+import { eq } from "drizzle-orm";
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST = async ({ request, cookies }) => {
   try {
     const { username, password, publicKey, privateKeyEncrypted } =
       await request.json();
@@ -15,7 +15,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
     // Check if username already exists
     const existing = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.username, username),
+      where: (users) => eq(users.username, username),
     });
 
     if (existing) {

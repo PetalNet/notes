@@ -1,14 +1,12 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
   import "katex/dist/katex.min.css";
 
-  // CodeMirror imports
   import { EditorView, keymap } from "@codemirror/view";
-  import { EditorState } from "@codemirror/state";
   import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
   import { markdown } from "@codemirror/lang-markdown";
   import { languages } from "@codemirror/language-data";
   import { GFM } from "@lezer/markdown";
+  import { onMount, onDestroy } from "svelte";
 
   // Lucide icons
   import {
@@ -37,7 +35,7 @@
   }: { content: string; onchange: (newContent: string) => void } = $props();
 
   let editorElement: HTMLElement;
-  let editorView: EditorView = $state()!;
+  let editorView: EditorView;
 
   // Helper function to wrap selection with markdown syntax
   function wrapSelection(
@@ -69,8 +67,6 @@
 
   // Helper function to insert text at the start of the current line
   function insertAtLineStart(text: string) {
-    if (!editorView) return;
-
     const { from } = editorView.state.selection.main;
     const line = editorView.state.doc.lineAt(from);
 
@@ -149,7 +145,6 @@
           },
           ".cm-content": {
             minHeight: "100px",
-            maxWidth: "65ch",
             margin: "0 auto",
             caretColor: "var(--pm-cursor-color, black)",
             padding: "0",
@@ -167,14 +162,12 @@
   });
 
   onDestroy(() => {
-    if (editorView) {
-      editorView.destroy();
-    }
+    editorView.destroy();
   });
 
   // Update content if it changes externally (from Loro)
   $effect(() => {
-    if (editorView && content !== editorView.state.doc.toString()) {
+    if (content !== editorView.state.doc.toString()) {
       console.log("[Prosemark] External content update");
       editorView.dispatch({
         changes: {
@@ -193,28 +186,28 @@
     <div class="flex items-center gap-1">
       <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
         <button
-          onclick={() => editorView && wrapSelection(editorView, "**")}
+          onclick={() => wrapSelection(editorView, "**")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Bold (Cmd+B)"
         >
           <Bold size={18} />
         </button>
         <button
-          onclick={() => editorView && wrapSelection(editorView, "*")}
+          onclick={() => wrapSelection(editorView, "*")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Italic (Cmd+I)"
         >
           <Italic size={18} />
         </button>
         <button
-          onclick={() => editorView && wrapSelection(editorView, "~~")}
+          onclick={() => wrapSelection(editorView, "~~")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Strikethrough (Cmd+Shift+X)"
         >
           <Strikethrough size={18} />
         </button>
         <button
-          onclick={() => editorView && wrapSelection(editorView, "`")}
+          onclick={() => wrapSelection(editorView, "`")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Code (Cmd+E)"
         >
@@ -226,7 +219,7 @@
 
       <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
         <button
-          onclick={() => editorView && wrapSelection(editorView, "[", "](url)")}
+          onclick={() => wrapSelection(editorView, "[", "](url)")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Link (Cmd+K)"
         >
@@ -238,21 +231,21 @@
 
       <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
         <button
-          onclick={() => editorView && insertAtLineStart("# ")}
+          onclick={() => insertAtLineStart("# ")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Heading 1"
         >
           <Heading1 size={18} />
         </button>
         <button
-          onclick={() => editorView && insertAtLineStart("## ")}
+          onclick={() => insertAtLineStart("## ")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Heading 2"
         >
           <Heading2 size={18} />
         </button>
         <button
-          onclick={() => editorView && insertAtLineStart("### ")}
+          onclick={() => insertAtLineStart("### ")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Heading 3"
         >
@@ -264,14 +257,14 @@
 
       <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
         <button
-          onclick={() => editorView && insertAtLineStart("- ")}
+          onclick={() => insertAtLineStart("- ")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Bullet List"
         >
           <List size={18} />
         </button>
         <button
-          onclick={() => editorView && insertAtLineStart("1. ")}
+          onclick={() => insertAtLineStart("1. ")}
           class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
           title="Numbered List"
         >

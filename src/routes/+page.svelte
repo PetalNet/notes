@@ -11,6 +11,7 @@
     createNote,
     getLoroManager,
   } from "$lib/store.svelte.ts";
+  import type { LoroNoteManager } from "$lib/loro.js";
 
   let { data } = $props();
 
@@ -30,7 +31,7 @@
   });
 
   let selectedNote = $derived(notes.find((n) => n.id === selectedNoteId));
-  let loroManager = $state<any>(null);
+  let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
   let unsubscribeContent: (() => void) | null = null;
 
@@ -71,7 +72,7 @@
       });
     } else {
       console.log("[Page] No valid note selected or is folder");
-      loroManager = null;
+      loroManager = undefined;
       editorContent = "";
     }
   });
@@ -104,7 +105,7 @@
           // Update local state immediately to avoid jitter
           editorContent = newContent;
           // Update Loro
-          loroManager.updateContent(newContent);
+          loroManager?.updateContent(newContent);
         }}
       />
     {:else if selectedNote && selectedNote.isFolder}

@@ -11,12 +11,12 @@ export const webSocketServer = {
       server: server.httpServer as http.Server,
     });
 
-    wss.on("connection", (ws: any) => {
+    wss.on("connection", (ws) => {
       console.log("Client connected");
 
-      ws.on("message", (message: any) => {
+      ws.on("message", (message) => {
         // Broadcast to all other clients
-        wss.clients.forEach((client: any) => {
+        wss.clients.forEach((client) => {
           if (client !== ws && client.readyState === 1) {
             client.send(message);
           }

@@ -1,4 +1,4 @@
-import { LoroDoc, LoroText } from "loro-crdt";
+import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
 import diff from "fast-diff";
 import { encryptData, decryptData } from "./crypto";
 
@@ -44,8 +44,8 @@ export class LoroNoteManager {
         // or just export the whole update since last frontiers.
         try {
           const update = this.doc.export({
-            mode: "update",
-            from: this.lastFrontiers,
+            mode: "shallow-snapshot",
+            frontiers: this.lastFrontiers,
           });
           this.lastFrontiers = frontiers;
           this.sendUpdate(update);
@@ -80,7 +80,7 @@ export class LoroNoteManager {
     }
   }
 
-  private lastFrontiers: any; // Frontiers type depends on Loro version
+  private lastFrontiers: Frontiers;
 
   /**
    * Start real-time sync

@@ -58,10 +58,10 @@ export const noteTree = $derived.by(() => {
   });
 
   // Recursive function to sort children at all levels
-  const sortChildren = (items: any[]) => {
+  const sortChildren = (items: NoteOrFolder[]) => {
     items.sort((a, b) => a.order - b.order);
     items.forEach((item) => {
-      if (item.children && item.children.length > 0) {
+      if (item.isFolder && item.children.length > 0) {
         sortChildren(item.children);
       }
     });
@@ -101,7 +101,7 @@ async function decryptNoteKey(
 // Get or create Loro manager for a note
 export async function getLoroManager(
   noteId: string,
-): Promise<LoroNoteManager | null> {
+): Promise<LoroNoteManager | undefined> {
   // Return existing manager if available
   if (loroManagers.has(noteId)) {
     return loroManagers.get(noteId)!;
@@ -109,12 +109,12 @@ export async function getLoroManager(
 
   // Find the note
   const note = notes.find((n) => n.id === noteId);
-  if (!note) return null;
+  if (!note) return undefined;
 
   const privateKey = userPrivateKey;
   if (!privateKey) {
     console.error("No private key available");
-    return null;
+    return undefined;
   }
 
   try {
@@ -149,7 +149,7 @@ export async function getLoroManager(
     return manager;
   } catch (error) {
     console.error("Failed to decrypt note:", error);
-    return null;
+    return undefined;
   }
 }
 

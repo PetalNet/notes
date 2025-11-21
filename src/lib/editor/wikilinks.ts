@@ -4,9 +4,10 @@ import {
   MatchDecorator,
   EditorView,
   WidgetType,
+  type ViewUpdate,
 } from "@codemirror/view";
-import { get } from "svelte/store";
-import { notes, selectedNoteId } from "$lib/store";
+import { notes, selectNote } from "$lib/store.svelte.ts";
+import type { RangeSet } from "@codemirror/state";
 
 class WikilinkWidget extends WidgetType {
   constructor(readonly title: string) {
@@ -19,10 +20,10 @@ class WikilinkWidget extends WidgetType {
     span.textContent = `[[${this.title}]]`;
     span.onclick = (e) => {
       e.preventDefault();
-      const allNotes = get(notes);
+      const allNotes = notes;
       const targetNote = allNotes.find((n) => n.title === this.title);
       if (targetNote) {
-        selectedNoteId.set(targetNote.id);
+        selectNote(targetNote.id);
       } else {
         console.log("Note not found:", this.title);
         // Optional: Create note if not found?
@@ -46,11 +47,11 @@ const wikilinkMatcher = new MatchDecorator({
 
 export const wikilinks = ViewPlugin.fromClass(
   class {
-    bookmarks: any;
+    bookmarks: RangeSet<Decoration>;
     constructor(view: EditorView) {
       this.bookmarks = wikilinkMatcher.createDeco(view);
     }
-    update(update: any) {
+    update(update: ViewUpdate) {
       this.bookmarks = wikilinkMatcher.updateDeco(update, this.bookmarks);
     }
   },

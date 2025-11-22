@@ -203,7 +203,7 @@
     <div class="group relative">
       <button
         tabindex="0"
-        class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition-colors select-none hover:bg-slate-100"
+        class="flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition-all select-none hover:bg-white hover:text-indigo-600 hover:shadow-sm"
         onclick={() => toggleFolder(item.id)}
         oncontextmenu={(e) => handleContextMenu(e, item.id, true)}
         onkeydown={(e) => e.key === "Enter" && toggleFolder(item.id)}
@@ -218,7 +218,7 @@
           )}
         />
         <Folder class="text-indigo-400" />
-        <span class="flex-1 truncate">{item.title}</span>
+        <span class="flex-1 truncate text-start">{item.title}</span>
       </button>
 
       <!-- Nested Items -->
@@ -285,9 +285,9 @@
         "hover:bg-white": true,
         "hover:text-indigo-600": true,
         "hover:shadow-sm": true,
-        "bg-white": page.route.id === item.id,
-        "shadow-sm": page.route.id === item.id,
-        "text-indigo-600": page.route.id === item.id,
+        "bg-white": page.params.id === item.id,
+        "shadow-sm": page.params.id === item.id,
+        "text-indigo-600": page.params.id === item.id,
       }}
       oncontextmenu={(e) => handleContextMenu(e, item.id, false)}
     >

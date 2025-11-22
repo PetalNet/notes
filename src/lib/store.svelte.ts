@@ -174,7 +174,7 @@ export class Notes {
       this.#notesList = this.#notesList.filter((note) => note.id !== noteId);
 
       // Clear selection if deleted note was selected
-      if (page.data.id === noteId) {
+      if (page.params.id === noteId) {
         goto(resolve("/"));
       }
 

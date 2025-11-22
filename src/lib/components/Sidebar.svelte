@@ -23,7 +23,7 @@
   }
 
   interface Props {
-    user: User | null;
+    user: User | undefined;
   }
 
   let { user }: Props = $props();
@@ -157,7 +157,7 @@
   <div class="grid grid-cols-2 gap-2 p-3">
     <button
       onclick={async () => {
-        if (user?.publicKey === undefined) {
+        if (user === undefined) {
           throw new Error("Cannot create note whilst logged out.");
         }
 
@@ -168,7 +168,7 @@
     >
     <button
       onclick={async () => {
-        if (user?.publicKey === undefined) {
+        if (user === undefined) {
           throw new Error("Cannot create folder whilst logged out.");
         }
 
@@ -230,7 +230,7 @@
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
         onclick={() => {
-          if (user?.publicKey === undefined) {
+          if (user === undefined) {
             throw new Error("Cannot create note whilst logged out.");
           }
 

@@ -38,8 +38,8 @@ export interface Session {
 
 export type AuthData =
   | {
-      session: null;
-      user: null;
+      session: undefined;
+      user: undefined;
     }
   | {
       session: Session;
@@ -51,7 +51,12 @@ export async function validateSessionToken(token: string): Promise<AuthData> {
   const [result] = await db
     .select({
       // Adjust user table here to tweak returned data
-      user: { id: table.users.id, username: table.users.username },
+      user: {
+        id: table.users.id,
+        username: table.users.username,
+        publicKey: table.users.publicKey,
+        privateKeyEncrypted: table.users.privateKeyEncrypted,
+      },
       session: table.sessions,
     })
     .from(table.sessions)
@@ -65,7 +70,7 @@ export async function validateSessionToken(token: string): Promise<AuthData> {
     await db
       .delete(table.sessions)
       .where(eq(table.sessions.token, session.token));
-    return { session: null, user: null };
+    return { session: undefined, user: undefined };
   }
 
   const renewSession =

@@ -33,6 +33,6 @@ export type NoteOrFolder = Note | Folder;
 export interface User {
   id: string;
   username: string;
-  publicKey?: string;
-  privateKeyEncrypted?: string;
+  publicKey: string;
+  privateKeyEncrypted: string;
 }

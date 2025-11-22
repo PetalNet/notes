@@ -361,10 +361,6 @@ export async function getLoroManager(
 
     return manager;
   } catch (error) {
-    // FIXME: DOMException: Data provided to an operation does not meet requirements
-    const e = new Error("Failed to decrypt note", { cause: error });
-    e.stack = error.stack;
-
-    throw e;
+    throw new Error("Failed to decrypt note", { cause: error });
   }
 }

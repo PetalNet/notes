@@ -46,6 +46,7 @@ export default defineConfig(
       "**/*.svelte",
       "**/+{layout,page}.{svelte,server.ts}",
       "**/+server.ts",
+      "**/*.js",
     ],
     rules: {
       "@typescript-eslint/no-confusing-void-expression": "off",

@@ -2,7 +2,7 @@ import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
-import { broadcast } from "$lib/server/realTime";
+import { broadcast } from "$lib/server/real-time";
 
 export const POST = async ({ request, locals }) => {
   if (!locals.user) {

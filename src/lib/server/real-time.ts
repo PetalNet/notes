@@ -1,8 +1,6 @@
-import type { RequestEvent } from "@sveltejs/kit";
-
 // In-memory map of noteId to set of controller objects for SSE
 // Using ReadableStreamDefaultController for SvelteKit's custom stream response
-const clients: Map<string, Set<ReadableStreamDefaultController>> = new Map();
+const clients = new Map<string, Set<ReadableStreamDefaultController>>();
 
 export function addClient(
   noteId: string,

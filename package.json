@@ -83,11 +83,9 @@
     "@tiptap/extension-mathematics": "^3.11.0",
     "@tiptap/extension-typography": "^3.11.0",
     "@tiptap/starter-kit": "^3.11.0",
-    "@types/ws": "^8.18.1",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",
-    "crossws": "^0.4.1",
     "daisyui": "5.5.1-beta.2",
     "dotenv": "^17.2.3",
     "effect": "^3.19.5",
@@ -95,10 +93,8 @@
     "katex": "^0.16.25",
     "loro-crdt": "^1.9.0",
     "lucide-svelte": "^0.554.0",
-    "srvx": "^0.9.6",
     "tiptap-markdown": "^0.9.0",
-    "typescript-svelte-plugin": "^0.3.50",
-    "ws": "^8.18.3"
+    "typescript-svelte-plugin": "^0.3.50"
   },
   "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b"
 }

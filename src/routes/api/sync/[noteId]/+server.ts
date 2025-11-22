@@ -2,7 +2,7 @@ import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
-import { addClient, removeClient } from "$lib/server/realTime";
+import { addClient, removeClient } from "$lib/server/real-time";
 
 export const GET = async ({ params, locals }) => {
   if (!locals.user) {

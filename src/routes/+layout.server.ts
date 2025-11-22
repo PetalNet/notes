@@ -1,11 +1,16 @@
 import { eq } from "drizzle-orm";
 import { db } from "$lib/server/db";
+import type { User } from "$lib/schema.js";
 
-export const load = async ({ locals }) => {
+interface Data {
+  user: User | undefined;
+}
+
+export const load = async ({ locals }): Promise<Data> => {
   const localUser = locals.user;
 
   if (!localUser) {
-    return { user: null };
+    return { user: undefined };
   }
 
   // Get user with private key from database
@@ -21,6 +26,6 @@ export const load = async ({ locals }) => {
           publicKey: user.publicKey,
           privateKeyEncrypted: user.privateKeyEncrypted,
         }
-      : null,
+      : undefined,
   };
 };

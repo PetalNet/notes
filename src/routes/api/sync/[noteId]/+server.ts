@@ -25,8 +25,8 @@ export const GET = async ({ params, locals }) => {
   }
 
   // Create a stream for SSE
-  let controller: ReadableStreamDefaultController;
-  const stream = new ReadableStream({
+  let controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+  const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
     start(c) {
       controller = c;
       addClient(noteId, controller);
@@ -37,9 +37,7 @@ export const GET = async ({ params, locals }) => {
       );
     },
     cancel() {
-      if (controller) {
-        removeClient(noteId, controller);
-      }
+      removeClient(noteId, controller);
     },
   });
 

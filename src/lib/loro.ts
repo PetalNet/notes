@@ -29,7 +29,9 @@ export class LoroNoteManager {
     this.doc.subscribe((event) => {
       // Notify content listeners
       const content = this.text.toString();
-      this.contentListeners.forEach((listener) => listener(content));
+      this.contentListeners.forEach((listener) => {
+        listener(content);
+      });
 
       // Only trigger update if the change is local or we need to persist remote changes
       // For now, we persist everything to be safe
@@ -48,7 +50,7 @@ export class LoroNoteManager {
             frontiers: this.lastFrontiers,
           });
           this.lastFrontiers = frontiers;
-          this.sendUpdate(update);
+          void this.sendUpdate(update);
         } catch (e) {
           console.error("Error exporting update", e);
         }
@@ -170,16 +172,25 @@ export class LoroNoteManager {
 
     let index = 0;
     for (const [type, text] of diffs) {
-      if (type === 0) {
-        // EQUAL
-        index += text.length;
-      } else if (type === 1) {
-        // INSERT
-        this.text.insert(index, text);
-        index += text.length;
-      } else if (type === -1) {
+      switch (type) {
         // DELETE
-        this.text.delete(index, text.length);
+        case -1: {
+          this.text.delete(index, text.length);
+          break;
+        }
+
+        // EQUAL
+        case 0: {
+          index += text.length;
+          break;
+        }
+
+        // INSERT
+        case 1: {
+          this.text.insert(index, text);
+          index += text.length;
+          break;
+        }
       }
     }
   }

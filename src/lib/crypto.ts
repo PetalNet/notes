@@ -4,10 +4,12 @@
 
 import { Either, Encoding } from "effect";
 
-export async function generateUserKeys(): Promise<{
+interface KeyPair {
   publicKey: string;
   privateKey: string;
-}> {
+}
+
+export async function generateUserKeys(): Promise<KeyPair> {
   const keyPair = await crypto.subtle.generateKey(
     {
       name: "RSA-OAEP",

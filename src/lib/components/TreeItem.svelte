@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { slide } from "svelte/transition";
   import {
     draggable,
     dropTargetForElements,
@@ -10,15 +8,20 @@
     extractClosestEdge,
     type Edge,
   } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-  import { moveNoteToFolder, reorderNotes, notes } from "$lib/store.svelte.ts";
+  import { onMount } from "svelte";
+  import { slide } from "svelte/transition";
+  import { notes, type TreeNode } from "$lib/store.svelte.ts";
   import Self from "./TreeItem.svelte";
-  import type { NoteOrFolder } from "$lib/schema.ts";
+  import { ChevronRight, Folder, FileText } from "lucide-svelte";
+  import { clsx } from "clsx";
+  import { page } from "$app/state";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
 
   interface Props {
-    item: NoteOrFolder;
+    item: TreeNode;
     expandedFolders: Set<string>;
     toggleFolder: (id: string) => void;
-    selectNote: (id: string) => void;
     handleContextMenu: (e: MouseEvent, id: string, isFolder: boolean) => void;
     index: number;
     parentId?: string | null;
@@ -33,7 +36,6 @@
     item,
     expandedFolders,
     toggleFolder,
-    selectNote,
     handleContextMenu,
     index = 0,
     parentId = null,
@@ -46,8 +48,6 @@
   let isDropTarget = $state(false); // For "drop into" folder
 
   onMount(() => {
-    if (!element) return;
-
     // Make draggable
     const dragCleanup = draggable({
       element,
@@ -103,7 +103,7 @@
         closestEdge = null;
         isDropTarget = false;
       },
-      onDrop: async ({ source, self }) => {
+      onDrop: async ({ source }) => {
         const sourceId = source.data.id as string;
         const sourceParentId = source.data.parentId as string | null;
 
@@ -112,7 +112,7 @@
           isDropTarget = false;
           closestEdge = null;
           if (sourceId !== item.id && sourceParentId !== item.id) {
-            await moveNoteToFolder(sourceId, item.id);
+            await notes.moveNoteToFolder(sourceId, item.id);
             // Expand folder to show dropped item
             if (!expandedFolders.has(item.id)) {
               toggleFolder(item.id);
@@ -122,42 +122,39 @@
         }
 
         // 2. Reorder (Insert Before/After)
+        if (closestEdge == null) return;
         const edge = closestEdge;
         closestEdge = null;
         isDropTarget = false;
 
-        if (edge && onReorder) {
-          // Don't reorder if dropping on itself
-          if (sourceId === item.id) return;
+        // Don't reorder if dropping on itself
+        if (sourceId === item.id) return;
 
-          // Calculate target index
-          let targetIndex = index;
-          if (edge === "bottom") {
-            targetIndex += 1;
-          }
-
-          // Adjust targetIndex if source is before target in the same list
-          // This is necessary because removing an item shifts subsequent items' indices.
-          // If we're moving an item from an earlier position to a later position,
-          // the target index needs to be decremented by 1 to account for the removal.
-          if (sourceParentId === parentId) {
-            const currentList =
-              parentId === null
-                ? notes.notes
-                : ((note) => {
-                    if (note?.isFolder) {
-                      return note.children;
-                    }
-                    return [];
-                  })(notes.notes.find((f) => f.id === parentId));
-            const sourceIndex = currentList.findIndex((n) => n.id === sourceId);
-            if (sourceIndex !== -1 && sourceIndex < targetIndex) {
-              targetIndex -= 1;
-            }
-          }
-
-          await onReorder(sourceId, targetIndex, parentId);
+        // Calculate target index
+        let targetIndex = index;
+        if (edge === "bottom") {
+          targetIndex += 1;
         }
+
+        // Adjust targetIndex if source is before target in the same list
+        // This is necessary because removing an item shifts subsequent items' indices.
+        // If we're moving an item from an earlier position to a later position,
+        // the target index needs to be decremented by 1 to account for the removal.
+        if (sourceParentId === parentId) {
+          const currentList =
+            parentId === null
+              ? notes.notesList
+              : (() => {
+                  let note = notes.notesList.find((f) => f.id === parentId);
+                  return note?.isFolder ? note.children : [];
+                })();
+          const sourceIndex = currentList.findIndex((n) => n.id === sourceId);
+          if (sourceIndex !== -1 && sourceIndex < targetIndex) {
+            targetIndex -= 1;
+          }
+        }
+
+        await onReorder(sourceId, targetIndex, parentId);
       },
     });
 
@@ -189,56 +186,40 @@
 
   <!-- Drop Into Highlight -->
   <div
-    class="pointer-events-none absolute inset-0 rounded-md bg-indigo-100/50 transition-opacity duration-200"
-    class:opacity-100={isDropTarget}
-    class:opacity-0={!isDropTarget}
+    class={{
+      "pointer-events-none": true,
+      absolute: true,
+      "inset-0": true,
+      "rounded-md": true,
+      "bg-indigo-100/50": true,
+      "transition-opacity duration-200": true,
+      "opacity-100": isDropTarget,
+      "opacity-0": !isDropTarget,
+    }}
   ></div>
 
   {#if item.isFolder}
     <!-- Folder Item -->
     <div class="group relative">
-      <div
-        role="button"
+      <button
         tabindex="0"
         class="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition-colors select-none hover:bg-slate-100"
         onclick={() => toggleFolder(item.id)}
         oncontextmenu={(e) => handleContextMenu(e, item.id, true)}
         onkeydown={(e) => e.key === "Enter" && toggleFolder(item.id)}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="transition-transform duration-200 {expandedFolders.has(item.id)
-            ? 'rotate-90'
-            : ''}"
-        >
-          <polyline points="9 18 15 12 9 6"></polyline>
-        </svg>
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="text-indigo-400"
-        >
-          <path
-            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-          ></path>
-        </svg>
+        <ChevronRight
+          class={clsx(
+            // lucid-svelte doesn’t automatically wrap classes with clsx.
+            [
+              "transition-transform duration-200",
+              expandedFolders.has(item.id) && "rotate-90",
+            ],
+          )}
+        />
+        <Folder class="text-indigo-400" />
         <span class="flex-1 truncate">{item.title}</span>
-      </div>
+      </button>
 
       <!-- Nested Items -->
       {#if expandedFolders.has(item.id)}
@@ -246,17 +227,16 @@
           class="mt-0.5 ml-4 min-h-2.5 space-y-0.5 border-l border-slate-200 pl-2"
           transition:slide|local={{ duration: 200 }}
         >
-          {#each item.children ?? [] as child, idx (child.id)}
+          {#each item.children as child, idx (child.id)}
             <Self
               item={child}
               {expandedFolders}
               {toggleFolder}
-              {selectNote}
               {handleContextMenu}
               index={idx}
               parentId={item.id}
               onReorder={async (sourceId, targetIndex) => {
-                const children = item.children || [];
+                const children = item.children;
                 const sourceIndex = children.findIndex(
                   (c) => c.id === sourceId,
                 );
@@ -274,11 +254,11 @@
                     children.find((c) => c.id === sourceId)!,
                   )
                   .map((c, i) => ({ id: c.id, order: i }));
-                await reorderNotes(updates);
+                await notes.reorderNotes(updates);
               }}
             />
           {/each}
-          {#if !item.children || item.children.length === 0}
+          {#if item.children.length === 0}
             <div class="px-2 py-1.5 text-xs text-slate-400 italic">
               Empty folder
             </div>
@@ -289,32 +269,29 @@
   {:else}
     <!-- Note Item -->
     <button
-      onclick={() => selectNote(item.id)}
-      class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-slate-600 transition-all hover:bg-white hover:text-indigo-600 hover:shadow-sm"
+      onclick={() => goto(resolve("/notes/[id]", { id: item.id }))}
+      class={{
+        flex: true,
+        "w-full": true,
+        "items-center": true,
+        "gap-2": true,
+        "rounded-md": true,
+        "px-2": true,
+        "py-1.5": true,
+        "text-left": true,
+        "text-sm": true,
+        "text-slate-600": true,
+        "transition-all": true,
+        "hover:bg-white": true,
+        "hover:text-indigo-600": true,
+        "hover:shadow-sm": true,
+        "bg-white": page.route.id === item.id,
+        "shadow-sm": page.route.id === item.id,
+        "text-indigo-600": page.route.id === item.id,
+      }}
       oncontextmenu={(e) => handleContextMenu(e, item.id, false)}
-      class:bg-white={notes.selectedNoteId === item.id}
-      class:shadow-sm={notes.selectedNoteId === item.id}
-      class:text-indigo-600={notes.selectedNoteId === item.id}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="opacity-50"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-        ></path>
-        <polyline points="14 2 14 8 20 8"></polyline>
-        <line x1="16" y1="13" x2="8" y2="13"></line>
-        <line x1="16" y1="17" x2="8" y2="17"></line>
-        <polyline points="10 9 9 9 8 9"></polyline>
-      </svg>
+      <FileText />
       <span class="truncate">{item.title || "Untitled"}</span>
     </button>
   {/if}

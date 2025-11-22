@@ -1,22 +1,19 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import Sidebar from "$lib/components/Sidebar.svelte";
-  import Editor from "$lib/components/Editor.svelte";
+  import Editor from "$lib/components/codemirror/Editor.svelte";
   import {
-    setCurrentUser,
     setUserPrivateKey,
-    notes,
-    loadNotes,
     getLoroManager,
+    notes,
   } from "$lib/store.svelte.ts";
   import type { LoroNoteManager } from "$lib/loro.js";
+  import { FilePlus } from "lucide-svelte";
 
-  let { data } = $props();
+  let { params, data } = $props();
 
   onMount(async () => {
     if (data.user) {
-      setCurrentUser(data.user);
-
       // TODO: Decrypt private key with password
       // For now, using the encrypted key as-is (needs proper PBKDF2 implementation)
       if (data.user.privateKeyEncrypted) {
@@ -24,23 +21,18 @@
         setUserPrivateKey(atob(data.user.privateKeyEncrypted));
       }
 
-      await loadNotes();
+      await notes.load();
     }
   });
 
-  let selectedNote = $derived(
-    notes.notes.find((n) => n.id === notes.selectedNoteId),
-  );
+  let selectedNote = $derived(notes.notesList.find((n) => n.id === params.id));
   let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
   let unsubscribeContent: (() => void) | undefined = undefined;
 
   // Load Loro manager when note is selected
-  $effect(() => {
-    console.log(
-      "[Page] Effect triggered. SelectedNoteId:",
-      notes.selectedNoteId,
-    );
+  $effect.pre(() => {
+    console.log("[Page] Effect triggered. SelectedNoteId:", params.id);
 
     // Cleanup previous subscription
     if (unsubscribeContent) {
@@ -49,12 +41,9 @@
       unsubscribeContent = undefined;
     }
 
-    if (notes.selectedNoteId && selectedNote && !selectedNote.isFolder) {
-      console.log(
-        "[Page] Loading Loro manager for note:",
-        notes.selectedNoteId,
-      );
-      void getLoroManager(notes.selectedNoteId).then((manager) => {
+    if (params.id && selectedNote && !selectedNote.isFolder) {
+      console.log("[Page] Loading Loro manager for note:", params.id);
+      void getLoroManager(params.id).then((manager) => {
         console.log(
           "[Page] Loro manager loaded:",
           manager ? "Success" : "Failed",
@@ -123,21 +112,7 @@
           <div
             class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              ><path
-                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-              ></path><path d="M14 2v6h6"></path><path d="M12 18v-6"
-              ></path><path d="M9 15h6"></path></svg
-            >
+            <FilePlus />
           </div>
           <p class="mb-2 text-xl font-medium">No note selected</p>
           <p class="text-sm">
@@ -152,7 +127,7 @@
   <div
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
-    <p>Selected Note: {notes.selectedNoteId}</p>
+    <p>Selected Note: {selectedNote?.id}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>

@@ -1,32 +1,36 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    createNote,
-    createFolder,
-    updateNoteTitle,
-    deleteNote,
-    reorderNotes,
-    moveNoteToFolder,
-    getNoteTree,
-    selectNote,
-    notes,
-  } from "$lib/store.svelte.ts";
+  import { notes } from "$lib/store.svelte.ts";
   import { fade } from "svelte/transition";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
   import { SvelteSet } from "svelte/reactivity";
+  import {
+    FolderPlus,
+    FilePlus,
+    File,
+    Plus,
+    Trash2,
+    Pencil,
+  } from "lucide-svelte";
+  import type { User } from "$lib/schema.ts";
 
-  let { user } = $props();
-  let expandedFolders = new SvelteSet<string>();
-  let renamingId = $state<string | null>(null);
-  let renameTitle = $state("");
-  let contextMenu = $state<{
+  interface ContextState {
     x: number;
     y: number;
     noteId: string;
     isFolder: boolean;
-  }>();
-  let noteTree = $state(getNoteTree());
+  }
+
+  interface Props {
+    user: User | null;
+  }
+
+  let { user }: Props = $props();
+  let expandedFolders = new SvelteSet<string>();
+  let renamingId = $state<string | null>(null);
+  let renameTitle = $state("");
+  let contextMenu = $state<ContextState>();
 
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
@@ -48,7 +52,7 @@
 
         // Move to root if it's not already there
         if (sourceParentId !== null) {
-          void moveNoteToFolder(sourceId, null);
+          void notes.moveNoteToFolder(sourceId, null);
         }
       },
     });
@@ -75,7 +79,7 @@
 
   async function handleRename() {
     if (!renamingId) return;
-    await updateNoteTitle(renamingId, renameTitle);
+    await notes.updateNoteTitle(renamingId, renameTitle);
     renamingId = null;
     closeContextMenu();
   }
@@ -88,7 +92,7 @@
 
   async function handleDelete(noteId: string) {
     if (confirm("Are you sure you want to delete this note?")) {
-      await deleteNote(noteId);
+      await notes.deleteNote(noteId);
     }
     closeContextMenu();
   }
@@ -100,7 +104,7 @@
 
   // Handle reordering at root level
   async function handleRootReorder(sourceId: string, targetIndex: number) {
-    const rootItems = getNoteTree();
+    const rootItems = notes.notesTree;
     const sourceIndex = rootItems.findIndex((item) => item.id === sourceId);
 
     let adjustedTargetIndex = targetIndex;
@@ -117,7 +121,8 @@
         rootItems.find((item) => item.id === sourceId)!,
       )
       .map((item, i) => ({ id: item.id, order: i }));
-    await reorderNotes(updates);
+
+    await notes.reorderNotes(updates);
   }
 </script>
 
@@ -132,10 +137,10 @@
       <div
         class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600"
       >
-        {user.username[0].toUpperCase()}
+        {user?.username[0].toUpperCase() ?? "A"}
       </div>
       <span class="max-w-[100px] truncate text-sm font-medium text-slate-700"
-        >{user.username}</span
+        >{user?.username ?? "Anonymous"}</span
       >
     </div>
     <form action="/logout" method="POST">
@@ -151,68 +156,50 @@
   <!-- Actions -->
   <div class="grid grid-cols-2 gap-2 p-3">
     <button
-      onclick={() => createNote()}
+      onclick={async () => {
+        if (user?.publicKey === undefined) {
+          throw new Error("Cannot create note whilst logged out.");
+        }
+
+        await notes.createNote("Untitled Note", null, false, user.publicKey);
+      }}
       class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
+      ><FilePlus /> Note</button
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        ><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-        ></path><path d="M14 2v6h6"></path><path d="M12 18v-6"></path><path
-          d="M9 15h6"
-        ></path></svg
-      >
-      Note
-    </button>
     <button
-      onclick={() => createFolder("New Folder")}
+      onclick={async () => {
+        if (user?.publicKey === undefined) {
+          throw new Error("Cannot create folder whilst logged out.");
+        }
+
+        await notes.createFolder("New Folder", null, user.publicKey);
+      }}
       class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
+      ><FolderPlus /> Folder</button
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        ><path
-          d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
-        ></path><line x1="12" y1="11" x2="12" y2="17"></line><line
-          x1="9"
-          y1="14"
-          x2="15"
-          y2="14"
-        ></line></svg
-      >
-      Folder
-    </button>
   </div>
 
   <!-- Note Tree -->
   <div
     bind:this={rootContainer}
-    class="flex-1 space-y-0.5 overflow-y-auto px-2 py-2 transition-all"
-    class:ring-2={isRootDropTarget}
-    class:ring-indigo-400={isRootDropTarget}
-    class:ring-inset={isRootDropTarget}
-    class:bg-indigo-50={isRootDropTarget}
+    class={{
+      "flex-1": true,
+      "space-y-0.5": true,
+      "overflow-y-auto": true,
+      "px-2": true,
+      "py-2": true,
+      "transition-all": true,
+      "ring-2": isRootDropTarget,
+      "ring-indigo-400": isRootDropTarget,
+      "ring-inset": isRootDropTarget,
+      "bg-indigo-50": isRootDropTarget,
+    }}
   >
-    {#each noteTree as item, idx (item.id)}
+    {#each notes.notesTree as item, idx (item.id)}
       <TreeItem
         {item}
         {expandedFolders}
         {toggleFolder}
-        {selectNote}
         {handleContextMenu}
         index={idx}
         onReorder={handleRootReorder}
@@ -220,24 +207,9 @@
     {/each}
 
     <!-- Empty state -->
-    {#if noteTree.length === 0}
+    {#if notes.notesTree.length === 0}
       <div class="flex flex-col items-center justify-center py-12 text-center">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="48"
-          height="48"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="mb-3 text-slate-300"
-        >
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-          ></path>
-          <polyline points="14 2 14 8 20 8"></polyline>
-        </svg>
+        <File />
         <p class="text-sm text-slate-400">No notes yet</p>
         <p class="mt-1 text-xs text-slate-300">
           Create your first note to get started
@@ -249,6 +221,7 @@
 
 <!-- Context Menu -->
 {#if contextMenu}
+  {@const clickedId = contextMenu.noteId}
   <div
     class="animate-in fade-in zoom-in-95 fixed z-50 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-lg duration-100"
     style="top: {contextMenu.y}px; left: {contextMenu.x}px;"
@@ -257,74 +230,39 @@
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
         onclick={() => {
-          void createNote(contextMenu?.noteId);
+          if (user?.publicKey === undefined) {
+            throw new Error("Cannot create note whilst logged out.");
+          }
+
+          void notes.createNote(
+            "Untitled Note",
+            clickedId,
+            false,
+            user.publicKey,
+          );
           closeContextMenu();
-        }}
+        }}><Plus /> New Note Inside</button
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M12 5v14"></path>
-          <path d="M5 12h14"></path>
-        </svg>
-        New Note Inside
-      </button>
     {/if}
 
     <button
       class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
       onclick={() => {
-        const noteToRename = notes.notes.find(
-          (n) => n.id === contextMenu!.noteId,
-        );
+        const noteToRename = notes.notesList.find((n) => n.id === clickedId);
         if (noteToRename) {
           startRename(noteToRename.id, noteToRename.title);
         }
       }}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M17 3a2.83 2.83 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5Z"></path>
-      </svg>
+      <Pencil />
       Rename
     </button>
 
     <button
       class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-      onclick={() => handleDelete(contextMenu!.noteId)}
+      onclick={() => handleDelete(clickedId)}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M3 6h18"></path>
-        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
-      </svg>
+      <Trash2 />
       Delete
     </button>
   </div>
@@ -346,9 +284,9 @@
         bind:value={renameTitle}
         class="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
         placeholder="Enter new name..."
-        onkeydown={(e) => {
+        onkeydown={async (e) => {
           if (e.key === "Enter") {
-            handleRename();
+            await handleRename();
           } else if (e.key === "Escape") {
             renamingId = null;
           }

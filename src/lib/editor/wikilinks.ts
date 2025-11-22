@@ -6,30 +6,36 @@ import {
   WidgetType,
   type ViewUpdate,
 } from "@codemirror/view";
-import { notes, selectNote } from "$lib/store.svelte.ts";
+import { notes } from "$lib/store.svelte.ts";
 import type { RangeSet } from "@codemirror/state";
+import { goto } from "$app/navigation";
+import { resolve } from "$app/paths";
 
 class WikilinkWidget extends WidgetType {
-  constructor(readonly title: string) {
+  title: string;
+
+  constructor(title: string) {
     super();
+
+    this.title = title;
   }
 
   toDOM() {
-    const span = document.createElement("span");
-    span.className = "cm-wikilink cursor-pointer text-primary underline";
-    span.textContent = `[[${this.title}]]`;
-    span.onclick = (e) => {
+    const a = document.createElement("a");
+    a.className = "cursor-pointer text-primary underline";
+    a.textContent = `[[${this.title}]]`;
+    a.onclick = (e) => {
       e.preventDefault();
       const allNotes = notes;
-      const targetNote = allNotes.notes.find((n) => n.title === this.title);
+      const targetNote = allNotes.notesList.find((n) => n.title === this.title);
       if (targetNote) {
-        selectNote(targetNote.id);
+        goto(resolve("/notes/[id]", { id: targetNote.id }));
       } else {
         console.log("Note not found:", this.title);
         // Optional: Create note if not found?
       }
     };
-    return span;
+    return a;
   }
 
   ignoreEvent() {
@@ -59,7 +65,7 @@ export const wikilinks = ViewPlugin.fromClass(
     decorations: (instance) => instance.bookmarks,
     provide: (plugin) =>
       EditorView.atomicRanges.of((view) => {
-        return view.plugin(plugin)?.bookmarks || Decoration.none;
+        return view.plugin(plugin)?.bookmarks ?? Decoration.none;
       }),
   },
 );

@@ -1,7 +1,7 @@
 import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
 import { users } from "$lib/server/db/schema";
-import bcrypt from "bcryptjs";
+import bcrypt from "bcryptjs"; // TODO: argon2 as per lucia
 import { eq } from "drizzle-orm";
 import * as auth from "$lib/server/auth";
 

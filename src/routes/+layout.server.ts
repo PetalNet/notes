@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "$lib/server/db";
 import type { User } from "$lib/schema.js";
 
+// TODO: rebase on lucia, user prob shouldn't be in data
 interface Data {
   user: User | undefined;
 }

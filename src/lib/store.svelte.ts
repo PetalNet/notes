@@ -6,7 +6,7 @@ import type { Folder, Note, NoteOrFolder } from "./schema.ts";
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
-import { createSubscriber, SvelteMap } from "svelte/reactivity";
+import { SvelteMap } from "svelte/reactivity";
 
 //#region Tree
 export type TreeNode = NoteOrFolder & { children: TreeNode[] };
@@ -44,6 +44,8 @@ export function setUserPrivateKey(privateKey: string) {
 export class Notes {
   #notesList = $state<NoteOrFolder[]>([]);
 
+  #selectedNoteId = $derived(page.params.id);
+
   /** Derived note tree for sidebar. */
   #notesTree = $derived.by(() => {
     console.log("Recalculating note tree");
@@ -80,38 +82,15 @@ export class Notes {
     return tree;
   });
 
-  #subscribe;
-
-  constructor() {
-    this.#subscribe = createSubscriber((update) => {
-      // const selectedId = page.params.id;
-      // // Stop sync for all other managers
-      // for (const [id, manager] of loroManagers) {
-      //   if (id !== selectedId) {
-      //     manager.stopSync();
-      //   }
-      // }
-      // if (!selectedId) return;
-      // const manager = loroManagers.get(selectedId);
-      // if (manager) {
-      //   manager.startSync();
-      // } else {
-      //   // Manager might not exist yet; creation will start sync once ready
-      //   getLoroManager(selectedId).then(update);
-      // }
-      // return () => {
-      //   loroManagers.get(selectedId)?.stopSync();
-      // };
-    });
-  }
-
   get notesList(): NoteOrFolder[] {
-    this.#subscribe();
-
     return this.#notesList;
   }
   get notesTree(): TreeNode[] {
     return this.#notesTree;
+  }
+
+  get selectedNoteId(): string | undefined {
+    return this.#selectedNoteId;
   }
 
   /** Load current user's notes from the API. */
@@ -161,7 +140,7 @@ export class Notes {
         updatedAt: new Date(data.note.updatedAt),
       };
 
-      this.#notesList = [...notesList, newNote];
+      this.#notesList = [...this.#notesList, newNote];
       goto(resolve("/notes/[id]", { id: newNote.id }));
 
       // Create Loro manager for the new note
@@ -273,7 +252,7 @@ export class Notes {
     }
   }
   /** Reorder notes. */
-  async reorderNotes(updates: Array<{ id: string; order: number }>) {
+  async reorderNotes(updates: { id: string; order: number }[]) {
     try {
       const res = await fetch("/api/notes/reorder", {
         method: "POST",
@@ -306,6 +285,26 @@ export const notes = new Notes();
 
 // Loro managers per note
 const loroManagers = new SvelteMap<string, LoroNoteManager>();
+
+export async function syncSelectedNote(selectedId: string | undefined) {
+  for (const [id, manager] of loroManagers) {
+    if (id !== selectedId) {
+      manager.stopSync();
+    }
+  }
+
+  if (!selectedId) {
+    return;
+  }
+
+  const manager = loroManagers.get(selectedId);
+  if (manager) {
+    manager.startSync();
+    return;
+  }
+
+  await getLoroManager(selectedId);
+}
 
 // Decrypt note key with user's private key
 async function decryptNoteKey(
@@ -356,11 +355,16 @@ export async function getLoroManager(
 
     loroManagers.set(noteId, manager);
 
-    manager.startSync();
+    if (notes.selectedNoteId === noteId) {
+      manager.startSync();
+    }
 
     return manager;
   } catch (error) {
-    console.error("Failed to decrypt note:", error);
-    return undefined;
+    // FIXME: DOMException: Data provided to an operation does not meet requirements
+    const e = new Error("Failed to decrypt note", { cause: error });
+    e.stack = error.stack;
+
+    throw e;
   }
 }

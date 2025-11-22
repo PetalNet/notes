@@ -4,6 +4,7 @@ import { sha256 } from "@oslojs/crypto/sha2";
 import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
+import type { User } from "$lib/schema.ts";
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -15,7 +16,10 @@ export function generateSessionToken() {
   return token;
 }
 
-export async function createSession(token: string, userId: string) {
+export async function createSession(
+  token: string,
+  userId: string,
+): Promise<Session> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const session: table.Session = {
     token: sessionId,
@@ -26,7 +30,23 @@ export async function createSession(token: string, userId: string) {
   return session;
 }
 
-export async function validateSessionToken(token: string) {
+export interface Session {
+  token: string;
+  userId: string;
+  expiresAt: Date;
+}
+
+export type AuthData =
+  | {
+      session: null;
+      user: null;
+    }
+  | {
+      session: Session;
+      user: User;
+    };
+
+export async function validateSessionToken(token: string): Promise<AuthData> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
   const [result] = await db
     .select({
@@ -38,9 +58,6 @@ export async function validateSessionToken(token: string) {
     .innerJoin(table.users, eq(table.sessions.userId, table.users.id))
     .where(eq(table.sessions.token, sessionId));
 
-  if (!result) {
-    return { session: null, user: null };
-  }
   const { session, user } = result;
 
   const sessionExpired = Date.now() >= session.expiresAt.getTime();
@@ -63,10 +80,6 @@ export async function validateSessionToken(token: string) {
 
   return { session, user };
 }
-
-export type SessionValidationResult = Awaited<
-  ReturnType<typeof validateSessionToken>
->;
 
 export async function invalidateSession(sessionId: string) {
   await db.delete(table.sessions).where(eq(table.sessions.token, sessionId));

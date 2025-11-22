@@ -145,7 +145,7 @@
             parentId === null
               ? notes.notesList
               : (() => {
-                  let note = notes.notesList.find((f) => f.id === parentId);
+                  let note = notes.notesTree.find((f) => f.id === parentId);
                   return note?.isFolder ? note.children : [];
                 })();
           const sourceIndex = currentList.findIndex((n) => n.id === sourceId);

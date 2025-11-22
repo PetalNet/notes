@@ -21,10 +21,6 @@
       // Generate encryption keys
       const { publicKey, privateKey } = await generateUserKeys();
 
-      // For now, encrypt private key with password (simplified)
-      // In production, use PBKDF2 to derive encryption key
-      const privateKeyEncrypted = btoa(privateKey); // TODO: Proper encryption
-
       const res = await fetch("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -32,13 +28,13 @@
           username,
           password,
           publicKey,
-          privateKeyEncrypted,
+          privateKeyEncrypted: privateKey,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Signup failed");
+        throw new Error(data.error ?? "Signup failed");
       }
 
       goto(resolve("/"));
@@ -51,7 +47,7 @@
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
-  <div class="card w-96 bg-base-100 shadow-xl">
+  <div class="card w-96 bg-base-100 text-primary-content shadow-xl">
     <div class="card-body">
       <h2 class="card-title">Sign Up</h2>
 

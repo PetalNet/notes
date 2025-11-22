@@ -1,13 +1,14 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
 
-import type { SessionValidationResult } from "$lib/server/auth.ts";
+import type { User } from "$lib/schema.ts";
+import type { Session } from "$lib/server/auth.ts";
 
 declare global {
   namespace App {
     interface Locals {
-      user: SessionValidationResult["user"];
-      session: SessionValidationResult["session"];
+      user: User | undefined;
+      session: Session;
     }
 
     // interface Error {}

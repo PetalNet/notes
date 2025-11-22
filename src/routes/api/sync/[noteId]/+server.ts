@@ -20,7 +20,7 @@ export const GET = async ({ params, locals }) => {
   });
 
   if (!note || note.ownerId !== locals.user.id) {
-    // TODO: Add check for shared notes when federation is implemented
+    // TODO: Add check for shared notes when federation via ATProto is implemented
     return json({ error: "Not found or unauthorized" }, { status: 404 });
   }
 

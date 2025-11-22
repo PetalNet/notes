@@ -1,6 +1,7 @@
 import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
 import diff from "fast-diff";
 import { encryptData, decryptData } from "./crypto";
+import { Encoding, Function, Either } from "effect";
 
 export class LoroNoteManager {
   private noteId: string;
@@ -20,7 +21,7 @@ export class LoroNoteManager {
     this.noteKey = noteKey;
     this.doc = new LoroDoc();
     this.text = this.doc.getText("content");
-    this.onUpdate = onUpdate || (() => {});
+    this.onUpdate = onUpdate ?? Function.constVoid;
 
     // Initialize frontiers
     this.lastFrontiers = this.doc.frontiers();
@@ -94,12 +95,14 @@ export class LoroNoteManager {
     // Connect to SSE endpoint
     this.eventSource = new EventSource(`/api/sync/${this.noteId}`);
 
-    this.eventSource.onmessage = (event) => {
+    this.eventSource.onmessage = (event: MessageEvent<string>) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = JSON.parse(event.data) as unknown as { update: string };
         if (data.update) {
           // Apply remote update
-          const updateBytes = this.base64ToBytes(data.update);
+          const updateBytes = Encoding.decodeBase64(data.update).pipe(
+            Either.getOrThrow,
+          ) as Uint8Array<ArrayBuffer>;
           this.doc.import(updateBytes);
         }
       } catch (error) {
@@ -132,7 +135,7 @@ export class LoroNoteManager {
   private async sendUpdate(updates: Uint8Array) {
     // Assuming we can get the update bytes
     try {
-      const updateBase64 = this.bytesToBase64(updates);
+      const updateBase64 = Encoding.encodeBase64(updates);
       await fetch("/api/sync/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -203,7 +206,7 @@ export class LoroNoteManager {
       mode: "snapshot",
     }) as Uint8Array<ArrayBuffer>;
     const encrypted = await encryptData(snapshot, this.noteKey);
-    return this.bytesToBase64(encrypted);
+    return Encoding.encodeBase64(encrypted);
   }
 
   /**
@@ -211,7 +214,9 @@ export class LoroNoteManager {
    */
   async loadEncryptedSnapshot(encryptedSnapshot: string) {
     try {
-      const encryptedBytes = this.base64ToBytes(encryptedSnapshot);
+      const encryptedBytes = Encoding.decodeBase64(encryptedSnapshot).pipe(
+        Either.getOrThrow,
+      ) as Uint8Array<ArrayBuffer>;
       const decrypted = await decryptData(encryptedBytes, this.noteKey);
       this.doc.import(decrypted);
     } catch (error) {
@@ -232,23 +237,5 @@ export class LoroNoteManager {
    */
   commit() {
     this.doc.commit();
-  }
-
-  // Helper methods
-  private bytesToBase64(bytes: Uint8Array): string {
-    let binary = "";
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]);
-    }
-    return btoa(binary);
-  }
-
-  private base64ToBytes(base64: string): Uint8Array {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
   }
 }

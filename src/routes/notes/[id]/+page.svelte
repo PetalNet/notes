@@ -6,11 +6,12 @@
     setUserPrivateKey,
     getLoroManager,
     notes,
+    syncSelectedNote,
   } from "$lib/store.svelte.ts";
   import type { LoroNoteManager } from "$lib/loro.js";
   import { FilePlus } from "lucide-svelte";
 
-  let { params, data } = $props();
+  let { data } = $props();
 
   onMount(async () => {
     if (data.user) {
@@ -18,21 +19,25 @@
       // For now, using the encrypted key as-is (needs proper PBKDF2 implementation)
       if (data.user.privateKeyEncrypted) {
         // In production, this should decrypt with user's password
-        setUserPrivateKey(atob(data.user.privateKeyEncrypted));
+        // The crypto functions expect base64-encoded strings, so pass as-is
+        setUserPrivateKey(data.user.privateKeyEncrypted);
       }
 
       await notes.load();
     }
   });
 
-  let selectedNote = $derived(notes.notesList.find((n) => n.id === params.id));
+  let selectedNote = $derived(
+    notes.notesList.find((n) => n.id === notes.selectedNoteId),
+  );
   let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
   let unsubscribeContent: (() => void) | undefined = undefined;
 
   // Load Loro manager when note is selected
   $effect.pre(() => {
-    console.log("[Page] Effect triggered. SelectedNoteId:", params.id);
+    const selectedId = notes.selectedNoteId;
+    console.log("[Page] Effect triggered. SelectedNoteId:", selectedId);
 
     // Cleanup previous subscription
     if (unsubscribeContent) {
@@ -41,9 +46,10 @@
       unsubscribeContent = undefined;
     }
 
-    if (params.id && selectedNote && !selectedNote.isFolder) {
-      console.log("[Page] Loading Loro manager for note:", params.id);
-      void getLoroManager(params.id).then((manager) => {
+    if (selectedId && selectedNote && !selectedNote.isFolder) {
+      void syncSelectedNote(selectedId);
+      console.log("[Page] Loading Loro manager for note:", selectedId);
+      void getLoroManager(selectedId).then((manager) => {
         console.log(
           "[Page] Loro manager loaded:",
           manager ? "Success" : "Failed",
@@ -95,7 +101,7 @@
           loroManager?.updateContent(newContent);
         }}
       />
-    {:else if selectedNote && selectedNote.isFolder}
+    {:else if selectedNote?.isFolder}
       <div
         class="flex h-full items-center justify-center bg-slate-50 text-slate-400"
       >
@@ -127,7 +133,7 @@
   <div
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
-    <p>Selected Note: {selectedNote?.id}</p>
+    <p>Selected Note: {notes.selectedNoteId}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>

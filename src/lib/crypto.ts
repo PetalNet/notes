@@ -32,6 +32,10 @@ export async function generateUserKeys(): Promise<KeyPair> {
 
   return {
     publicKey: Encoding.encodeBase64(new Uint8Array(publicKeyData)),
+
+    // TODO: Proper encryption
+    // For now, encode private key to bash64
+    // In production, use PBKDF2 to derive encryption key
     privateKey: Encoding.encodeBase64(new Uint8Array(privateKeyData)),
   };
 }

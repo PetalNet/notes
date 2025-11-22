@@ -143,12 +143,12 @@
         >{user?.username ?? "Anonymous"}</span
       >
     </div>
-    <form action="/logout" method="POST">
+    <form action="?/logout" method="POST">
       <button
         type="submit"
         class="text-xs text-slate-400 transition-colors hover:text-slate-600"
       >
-        Logout
+        Log out
       </button>
     </form>
   </div>

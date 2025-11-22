@@ -25,7 +25,7 @@
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Login failed");
+        throw new Error(data.error ?? "Login failed");
       }
 
       goto(resolve("/"));
@@ -38,7 +38,7 @@
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
-  <div class="card w-96 bg-base-100 shadow-xl">
+  <div class="card w-96 bg-base-100 text-primary-content shadow-xl">
     <div class="card-body">
       <h2 class="card-title">Log In</h2>
 

@@ -27,6 +27,7 @@ export const NoteOrFolderSchema = Schema.Union(NoteSchema, FolderSchema);
 
 export type Note = typeof NoteSchema.Type;
 export type Folder = typeof FolderSchema.Type;
+// TODO: Add in Drawing support via Excalidraw
 export type NoteOrFolder = Note | Folder;
 
 export interface User {

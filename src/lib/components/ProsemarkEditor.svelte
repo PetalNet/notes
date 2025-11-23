@@ -10,26 +10,12 @@
   import { languages } from "@codemirror/language-data";
   import { GFM } from "@lezer/markdown";
 
-  // Lucide icons
-  import {
-    Bold,
-    Italic,
-    Strikethrough,
-    Code,
-    Link,
-    Heading1,
-    Heading2,
-    Heading3,
-    List,
-    ListOrdered,
-  } from "lucide-svelte";
-
   // Prosemark imports
   import {
     prosemarkBasicSetup,
-    prosemarkBaseThemeSetup,
     prosemarkMarkdownSyntaxExtensions,
   } from "@prosemark/core";
+  import EditorToolbar from "./EditorToolbar.svelte";
 
   let {
     content,
@@ -46,61 +32,107 @@
     after: string = before,
   ) {
     const { from, to } = view.state.selection.main;
-    const selectedText = view.state.doc.sliceString(from, to);
-
-    if (selectedText.length === 0) {
-      // No selection - insert markdown syntax and position cursor in the middle
-      view.dispatch({
-        changes: { from, to, insert: `${before}${after}` },
-        selection: { anchor: from + before.length },
-      });
-    } else {
-      // Has selection - wrap it and position cursor after
-      view.dispatch({
-        changes: { from, to, insert: `${before}${selectedText}${after}` },
-        selection: {
-          anchor: from + before.length + selectedText.length + after.length,
-        },
-      });
-    }
-
-    return true;
+    const selectedText = view.state.sliceDoc(from, to);
+    view.dispatch({
+      changes: { from, to, insert: `${before}${selectedText}${after}` },
+      selection: { anchor: from + before.length + selectedText.length },
+    });
+    view.focus();
   }
 
   // Helper function to insert text at the start of the current line
   function insertAtLineStart(text: string) {
     if (!editorView) return;
-
     const { from } = editorView.state.selection.main;
     const line = editorView.state.doc.lineAt(from);
-
     editorView.dispatch({
-      changes: { from: line.from, to: line.from, insert: text },
+      changes: { from: line.from, insert: text },
       selection: { anchor: line.from + text.length },
     });
+    editorView.focus();
+  }
+
+  function handleCommand(command: string, payload?: any) {
+    if (!editorView) return;
+
+    switch (command) {
+      case "bold":
+        wrapSelection(editorView, "**");
+        break;
+      case "italic":
+        wrapSelection(editorView, "*");
+        break;
+      case "strikethrough":
+        wrapSelection(editorView, "~~");
+        break;
+      case "code":
+        wrapSelection(editorView, "`");
+        break;
+      case "link":
+        wrapSelection(editorView, "[", "](url)");
+        break;
+      case "heading":
+        const level = payload || 1;
+        insertAtLineStart("#".repeat(level) + " ");
+        break;
+      case "bulletList":
+        insertAtLineStart("- ");
+        break;
+      case "orderedList":
+        insertAtLineStart("1. ");
+        break;
+    }
   }
 
   // Custom keyboard shortcuts for markdown formatting
   const markdownKeymap = [
-    { key: "Mod-b", run: (view: EditorView) => wrapSelection(view, "**") }, // Bold
-    { key: "Mod-i", run: (view: EditorView) => wrapSelection(view, "*") }, // Italic
+    {
+      key: "Mod-b",
+      run: (view: EditorView) => {
+        wrapSelection(view, "**");
+        return true;
+      },
+    }, // Bold
+    {
+      key: "Mod-i",
+      run: (view: EditorView) => {
+        wrapSelection(view, "*");
+        return true;
+      },
+    }, // Italic
     {
       key: "Mod-k",
-      run: (view: EditorView) => wrapSelection(view, "[", "](url)"),
+      run: (view: EditorView) => {
+        wrapSelection(view, "[", "](url)");
+        return true;
+      },
     }, // Link
-    { key: "Mod-e", run: (view: EditorView) => wrapSelection(view, "`") }, // Inline code
+    {
+      key: "Mod-e",
+      run: (view: EditorView) => {
+        wrapSelection(view, "`");
+        return true;
+      },
+    }, // Inline code
     {
       key: "Mod-Shift-x",
-      run: (view: EditorView) => wrapSelection(view, "~~"),
+      run: (view: EditorView) => {
+        wrapSelection(view, "~~");
+        return true;
+      },
     }, // Strikethrough
   ];
 
   onMount(() => {
-    // Initialize CodeMirror with Prosemark (following official docs)
+    console.log("[Prosemark] Initial content:", JSON.stringify(content));
+
+    // Initialize CodeMirror with Prosemark - minimal setup, no default styling
     editorView = new EditorView({
       doc: content,
       parent: editorElement,
       extensions: [
+        // Custom markdown keyboard shortcuts - MUST come first to override defaults
+        keymap.of(markdownKeymap),
         // Adds support for the Markdown language
         markdown({
           // adds support for standard syntax highlighting inside code fences
@@ -112,14 +144,11 @@
             ...prosemarkMarkdownSyntaxExtensions,
           ],
         }),
-        // Basic prosemark extensions
+        // Basic prosemark extensions (markdown hiding, etc.)
         prosemarkBasicSetup(),
-        // Theme extensions
-        prosemarkBaseThemeSetup(),
         // History support
         history(),
-        // Custom markdown keyboard shortcuts
-        keymap.of(markdownKeymap),
+        // Default keymaps come after custom ones
         keymap.of([...defaultKeymap, ...historyKeymap]),
         // Update listener
         EditorView.updateListener.of((update) => {
@@ -127,41 +156,13 @@
             const newContent = update.state.doc.toString();
             console.log(
               "[Prosemark] Content updated:",
-              newContent.slice(0, 50),
+              JSON.stringify(newContent),
             );
             onchange(newContent);
           }
         }),
-        // Custom theme
-        EditorView.theme({
-          "&": {
-            height: "100%",
-            fontSize: "16px",
-            fontFamily:
-              "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-            backgroundColor: "#ffffff",
-          },
-          ".cm-scroller": {
-            fontFamily: "inherit",
-            lineHeight: "1.5",
-            overflow: "auto",
-            padding: "16px",
-          },
-          ".cm-content": {
-            minHeight: "100px",
-            maxWidth: "65ch",
-            margin: "0 auto",
-            caretColor: "var(--pm-cursor-color, black)",
-            padding: "0",
-          },
-          ".cm-line": {
-            padding: "0",
-            lineHeight: "1.5",
-          },
-          "&.cm-focused": {
-            outline: "none",
-          },
-        }),
+        // Disable line wrapping to preserve exact newlines
+        EditorView.lineWrapping,
       ],
     });
   });
@@ -176,6 +177,11 @@
   $effect(() => {
     if (editorView && content !== editorView.state.doc.toString()) {
       console.log("[Prosemark] External content update");
+      console.log("[Prosemark] New content:", JSON.stringify(content));
+      console.log(
+        "[Prosemark] Current content:",
+        JSON.stringify(editorView.state.doc.toString()),
+      );
       editorView.dispatch({
         changes: {
           from: 0,
@@ -188,106 +194,56 @@
 </script>
 
 <div class="flex h-full flex-col bg-white">
-  <!-- Formatting Toolbar -->
-  <div class="border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
-    <div class="flex items-center gap-1">
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => editorView && wrapSelection(editorView, "**")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Bold (Cmd+B)"
-        >
-          <Bold size={18} />
-        </button>
-        <button
-          onclick={() => editorView && wrapSelection(editorView, "*")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Italic (Cmd+I)"
-        >
-          <Italic size={18} />
-        </button>
-        <button
-          onclick={() => editorView && wrapSelection(editorView, "~~")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Strikethrough (Cmd+Shift+X)"
-        >
-          <Strikethrough size={18} />
-        </button>
-        <button
-          onclick={() => editorView && wrapSelection(editorView, "`")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Code (Cmd+E)"
-        >
-          <Code size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => editorView && wrapSelection(editorView, "[", "](url)")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Link (Cmd+K)"
-        >
-          <Link size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => editorView && insertAtLineStart("# ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 1"
-        >
-          <Heading1 size={18} />
-        </button>
-        <button
-          onclick={() => editorView && insertAtLineStart("## ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 2"
-        >
-          <Heading2 size={18} />
-        </button>
-        <button
-          onclick={() => editorView && insertAtLineStart("### ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 3"
-        >
-          <Heading3 size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => editorView && insertAtLineStart("- ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Bullet List"
-        >
-          <List size={18} />
-        </button>
-        <button
-          onclick={() => editorView && insertAtLineStart("1. ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Numbered List"
-        >
-          <ListOrdered size={18} />
-        </button>
-      </div>
-    </div>
-  </div>
-
+  <EditorToolbar onCommand={handleCommand} />
   <!-- Editor Content -->
-  <div bind:this={editorElement} class="flex-1 overflow-y-auto"></div>
+  <div
+    bind:this={editorElement}
+    class="custom-editor flex-1 overflow-y-auto"
+  ></div>
 </div>
 
 <style>
-  /* Additional Prosemark styling */
-  :global(.cm-editor) {
-    height: 100%;
+  /* Shared editor styles */
+  .custom-editor {
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+      "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+      sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    padding: 16px;
+  }
+
+  /* Force font on all CodeMirror content */
+  :global(.cm-content),
+  :global(.cm-line) {
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+      "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+      sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+  }
+
+  :global(.cm-content) {
+    padding: 0 !important;
+  }
+
+  /* Hide all CodeMirror UI elements */
+  :global(.cm-gutters) {
+    display: none !important;
+  }
+
+  :global(.cm-lineNumbers) {
+    display: none !important;
+  }
+
+  :global(.cm-foldGutter) {
+    display: none !important;
+  }
+
+  /* Remove left padding from lines */
+  :global(.cm-line) {
+    padding-left: 0 !important;
   }
 </style>

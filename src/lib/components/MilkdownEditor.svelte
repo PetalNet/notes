@@ -9,7 +9,6 @@
     serializerCtx,
     remarkPluginsCtx,
   } from "@milkdown/core";
-  import remarkBreaks from "remark-breaks";
   import { commonmark } from "@milkdown/preset-commonmark";
   import { gfm } from "@milkdown/preset-gfm";
   import { listener, listenerCtx } from "@milkdown/plugin-listener";
@@ -37,6 +36,7 @@
     List,
     ListOrdered,
   } from "lucide-svelte";
+  import EditorToolbar from "./EditorToolbar.svelte";
 
   let {
     content,
@@ -47,12 +47,63 @@
   let editor: Editor | undefined;
   let isInternalUpdate = false;
 
+  function runCommand(command: any, payload?: any) {
+    if (editor) {
+      editor.action(callCommand(command, payload));
+    }
+  }
+
+  function handleCommand(command: string, payload?: any) {
+    switch (command) {
+      case "bold":
+        runCommand(toggleStrongCommand.key);
+        break;
+      case "italic":
+        runCommand(toggleEmphasisCommand.key);
+        break;
+      case "strikethrough":
+        runCommand(toggleStrikethroughCommand.key);
+        break;
+      case "code":
+        runCommand(toggleInlineCodeCommand.key);
+        break;
+      case "link":
+        runCommand(toggleLinkCommand.key);
+        break;
+      case "heading":
+        runCommand(wrapInHeadingCommand.key, payload || 1);
+        break;
+      case "bulletList":
+        runCommand(wrapInBulletListCommand.key);
+        break;
+      case "orderedList":
+        runCommand(wrapInOrderedListCommand.key);
+        break;
+    }
+  }
+
   onMount(async () => {
+    console.log("[Milkdown] Initial content:", JSON.stringify(content));
+    console.log(
+      "[Milkdown] Newline count:",
+      (content.match(/\n/g) || []).length,
+    );
+
+    // Preserve blank lines by converting them to empty paragraphs
+    // \n\n\n = 2 blank lines, \n\n\n\n\n = 4 blank lines, etc.
+    const processedContent = content.replace(/\n\n\n+/g, (match) => {
+      const blankLineCount = match.length - 1;
+      return "\n\n" + "&nbsp;\n\n".repeat(blankLineCount);
+    });
+    console.log(
+      "[Milkdown] Processed content:",
+      JSON.stringify(processedContent),
+    );
+
     editor = await Editor.make()
-      .use((ctx) => {
+      .config((ctx) => {
         ctx.set(rootCtx, editorElement);
-        ctx.set(defaultValueCtx, content);
-        return () => {};
+        ctx.set(defaultValueCtx, processedContent);
       })
       .use(commonmark)
       .use(gfm)
@@ -62,28 +113,31 @@
         // Listener for content changes
         ctx.get(listenerCtx).markdownUpdated((ctx, markdown, prevMarkdown) => {
           if (markdown !== prevMarkdown) {
+            console.log(
+              "[Milkdown] Content updated:",
+              JSON.stringify(markdown),
+            );
+            console.log(
+              "[Milkdown] Newline count:",
+              (markdown.match(/\n/g) || []).length,
+            );
+            // Remove the &nbsp; markers when sending back
+            let cleanedMarkdown = markdown.replace(/&nbsp;\n\n/g, "\n\n");
+            // Remove <br /> tags that Milkdown incorrectly adds (in any position)
+            cleanedMarkdown = cleanedMarkdown.replace(/<br\s*\/?\s*>/g, "");
+            // Clean up any resulting triple+ newlines back to double
+            cleanedMarkdown = cleanedMarkdown.replace(/\n{3,}/g, "\n\n");
             isInternalUpdate = true;
-            onchange(markdown);
+            onchange(cleanedMarkdown);
             isInternalUpdate = false;
           }
         });
         return () => {};
       })
-      .use((ctx) => {
-        ctx.update(remarkPluginsCtx, (prev) => [
-          ...(prev as any[]),
-          remarkBreaks,
-        ]);
-        return () => {};
-      })
       .create();
-  });
 
-  function runCommand(command: any, payload?: any) {
-    if (editor) {
-      editor.action(callCommand(command, payload));
-    }
-  }
+    console.log("[Milkdown] Editor created");
+  });
 
   onDestroy(() => {
     if (editor) {
@@ -92,22 +146,32 @@
   });
 
   // Handle external content updates
-  // Handle external content updates
   $effect(() => {
     if (editor && !isInternalUpdate) {
-      editor.action((ctx) => {
-        const view = ctx.get(editorViewCtx) as any; // Cast to any to avoid prosemirror types dependency
-        const { state } = view;
+      console.log(
+        "[Milkdown] External content update:",
+        JSON.stringify(content),
+      );
 
-        // Only update if content is different
-        // We skip serialization check for now to simplify, assuming !isInternalUpdate is enough
-        // and trusting that +page.svelte handles the loop prevention via onchange logic.
+      // Preserve blank lines
+      const processedContent = content.replace(/\n\n\n+/g, (match) => {
+        const blankLineCount = match.length - 1;
+        return "\n\n" + "&nbsp;\n\n".repeat(blankLineCount);
+      });
+      console.log(
+        "[Milkdown] Processed external content:",
+        JSON.stringify(processedContent),
+      );
+
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx) as any;
+        const { state } = view;
 
         const parser = ctx.get(parserCtx);
         const tr = state.tr.replaceWith(
           0,
           state.doc.content.size,
-          parser(content),
+          parser(processedContent),
         );
         view.dispatch(tr);
       });
@@ -116,101 +180,10 @@
 </script>
 
 <div class="flex h-full flex-col bg-white">
-  <!-- Formatting Toolbar -->
-  <div class="border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
-    <div class="flex items-center gap-1">
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => runCommand(toggleStrongCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Bold (Cmd+B)"
-        >
-          <Bold size={18} />
-        </button>
-        <button
-          onclick={() => runCommand(toggleEmphasisCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Italic (Cmd+I)"
-        >
-          <Italic size={18} />
-        </button>
-        <button
-          onclick={() => runCommand(toggleStrikethroughCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Strikethrough (Cmd+Shift+X)"
-        >
-          <Strikethrough size={18} />
-        </button>
-        <button
-          onclick={() => runCommand(toggleInlineCodeCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Code (Cmd+E)"
-        >
-          <Code size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => runCommand(toggleLinkCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Link (Cmd+K)"
-        >
-          <Link size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => runCommand(wrapInHeadingCommand.key, 1)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 1"
-        >
-          <Heading1 size={18} />
-        </button>
-        <button
-          onclick={() => runCommand(wrapInHeadingCommand.key, 2)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 2"
-        >
-          <Heading2 size={18} />
-        </button>
-        <button
-          onclick={() => runCommand(wrapInHeadingCommand.key, 3)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 3"
-        >
-          <Heading3 size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => runCommand(wrapInBulletListCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Bullet List"
-        >
-          <List size={18} />
-        </button>
-        <button
-          onclick={() => runCommand(wrapInOrderedListCommand.key)}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Numbered List"
-        >
-          <ListOrdered size={18} />
-        </button>
-      </div>
-    </div>
-  </div>
+  <EditorToolbar onCommand={handleCommand} />
   <div
     bind:this={editorElement}
-    class="milkdown-container prose max-w-none flex-1 cursor-text overflow-y-auto"
+    class="custom-editor milkdown-container"
     onclick={(e) => {
       if (e.target === editorElement) {
         editor?.action((ctx) => {
@@ -223,64 +196,98 @@
 </div>
 
 <style>
-  /* Match Prosemark styling */
-  :global(.milkdown-container .milkdown) {
-    font-family: "Inter", sans-serif;
-    background-color: #ffffff;
-    color: var(--color-slate-900);
-    min-height: 100%;
-    max-width: 65ch;
-    margin: 0 auto;
-    padding: 16px 16px 16px 24px; /* 16px + 8px gutter compensation */
+  /* Shared editor styles */
+  .custom-editor {
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+      "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+      sans-serif;
     font-size: 16px;
     line-height: 1.5;
+    padding: 16px;
   }
 
-  :global(.milkdown-container .milkdown .editor) {
-    outline: none;
-    white-space: pre-wrap;
+  /* Force font on all Milkdown/ProseMirror content */
+  :global(.milkdown),
+  :global(.ProseMirror),
+  :global(.ProseMirror *) {
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+      "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+      sans-serif !important;
+    font-size: 16px !important;
+    line-height: 1.5 !important;
+  }
+
+  .milkdown-container {
+    width: 100%;
     height: 100%;
   }
 
-  /* Remove top margin from the first element to prevent "running low" */
-  :global(.milkdown-container .prose > :first-child) {
-    margin-top: 0 !important;
+  /* Override Milkdown's default markdown styling */
+  :global(.milkdown strong),
+  :global(.milkdown b) {
+    font-weight: inherit !important;
   }
 
-  /* Override prose defaults to match Prosemark exactly */
-  :global(.milkdown-container .prose) {
-    color: var(--color-slate-900) !important;
-    max-width: 65ch;
+  :global(.milkdown em),
+  :global(.milkdown i) {
+    font-style: inherit !important;
   }
 
-  :global(.milkdown-container .prose h1),
-  :global(.milkdown-container .prose h2),
-  :global(.milkdown-container .prose h3),
-  :global(.milkdown-container .prose h4),
-  :global(.milkdown-container .prose h5),
-  :global(.milkdown-container .prose h6),
-  :global(.milkdown-container .prose strong),
-  :global(.milkdown-container .prose b),
-  :global(.milkdown-container .prose code),
-  :global(.milkdown-container .prose p) {
-    color: var(--color-slate-900) !important;
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
+  :global(.milkdown h1),
+  :global(.milkdown h2),
+  :global(.milkdown h3),
+  :global(.milkdown h4),
+  :global(.milkdown h5),
+  :global(.milkdown h6) {
+    font-size: inherit !important;
+    font-weight: inherit !important;
+    margin: 0 !important;
   }
 
-  :global(.milkdown-container .prose ul),
-  :global(.milkdown-container .prose ol),
-  :global(.milkdown-container .prose li),
-  :global(.milkdown-container .prose blockquote) {
-    color: var(--color-slate-900) !important;
+  :global(.milkdown code) {
+    background: none !important;
+    padding: 0 !important;
+    font-family: inherit !important;
   }
 
-  :global(.milkdown-container .prose a) {
-    color: #2563eb !important; /* Blue-600 */
-    text-decoration: none;
+  :global(.milkdown ul),
+  :global(.milkdown ol) {
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
-  :global(.milkdown-container .prose a:hover) {
-    text-decoration: underline;
+  /* Ensure br tags create line breaks */
+  :global(.milkdown br),
+  :global(.ProseMirror br) {
+    display: block !important;
+    content: "" !important;
+    margin: 0 !important;
+  }
+
+  /* Reset all ProseMirror default styling */
+  :global(.ProseMirror) {
+    padding: 0 !important;
+    margin: 0 !important;
+    outline: none !important;
+  }
+
+  :global(.ProseMirror p) {
+    margin: 0 !important;
+  }
+
+  :global(.ProseMirror-focused) {
+    outline: none !important;
+  }
+
+  /* Remove any Milkdown container styling */
+  :global(.milkdown) {
+    all: unset !important;
+  }
+
+  :global(.editor) {
+    all: unset !important;
   }
 </style>

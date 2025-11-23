@@ -1,0 +1,84 @@
+
+> notes@0.0.1 check /Users/hasenkap/Developer/notes
+> svelte-kit sync && svelte-check --tsconfig ./tsconfig.json
+
+Loading svelte-check in workspace: /Users/hasenkap/Developer/notes
+Getting Svelte diagnostics...
+
+/Users/hasenkap/Developer/notes/src/lib/crypto.ts:129:5
+Error: Argument of type 'Uint8Array<ArrayBufferLike>' is not assignable to parameter of type 'BufferSource'.
+  Type 'Uint8Array<ArrayBufferLike>' is not assignable to type 'ArrayBufferView<ArrayBuffer>'.
+    Types of property 'buffer' are incompatible.
+      Type 'ArrayBufferLike' is not assignable to type 'ArrayBuffer'.
+        Type 'SharedArrayBuffer' is missing the following properties from type 'ArrayBuffer': resizable, resize, detached, transfer, transferToFixedLength 
+    key,
+    data,
+  );
+
+/Users/hasenkap/Developer/notes/src/lib/editor/wikilinks.ts:9:39
+Error: Cannot find module '$lib/store' or its corresponding type declarations. 
+import { get } from "svelte/store";
+import { notes, selectedNoteId } from "$lib/store";
+
+/Users/hasenkap/Developer/notes/src/lib/editor/wikilinks.ts:23:26
+Error: 'allNotes' is of type 'unknown'. 
+      const allNotes = get(notes);
+      const targetNote = allNotes.find((n) => n.title === this.title);
+      if (targetNote) {
+
+/Users/hasenkap/Developer/notes/src/lib/editor/wikilinks.ts:23:41
+Error: Parameter 'n' implicitly has an 'any' type. 
+      const allNotes = get(notes);
+      const targetNote = allNotes.find((n) => n.title === this.title);
+      if (targetNote) {
+
+/Users/hasenkap/Developer/notes/src/routes/page.svelte.spec.ts:1:22
+Error: Cannot find module 'vitest/browser' or its corresponding type declarations. 
+import { page } from "vitest/browser";
+import { describe, expect, it } from "vitest";
+
+/Users/hasenkap/Developer/notes/src/routes/api/notes/+server.ts:12:49
+Error: 'locals.user' is possibly 'null'. 
+  const userNotes = await db.query.notes.findMany({
+    where: (notes, { eq }) => eq(notes.ownerId, locals.user.id),
+  });
+
+/Users/hasenkap/Developer/notes/src/lib/components/MilkdownEditor.svelte:211:3
+Warn: Visible, non-interactive elements with a click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as `<button type="button">` or `<a>` might be more appropriate
+https://svelte.dev/e/a11y_click_events_have_key_events (svelte)
+  </div>
+  <div
+    bind:this={editorElement}
+    class="milkdown-container prose max-w-none flex-1 cursor-text overflow-y-auto"
+    onclick={(e) => {
+      if (e.target === editorElement) {
+        editor?.action((ctx) => {
+          const view = ctx.get(editorViewCtx);
+          view.focus();
+        });
+      }
+    }}
+  ></div>
+</div>
+
+/Users/hasenkap/Developer/notes/src/lib/components/MilkdownEditor.svelte:211:3
+Warn: `<div>` with a click handler must have an ARIA role
+https://svelte.dev/e/a11y_no_static_element_interactions (svelte)
+  </div>
+  <div
+    bind:this={editorElement}
+    class="milkdown-container prose max-w-none flex-1 cursor-text overflow-y-auto"
+    onclick={(e) => {
+      if (e.target === editorElement) {
+        editor?.action((ctx) => {
+          const view = ctx.get(editorViewCtx);
+          view.focus();
+        });
+      }
+    }}
+  ></div>
+</div>
+
+====================================
+svelte-check found 6 errors and 2 warnings in 5 files
+ ELIFECYCLE  Command failed with exit code 1.

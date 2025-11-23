@@ -6,6 +6,7 @@ import * as auth from "$lib/server/auth";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
 import type { Actions, PageServerLoad } from "./$types";
+import { generateUserKeys } from "$lib/crypto";
 
 export const load: PageServerLoad = async (event) => {
   if (event.locals.user) {
@@ -79,11 +80,15 @@ export const actions: Actions = {
       parallelism: 1,
     });
 
+    const { publicKey, privateKey } = await generateUserKeys();
+
     try {
       await db.insert(table.users).values({
         id: userId,
         username,
         passwordHash,
+        publicKey,
+        privateKeyEncrypted: privateKey,
         createdAt: new Date(),
       } satisfies table.User);
 

@@ -5,8 +5,7 @@ import {
   EditorView,
   WidgetType,
 } from "@codemirror/view";
-import { get } from "svelte/store";
-import { notes, selectedNoteId } from "$lib/store";
+import { store } from "$lib/store.svelte";
 
 class WikilinkWidget extends WidgetType {
   constructor(readonly title: string) {
@@ -19,10 +18,10 @@ class WikilinkWidget extends WidgetType {
     span.textContent = `[[${this.title}]]`;
     span.onclick = (e) => {
       e.preventDefault();
-      const allNotes = get(notes);
+      const allNotes = store.notes;
       const targetNote = allNotes.find((n) => n.title === this.title);
       if (targetNote) {
-        selectedNoteId.set(targetNote.id);
+        store.selectNote(targetNote.id);
       } else {
         console.log("Note not found:", this.title);
         // Optional: Create note if not found?

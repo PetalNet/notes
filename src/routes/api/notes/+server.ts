@@ -9,7 +9,7 @@ export const GET: RequestHandler = async ({ locals }) => {
   }
 
   const userNotes = await db.query.notes.findMany({
-    where: (notes, { eq }) => eq(notes.ownerId, locals.user.id),
+    where: (notes, { eq }) => eq(notes.ownerId, locals.user!.id),
   });
 
   return json({ notes: userNotes });

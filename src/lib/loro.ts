@@ -26,7 +26,7 @@ export class LoroNoteManager {
     this.lastFrontiers = this.doc.frontiers();
 
     // Subscribe to changes
-    this.doc.subscribe((event) => {
+    this.doc.subscribe(async (event) => {
       // Notify content listeners
       const content = this.text.toString();
       this.contentListeners.forEach((listener) => listener(content));
@@ -34,23 +34,34 @@ export class LoroNoteManager {
       // Only trigger update if the change is local or we need to persist remote changes
       // For now, we persist everything to be safe
       const snapshot = this.doc.export({ mode: "snapshot" });
-      this.onUpdate(snapshot);
+      console.log(
+        "[Loro] Triggering onUpdate callback, snapshot size:",
+        snapshot.byteLength,
+      );
+      await this.onUpdate(snapshot);
 
       // Send update to server if syncing and change is local
-      if (this.isSyncing && event.by === "local") {
-        const frontiers = this.doc.frontiers();
-        // We need to be careful with export updates.
-        // For this MVP, let's just export the delta since last sync point if possible,
-        // or just export the whole update since last frontiers.
+      // Note: We skip SSE sync for now as it causes issues with manual text updates
+      // SSE sync is better suited for actual collaborative CRDT operations
+      // For now, we rely on the snapshot-based auto-save which works reliably
+      if (false && this.isSyncing && event.by === "local") {
         try {
-          const update = this.doc.export({
-            mode: "update",
-            from: this.lastFrontiers,
-          });
+          const frontiers = this.doc.frontiers();
+
+          // Only try to export update if we have previous frontiers
+          if (this.lastFrontiers && this.lastFrontiers.length > 0) {
+            const update = this.doc.export({
+              mode: "update",
+              from: this.lastFrontiers,
+            });
+            this.sendUpdate(update);
+          }
+
           this.lastFrontiers = frontiers;
-          this.sendUpdate(update);
         } catch (e) {
           console.error("Error exporting update", e);
+          // Fallback: just update lastFrontiers without sending
+          this.lastFrontiers = this.doc.frontiers();
         }
       }
     });
@@ -77,6 +88,8 @@ export class LoroNoteManager {
   async init(encryptedSnapshot?: string) {
     if (encryptedSnapshot) {
       await this.loadEncryptedSnapshot(encryptedSnapshot);
+      // Reset frontiers after loading snapshot to avoid export errors
+      this.lastFrontiers = this.doc.frontiers();
     }
   }
 
@@ -182,6 +195,9 @@ export class LoroNoteManager {
         this.text.delete(index, text.length);
       }
     }
+
+    // Commit the changes to trigger the subscription
+    this.doc.commit();
   }
 
   /**

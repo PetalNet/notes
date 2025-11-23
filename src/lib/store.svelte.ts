@@ -92,6 +92,20 @@ class NoteStore {
   }
 
   setUserPrivateKey(privateKey: string) {
+    // Handle double-encoded keys (TUlJ... -> MII...)
+    // This can happen if the key was base64 encoded twice
+    if (privateKey.startsWith("TUlJ")) {
+      try {
+        const decoded = atob(privateKey);
+        if (decoded.startsWith("MII")) {
+          console.log("Detected double-encoded private key, fixing...");
+          this.userPrivateKey = decoded;
+          return;
+        }
+      } catch (e) {
+        console.warn("Failed to attempt double-encoding fix:", e);
+      }
+    }
     this.userPrivateKey = privateKey;
   }
 
@@ -140,10 +154,14 @@ class NoteStore {
     }
 
     try {
+      console.log("Decrypting note key for:", noteId);
+      console.log("Encrypted Key length:", note.encryptedKey?.length);
+      console.log("Private Key length:", privateKey?.length);
       // Decrypt the note's encryption key
       const noteKey = await this.decryptNoteKey(note.encryptedKey, privateKey);
 
       // Create Loro manager with auto-save
+      console.log("Creating LoroNoteManager for:", noteId);
       const manager = new LoroNoteManager(noteId, noteKey, async (snapshot) => {
         // Auto-save on changes
         const encryptedSnapshot = await manager.getEncryptedSnapshot();
@@ -152,7 +170,10 @@ class NoteStore {
 
       // Initialize with encrypted snapshot
       if (note.loroSnapshot) {
+        console.log("Initializing manager with snapshot for:", noteId);
         await manager.init(note.loroSnapshot);
+      } else {
+        console.log("No snapshot for note:", noteId);
       }
 
       // Update note content
@@ -165,9 +186,11 @@ class NoteStore {
 
       // Start sync if this is the selected note
       if (this.selectedNoteId === noteId) {
+        console.log("Starting sync for:", noteId);
         manager.startSync();
       }
 
+      console.log("Returning new manager for:", noteId);
       return manager;
     } catch (error) {
       console.error("Failed to decrypt note:", error);
@@ -326,11 +349,18 @@ class NoteStore {
   // Helper function for API updates
   private async apiUpdateNote(noteId: string, loroSnapshot: string) {
     try {
+      console.log(
+        "Saving snapshot for note:",
+        noteId,
+        "length:",
+        loroSnapshot.length,
+      );
       await fetch(`/api/notes/${noteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ loroSnapshot }),
       });
+      console.log("Snapshot saved successfully for:", noteId);
     } catch (error) {
       console.error("API update error:", error);
     }

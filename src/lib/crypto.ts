@@ -82,24 +82,36 @@ export async function decryptKey(
   const encryptedBuffer = base64ToArrayBuffer(encryptedKey);
   const privateKeyBuffer = base64ToArrayBuffer(privateKey);
 
-  const key = await crypto.subtle.importKey(
-    "pkcs8",
-    privateKeyBuffer,
-    {
-      name: "RSA-OAEP",
-      hash: "SHA-256",
-    },
-    false,
-    ["decrypt"],
-  );
+  let key: CryptoKey;
+  try {
+    key = await crypto.subtle.importKey(
+      "pkcs8",
+      privateKeyBuffer,
+      {
+        name: "RSA-OAEP",
+        hash: "SHA-256",
+      },
+      false,
+      ["decrypt"],
+    );
+  } catch (e) {
+    console.error("Failed to import private key:", e);
+    throw e;
+  }
 
-  const decrypted = await crypto.subtle.decrypt(
-    {
-      name: "RSA-OAEP",
-    },
-    key,
-    encryptedBuffer,
-  );
+  let decrypted: ArrayBuffer;
+  try {
+    decrypted = await crypto.subtle.decrypt(
+      {
+        name: "RSA-OAEP",
+      },
+      key,
+      encryptedBuffer,
+    );
+  } catch (e) {
+    console.error("Failed to decrypt key data:", e);
+    throw e;
+  }
 
   return arrayBufferToBase64(decrypted);
 }
@@ -126,7 +138,7 @@ export async function encryptData(
       iv,
     },
     key,
-    data,
+    data as any,
   );
 
   // Prepend IV to encrypted data

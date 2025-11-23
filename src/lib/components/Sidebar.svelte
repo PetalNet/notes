@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import { store } from "$lib/store.svelte.ts";
   import { fade } from "svelte/transition";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
@@ -143,7 +144,12 @@
   <!-- Actions -->
   <div class="grid grid-cols-2 gap-2 p-3">
     <button
-      onclick={() => store.createNote()}
+      onclick={async () => {
+        const note = await store.createNote();
+        if (note) {
+          goto(`/notes/${note.id}`);
+        }
+      }}
       class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
     >
       <svg
@@ -204,7 +210,10 @@
         {item}
         {expandedFolders}
         {toggleFolder}
-        selectNote={(id) => store.selectNote(id)}
+        selectNote={(id) => {
+          store.selectNote(id);
+          goto(`/notes/${id}`);
+        }}
         {handleContextMenu}
         index={idx}
         onReorder={handleRootReorder}
@@ -271,8 +280,14 @@
     {#if contextMenu.isFolder}
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
-        onclick={() => {
-          store.createNote(contextMenu!.noteId);
+        onclick={async () => {
+          const note = await store.createNote(
+            "Untitled Note",
+            contextMenu!.noteId,
+          );
+          if (note) {
+            goto(`/notes/${note.id}`);
+          }
           closeContextMenu();
         }}
       >

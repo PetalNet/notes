@@ -2,41 +2,38 @@
   import { onMount, onDestroy } from "svelte";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import Editor from "$lib/components/Editor.svelte";
-  import {
-    setCurrentUser,
-    setUserPrivateKey,
-    notes,
-    selectedNoteId,
-    loadNotes,
-    createNote,
-    getLoroManager,
-  } from "$lib/store.svelte.ts";
+  import { store } from "$lib/store.svelte.ts";
 
   let { data } = $props();
 
   onMount(async () => {
     if (data.user) {
-      setCurrentUser(data.user);
+      store.setCurrentUser(data.user);
 
       // TODO: Decrypt private key with password
       // For now, using the encrypted key as-is (needs proper PBKDF2 implementation)
       if (data.user.privateKeyEncrypted) {
         // In production, this should decrypt with user's password
-        setUserPrivateKey(atob(data.user.privateKeyEncrypted));
+        store.setUserPrivateKey(atob(data.user.privateKeyEncrypted));
       }
 
-      await loadNotes();
+      await store.loadNotes();
     }
   });
 
-  let selectedNote = $derived(notes.find((n) => n.id === selectedNoteId));
+  let selectedNote = $derived(
+    store.notes?.find((n) => n.id === store.selectedNoteId),
+  );
   let loroManager = $state<any>(null);
   let editorContent = $state("");
   let unsubscribeContent: (() => void) | null = null;
 
   // Load Loro manager when note is selected
   $effect(() => {
-    console.log("[Page] Effect triggered. SelectedNoteId:", selectedNoteId);
+    console.log(
+      "[Page] Effect triggered. SelectedNoteId:",
+      store.selectedNoteId,
+    );
 
     // Cleanup previous subscription
     if (unsubscribeContent) {
@@ -45,9 +42,12 @@
       unsubscribeContent = null;
     }
 
-    if (selectedNoteId && selectedNote && !selectedNote.isFolder) {
-      console.log("[Page] Loading Loro manager for note:", selectedNoteId);
-      getLoroManager(selectedNoteId).then((manager) => {
+    if (store.selectedNoteId && selectedNote && !selectedNote.isFolder) {
+      console.log(
+        "[Page] Loading Loro manager for note:",
+        store.selectedNoteId,
+      );
+      store.getLoroManager(store.selectedNoteId).then((manager) => {
         console.log(
           "[Page] Loro manager loaded:",
           manager ? "Success" : "Failed",
@@ -85,7 +85,7 @@
 
   async function handleNewNote() {
     try {
-      await createNote("Untitled Note");
+      await store.createNote("Untitled Note");
     } catch (error) {
       console.error("Failed to create note:", error);
     }
@@ -153,7 +153,7 @@
   <div
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
-    <p>Selected Note: {selectedNoteId}</p>
+    <p>Selected Note: {store.selectedNoteId}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>

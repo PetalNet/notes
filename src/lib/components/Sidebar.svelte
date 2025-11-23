@@ -1,17 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import {
-    notes,
-    createNote,
-    createFolder,
-    updateNoteTitle,
-    deleteNote,
-    selectedNoteId,
-    reorderNotes,
-    moveNoteToFolder,
-    noteTree,
-    selectNote,
-  } from "$lib/store.svelte.ts";
+  import { store } from "$lib/store.svelte.ts";
   import { fade } from "svelte/transition";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
@@ -49,7 +38,7 @@
 
         // Move to root if it's not already there
         if (sourceParentId !== null) {
-          await moveNoteToFolder(sourceId, null);
+          await store.moveNoteToFolder(sourceId, null);
         }
       },
     });
@@ -78,7 +67,7 @@
 
   async function handleRename() {
     if (!renamingId) return;
-    await updateNoteTitle(renamingId, renameTitle);
+    await store.updateNoteTitle(renamingId, renameTitle);
     renamingId = null;
     closeContextMenu();
   }
@@ -91,7 +80,7 @@
 
   async function handleDelete(noteId: string) {
     if (confirm("Are you sure you want to delete this note?")) {
-      await deleteNote(noteId);
+      await store.deleteNote(noteId);
     }
     closeContextMenu();
   }
@@ -103,7 +92,7 @@
 
   // Handle reordering at root level
   async function handleRootReorder(sourceId: string, targetIndex: number) {
-    const rootItems = noteTree;
+    const rootItems = store.noteTree;
     const sourceIndex = rootItems.findIndex((item) => item.id === sourceId);
 
     let adjustedTargetIndex = targetIndex;
@@ -120,7 +109,7 @@
         rootItems.find((item) => item.id === sourceId)!,
       )
       .map((item, i) => ({ id: item.id, order: i }));
-    await reorderNotes(updates);
+    await store.reorderNotes(updates);
   }
 </script>
 
@@ -154,7 +143,7 @@
   <!-- Actions -->
   <div class="grid grid-cols-2 gap-2 p-3">
     <button
-      onclick={() => createNote()}
+      onclick={() => store.createNote()}
       class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
     >
       <svg
@@ -175,7 +164,7 @@
       Note
     </button>
     <button
-      onclick={() => createFolder("New Folder")}
+      onclick={() => store.createFolder("New Folder")}
       class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
     >
       <svg
@@ -210,12 +199,12 @@
     class:ring-inset={isRootDropTarget}
     class:bg-indigo-50={isRootDropTarget}
   >
-    {#each noteTree as item, idx (item.id)}
+    {#each store.noteTree as item, idx (item.id)}
       <TreeItem
         {item}
         {expandedFolders}
         {toggleFolder}
-        {selectNote}
+        selectNote={(id) => store.selectNote(id)}
         {handleContextMenu}
         index={idx}
         onReorder={handleRootReorder}
@@ -223,7 +212,7 @@
     {/each}
 
     <!-- Empty state -->
-    {#if noteTree.length === 0}
+    {#if store.noteTree.length === 0}
       <div class="flex flex-col items-center justify-center py-12 text-center">
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -248,6 +237,29 @@
       </div>
     {/if}
   </div>
+  <!-- Editor Mode Toggle -->
+  <div class="mt-auto border-t border-slate-200 p-4">
+    <div class="flex items-center justify-between rounded-lg bg-slate-100 p-1">
+      <button
+        class="flex-1 cursor-pointer rounded-md py-1 text-xs font-medium transition-all {store.editorMode ===
+        'prosemark'
+          ? 'bg-white text-indigo-600 shadow-sm'
+          : 'text-slate-500 hover:text-slate-700'}"
+        onclick={() => (store.editorMode = "prosemark")}
+      >
+        Prosemark
+      </button>
+      <button
+        class="flex-1 cursor-pointer rounded-md py-1 text-xs font-medium transition-all {store.editorMode ===
+        'milkdown'
+          ? 'bg-white text-indigo-600 shadow-sm'
+          : 'text-slate-500 hover:text-slate-700'}"
+        onclick={() => (store.editorMode = "milkdown")}
+      >
+        Milkdown
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- Context Menu -->
@@ -260,7 +272,7 @@
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
         onclick={() => {
-          createNote(contextMenu!.noteId);
+          store.createNote(contextMenu!.noteId);
           closeContextMenu();
         }}
       >
@@ -285,7 +297,9 @@
     <button
       class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
       onclick={() => {
-        const noteToRename = notes.find((n) => n.id === contextMenu!.noteId);
+        const noteToRename = store.notes.find(
+          (n) => n.id === contextMenu!.noteId,
+        );
         if (noteToRename) {
           startRename(noteToRename.id, noteToRename.title);
         }

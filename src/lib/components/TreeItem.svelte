@@ -10,12 +10,7 @@
     extractClosestEdge,
     type Edge,
   } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-  import {
-    selectedNoteId,
-    moveNoteToFolder,
-    reorderNotes,
-    notes,
-  } from "$lib/store.svelte.ts";
+  import { store } from "$lib/store.svelte.ts";
   import Self from "./TreeItem.svelte";
   import type { NoteOrFolder } from "$lib/schema.ts";
 
@@ -117,7 +112,7 @@
           isDropTarget = false;
           closestEdge = null;
           if (sourceId !== item.id && sourceParentId !== item.id) {
-            await moveNoteToFolder(sourceId, item.id);
+            await store.moveNoteToFolder(sourceId, item.id);
             // Expand folder to show dropped item
             if (!expandedFolders.has(item.id)) {
               toggleFolder(item.id);
@@ -148,13 +143,13 @@
           if (sourceParentId === parentId) {
             const currentList =
               parentId === null
-                ? notes
+                ? store.notes
                 : ((note) => {
                     if (note?.isFolder) {
                       return note.children;
                     }
                     return [];
-                  })(notes.find((f) => f.id === parentId));
+                  })(store.notes.find((f) => f.id === parentId));
             const sourceIndex = currentList.findIndex((n) => n.id === sourceId);
             if (sourceIndex !== -1 && sourceIndex < targetIndex) {
               targetIndex -= 1;
@@ -279,7 +274,7 @@
                     children.find((c) => c.id === sourceId)!,
                   )
                   .map((c, i) => ({ id: c.id, order: i }));
-                await reorderNotes(updates);
+                await store.reorderNotes(updates);
               }}
             />
           {/each}
@@ -297,9 +292,9 @@
       onclick={() => selectNote(item.id)}
       class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm text-slate-600 transition-all hover:bg-white hover:text-indigo-600 hover:shadow-sm"
       oncontextmenu={(e) => handleContextMenu(e, item.id, false)}
-      class:bg-white={selectedNoteId === item.id}
-      class:shadow-sm={selectedNoteId === item.id}
-      class:text-indigo-600={selectedNoteId === item.id}
+      class:bg-white={store.selectedNoteId === item.id}
+      class:shadow-sm={store.selectedNoteId === item.id}
+      class:text-indigo-600={store.selectedNoteId === item.id}
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"

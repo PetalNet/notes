@@ -1,23 +1,24 @@
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import {
-  markdownKeymap as langMdKeymap,
-  markdown,
-} from "@codemirror/lang-markdown";
+import { markdown } from "@codemirror/lang-markdown";
 import { languages } from "@codemirror/language-data";
 import { EditorView, keymap, type KeyBinding } from "@codemirror/view";
 import { GFM } from "@lezer/markdown";
 import {
-  prosemarkBaseThemeSetup,
   prosemarkBasicSetup,
+  prosemarkLightThemeSetup,
   prosemarkMarkdownSyntaxExtensions,
 } from "@prosemark/core";
+import {
+  pastePlainTextExtension,
+  pasteRichTextExtension,
+} from "@prosemark/paste-rich-text";
+import { htmlBlockExtension } from "@prosemark/render-html";
 
 // Helper function to wrap selection with markdown syntax
 export function wrapSelection(
   view: EditorView,
   before: string,
   after: string = before,
-) {
+): void {
   const { from, to } = view.state.selection.main;
   const selectedText = view.state.doc.sliceString(from, to);
 
@@ -36,12 +37,10 @@ export function wrapSelection(
       },
     });
   }
-
-  return true;
 }
 
 // Helper function to insert text at the start of the current line
-export function insertAtLineStart(view: EditorView, text: string) {
+export function insertAtLineStart(view: EditorView, text: string): void {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
 
@@ -51,15 +50,53 @@ export function insertAtLineStart(view: EditorView, text: string) {
   });
 }
 
-// Custom keyboard shortcuts for markdown formatting
+/** Custom keyboard shortcuts for markdown formatting. */
 export const markdownKeymap: KeyBinding[] = [
-  ...langMdKeymap,
+  {
+    // Bold
+    key: "Mod-b",
+    run: (view) => {
+      wrapSelection(view, "**");
 
-  { key: "Mod-b", run: (view) => wrapSelection(view, "**") }, // Bold
-  { key: "Mod-i", run: (view) => wrapSelection(view, "*") }, // Italic
-  { key: "Mod-k", run: (view) => wrapSelection(view, "[", "](url)") }, // Link
-  { key: "Mod-e", run: (view) => wrapSelection(view, "`") }, // Inline code
-  { key: "Mod-Shift-x", run: (view) => wrapSelection(view, "~~") }, // Strikethrough
+      return true;
+    },
+  },
+  {
+    // Italic
+    key: "Mod-i",
+    run: (view) => {
+      wrapSelection(view, "*");
+
+      return true;
+    },
+  },
+  {
+    // Link
+    key: "Mod-k",
+    run: (view) => {
+      wrapSelection(view, "[", "](url)");
+
+      return true;
+    },
+  },
+  {
+    // Inline code
+    key: "Mod-e",
+    run: (view) => {
+      wrapSelection(view, "`");
+
+      return true;
+    },
+  },
+  {
+    // Strikethrough
+    key: "Mod-Shift-x",
+    run: (view) => {
+      wrapSelection(view, "~~");
+
+      return true;
+    },
+  },
 ];
 
 export const coreExtensions = [
@@ -77,10 +114,10 @@ export const coreExtensions = [
   // Basic prosemark extensions
   prosemarkBasicSetup(),
   // Theme extensions
-  prosemarkBaseThemeSetup(),
-  // History support
-  history(),
+  prosemarkLightThemeSetup(),
+  htmlBlockExtension,
+  pasteRichTextExtension(),
+  pastePlainTextExtension(),
   // Custom markdown keyboard shortcuts
   keymap.of(markdownKeymap),
-  keymap.of([...defaultKeymap, ...historyKeymap]),
 ];

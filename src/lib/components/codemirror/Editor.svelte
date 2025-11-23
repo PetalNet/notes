@@ -13,13 +13,14 @@
     List,
     ListOrdered,
     Strikethrough,
-  } from "lucide-svelte";
+  } from "@lucide/svelte";
   import Codemirror from "./Codemirror.svelte";
   import {
     coreExtensions,
     insertAtLineStart,
     wrapSelection,
   } from "./Editor.ts";
+  import Toolbar from "./Toolbar.svelte";
 
   interface Props {
     content: string;
@@ -37,7 +38,6 @@
       height: "100%",
       fontSize: "16px",
       fontFamily: "Inter, system-ui, Avenir, Helvetica, Arial, sans-serif",
-      backgroundColor: "#ffffff",
     },
     ".cm-scroller": {
       fontFamily: "inherit",
@@ -91,101 +91,72 @@
   });
 </script>
 
-<div class="flex h-full flex-col bg-white">
-  <!-- Formatting Toolbar -->
-  <div class="border-b border-gray-200 bg-white px-4 py-2 shadow-sm">
-    <div class="flex items-center gap-1">
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => wrapSelection(editorView, "**")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Bold (Cmd+B)"
-        >
-          <Bold size={18} />
-        </button>
-        <button
-          onclick={() => wrapSelection(editorView, "*")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Italic (Cmd+I)"
-        >
-          <Italic size={18} />
-        </button>
-        <button
-          onclick={() => wrapSelection(editorView, "~~")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Strikethrough (Cmd+Shift+X)"
-        >
-          <Strikethrough size={18} />
-        </button>
-        <button
-          onclick={() => wrapSelection(editorView, "`")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Code (Cmd+E)"
-        >
-          <Code size={18} />
-        </button>
-      </div>
+<div class="flex h-full flex-col">
+  <Toolbar
+    tools={[
+      [
+        {
+          title: "Bold (Cmd+B)",
+          onclick: () => wrapSelection(editorView, "**"),
+          icon: Bold,
+        },
+        {
+          title: "Italic (Cmd+I)",
+          onclick: () => wrapSelection(editorView, "*"),
+          icon: Italic,
+        },
+        {
+          title: "Strikethrough (Cmd+Shift+X)",
+          onclick: () => wrapSelection(editorView, "~~"),
+          icon: Strikethrough,
+        },
+        {
+          title: "Code (Cmd+E)",
+          onclick: () => wrapSelection(editorView, "`"),
+          icon: Code,
+        },
+      ],
+      [
+        {
+          title: "Link (Cmd+K)",
+          onclick: () => wrapSelection(editorView, "[", "](url)"),
+          icon: Link,
+        },
+      ],
+      [
+        {
+          title: "Heading 1",
+          onclick: () => insertAtLineStart(editorView, "# "),
+          icon: Heading1,
+        },
+        {
+          title: "Heading 2",
+          onclick: () => insertAtLineStart(editorView, "## "),
+          icon: Heading2,
+        },
+        {
+          title: "Heading 3",
+          onclick: () => insertAtLineStart(editorView, "### "),
+          icon: Heading3,
+        },
+      ],
+      [
+        {
+          onclick: () => insertAtLineStart(editorView, "- "),
+          title: "Bullet List",
 
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
+          icon: List,
+        },
+        {
+          onclick: () => insertAtLineStart(editorView, "1. "),
+          title: "Numbered List",
 
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => wrapSelection(editorView, "[", "](url)")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Link (Cmd+K)"
-        >
-          <Link size={18} />
-        </button>
-      </div>
+          icon: ListOrdered,
+        },
+      ],
+    ]}
+  />
 
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => insertAtLineStart(editorView, "# ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 1"
-        >
-          <Heading1 size={18} />
-        </button>
-        <button
-          onclick={() => insertAtLineStart(editorView, "## ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 2"
-        >
-          <Heading2 size={18} />
-        </button>
-        <button
-          onclick={() => insertAtLineStart(editorView, "### ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Heading 3"
-        >
-          <Heading3 size={18} />
-        </button>
-      </div>
-
-      <div class="mx-2 h-6 w-px bg-gray-200"></div>
-
-      <div class="flex items-center gap-0.5 rounded-lg bg-gray-100 p-1">
-        <button
-          onclick={() => insertAtLineStart(editorView, "- ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Bullet List"
-        >
-          <List size={18} />
-        </button>
-        <button
-          onclick={() => insertAtLineStart(editorView, "1. ")}
-          class="rounded p-1.5 text-gray-600 transition-all hover:bg-white hover:text-gray-900 hover:shadow-sm"
-          title="Numbered List"
-        >
-          <ListOrdered size={18} />
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Editor Content -->
   <Codemirror
     bind:editorView
     doc={content}

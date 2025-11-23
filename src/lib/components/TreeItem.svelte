@@ -12,7 +12,7 @@
   import { slide } from "svelte/transition";
   import { notes, type TreeNode } from "$lib/store.svelte.ts";
   import Self from "./TreeItem.svelte";
-  import { ChevronRight, Folder, FileText } from "lucide-svelte";
+  import { ChevronRight, Folder, FileText } from "@lucide/svelte";
   import { clsx } from "clsx";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
@@ -203,7 +203,7 @@
     <div class="group relative">
       <button
         tabindex="0"
-        class="flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-600 transition-all select-none hover:bg-white hover:text-indigo-600 hover:shadow-sm"
+        class="flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium text-base-content transition-all select-none hover:bg-primary-content hover:text-primary hover:shadow-sm"
         onclick={() => toggleFolder(item.id)}
         oncontextmenu={(e) => handleContextMenu(e, item.id, true)}
         onkeydown={(e) => e.key === "Enter" && toggleFolder(item.id)}
@@ -269,27 +269,18 @@
   {:else}
     <!-- Note Item -->
     <button
-      onclick={() => goto(resolve("/notes/[id]", { id: item.id }))}
-      class={{
-        flex: true,
-        "w-full": true,
-        "items-center": true,
-        "gap-2": true,
-        "rounded-md": true,
-        "px-2": true,
-        "py-1.5": true,
-        "text-left": true,
-        "text-sm": true,
-        "text-slate-600": true,
-        "transition-all": true,
-        "hover:bg-white": true,
-        "hover:text-indigo-600": true,
-        "hover:shadow-sm": true,
-        "bg-white": page.params.id === item.id,
-        "shadow-sm": page.params.id === item.id,
-        "text-indigo-600": page.params.id === item.id,
+      onclick={() => {
+        goto(resolve("/notes/[id]", { id: item.id }));
       }}
-      oncontextmenu={(e) => handleContextMenu(e, item.id, false)}
+      class={[
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-primary-content hover:text-primary hover:shadow-sm",
+        page.params.id === item.id
+          ? "bg-primary-content text-primary shadow-sm"
+          : "text-base-content",
+      ]}
+      oncontextmenu={(e) => {
+        handleContextMenu(e, item.id, false);
+      }}
     >
       <FileText />
       <span class="truncate">{item.title || "Untitled"}</span>

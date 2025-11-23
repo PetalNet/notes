@@ -7,10 +7,6 @@
   font-family: "Inter", sans-serif;
 }
 
-body {
-  @apply bg-slate-50 text-slate-900 antialiased;
-}
-
 /* Custom scrollbar for a cleaner look */
 ::-webkit-scrollbar {
   width: 8px;

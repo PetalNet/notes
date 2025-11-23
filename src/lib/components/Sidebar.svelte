@@ -12,8 +12,9 @@
     Plus,
     Trash2,
     Pencil,
-  } from "lucide-svelte";
+  } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
+  import ProfilePicture from "./ProfilePicture.svelte";
 
   interface ContextState {
     x: number;
@@ -128,25 +129,19 @@
 
 <svelte:window onclick={onWindowClick} />
 
-<div class="flex h-full w-64 flex-col border-r border-slate-200 bg-slate-50">
+<div class="flex h-full w-64 flex-col border-r">
   <!-- User Header -->
-  <div
-    class="flex items-center justify-between border-b border-slate-200 bg-white p-4"
-  >
+  <div class="flex items-center justify-between border-b p-4">
     <div class="flex items-center gap-2">
-      <div
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600"
-      >
-        {user?.username[0].toUpperCase() ?? "A"}
-      </div>
-      <span class="max-w-[100px] truncate text-sm font-medium text-slate-700"
+      <ProfilePicture name={user?.username ?? "A"} />
+      <span class="max-w-[100px] truncate text-sm font-medium"
         >{user?.username ?? "Anonymous"}</span
       >
     </div>
     <form action="?/logout" method="POST">
       <button
         type="submit"
-        class="text-xs text-slate-400 transition-colors hover:text-slate-600"
+        class="text-xs text-base-content/40 transition-colors hover:text-base-content/60"
       >
         Log out
       </button>

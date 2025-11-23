@@ -47,7 +47,7 @@
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
-  <div class="card w-96 bg-base-100 text-primary-content shadow-xl">
+  <div class="card w-96 bg-base-100 text-primary shadow-xl">
     <div class="card-body">
       <h2 class="card-title">Sign Up</h2>
 
@@ -64,9 +64,7 @@
         }}
       >
         <div class="form-control">
-          <label class="label" for="username">
-            <span class="label-text">Username</span>
-          </label>
+          <label class="label" for="username">Username</label>
           <input
             id="username"
             type="text"
@@ -77,9 +75,7 @@
         </div>
 
         <div class="form-control">
-          <label class="label" for="password">
-            <span class="label-text">Password</span>
-          </label>
+          <label class="label" for="password">Password</label>
           <input
             id="password"
             type="password"

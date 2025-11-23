@@ -9,7 +9,7 @@
     syncSelectedNote,
   } from "$lib/store.svelte.ts";
   import type { LoroNoteManager } from "$lib/loro.js";
-  import { FilePlus } from "lucide-svelte";
+  import { FilePlus, Folder } from "@lucide/svelte";
 
   let { data } = $props();
 
@@ -86,7 +86,7 @@
   });
 </script>
 
-<div class="flex h-screen overflow-hidden bg-white">
+<div class="flex h-screen overflow-hidden">
   {#if data.user}
     <Sidebar user={data.user} />
   {/if}
@@ -102,18 +102,17 @@
         }}
       />
     {:else if selectedNote?.isFolder}
-      <div
-        class="flex h-full items-center justify-center bg-slate-50 text-slate-400"
-      >
+      <div class="flex h-full items-center justify-center text-slate-400">
         <div class="text-center">
-          <p class="mb-2 text-xl font-medium">📁 {selectedNote.title}</p>
+          <p class="mb-2 text-xl font-medium">
+            <Folder class="inline-block" />
+            {selectedNote.title}
+          </p>
           <p class="text-sm">Select a note inside to start editing</p>
         </div>
       </div>
     {:else}
-      <div
-        class="flex h-full items-center justify-center bg-slate-50 text-slate-400"
-      >
+      <div class="flex h-full items-center justify-center text-slate-400">
         <div class="text-center">
           <div
             class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100"

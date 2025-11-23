@@ -129,9 +129,11 @@
 
 <svelte:window onclick={onWindowClick} />
 
-<div class="flex h-full w-64 flex-col border-r">
+<div class="flex h-full w-64 flex-col border-r border-base-content/10">
   <!-- User Header -->
-  <div class="flex items-center justify-between border-b p-4">
+  <div
+    class="flex items-center justify-between border-b border-base-content/10 p-4"
+  >
     <div class="flex items-center gap-2">
       <ProfilePicture name={user?.username ?? "A"} />
       <span class="max-w-[100px] truncate text-sm font-medium"

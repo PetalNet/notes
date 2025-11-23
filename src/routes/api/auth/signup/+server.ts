@@ -47,7 +47,7 @@ export const POST = async ({ request, cookies }) => {
       httpOnly: true,
       sameSite: "lax",
       expires: session.expiresAt,
-      secure: process.env.NODE_ENV === "production",
+      secure: import.meta.env.PROD,
     });
 
     return json({ success: true, user: { id, username } });

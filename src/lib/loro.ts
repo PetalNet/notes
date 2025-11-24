@@ -2,6 +2,7 @@ import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
 import diff from "fast-diff";
 import { encryptData, decryptData } from "./crypto";
 import { Encoding, Function, Either } from "effect";
+import { sync } from "./remote/sync.remote.ts";
 
 export class LoroNoteManager {
   private noteId: string;
@@ -133,23 +134,15 @@ export class LoroNoteManager {
    * Send update to server
    */
   private async sendUpdate(updates: Uint8Array) {
-    // Assuming we can get the update bytes
     try {
-      const updateBase64 = Encoding.encodeBase64(updates);
-      await fetch("/api/sync/update", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          noteId: this.noteId,
-          update: updateBase64,
-        }),
+      await sync({
+        noteId: this.noteId,
+        update: Encoding.encodeBase64(updates),
       });
     } catch (error) {
       console.error("Failed to send update:", error);
     }
   }
-
-  // ... existing methods ...
 
   /**
    * Get current text content
@@ -158,9 +151,6 @@ export class LoroNoteManager {
     return this.text.toString();
   }
 
-  /**
-   * Update text content
-   */
   /**
    * Update text content using diffs
    */

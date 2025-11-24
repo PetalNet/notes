@@ -225,22 +225,15 @@
               parentId={item.id}
               onReorder={async (sourceId, targetIndex) => {
                 const children = item.children;
-                const sourceIndex = children.findIndex(
-                  (c) => c.id === sourceId,
+                const itemToMove = notes.notesList.find(
+                  (n) => n.id === sourceId,
                 );
-                let adjustedTargetIndex = targetIndex;
 
-                if (sourceIndex !== -1 && sourceIndex < targetIndex) {
-                  adjustedTargetIndex -= 1;
-                }
+                if (!itemToMove) return;
 
                 const updates = children
                   .filter((c) => c.id !== sourceId)
-                  .toSpliced(
-                    adjustedTargetIndex,
-                    0,
-                    children.find((c) => c.id === sourceId)!,
-                  )
+                  .toSpliced(targetIndex, 0, { ...itemToMove, children: [] })
                   .map((c, i) => ({ id: c.id, order: i }));
                 await notes.reorderNotes(updates);
               }}

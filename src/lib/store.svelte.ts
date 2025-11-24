@@ -1,12 +1,18 @@
 import { generateNoteKey, encryptKeyForUser, decryptKey } from "$lib/crypto";
 import { LoroNoteManager } from "$lib/loro";
 import { Order } from "effect";
-import { getNotes } from "./remote/notes.remote.ts";
+import {
+  createNote,
+  getNotes,
+  reorderNotes,
+  updateNote,
+} from "./remote/notes.remote.ts";
 import type { Folder, Note, NoteOrFolder } from "./schema.ts";
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import { SvelteMap } from "svelte/reactivity";
+import type { ReorderNotes } from "./remote/notes.schemas.ts";
 
 //#region Tree
 export type TreeNode = NoteOrFolder & { children: TreeNode[] };
@@ -37,6 +43,12 @@ export const auth = $state<AuthStore>({});
 export function setUserPrivateKey(privateKey: string) {
   auth.userPrivateKey = privateKey;
 }
+type MaybeFolder<IsFolder extends boolean> = IsFolder extends true
+  ? Folder
+  : IsFolder extends false
+    ? Note
+    : NoteOrFolder;
+
 //#endregion
 
 //#region Notes
@@ -105,13 +117,7 @@ export class Notes {
     parentId: string | null,
     isFolder: IsFolder,
     publicKey: string,
-  ): Promise<
-    IsFolder extends true
-      ? Folder
-      : IsFolder extends false
-        ? Note
-        : NoteOrFolder
-  > {
+  ): Promise<MaybeFolder<IsFolder>> {
     try {
       console.log("createNote called");
 
@@ -121,26 +127,16 @@ export class Notes {
       // Encrypt note key with user's public key
       const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
 
-      const res = await fetch("/api/notes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, encryptedKey, parentId, isFolder }),
+      const data = await createNote({
+        title,
+        encryptedKey,
+        parentId,
+        isFolder,
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error ?? "Failed to create note");
-      }
+      const newNote: NoteOrFolder = { ...data, content: "" };
 
-      const data = await res.json();
-      const newNote = {
-        ...data.note,
-        content: "",
-        createdAt: new Date(data.note.createdAt),
-        updatedAt: new Date(data.note.updatedAt),
-      };
-
-      this.#notesList = [...this.#notesList, newNote];
+      this.#notesList.push(newNote);
       goto(resolve("/notes/[id]", { id: newNote.id }));
 
       // Create Loro manager for the new note
@@ -148,12 +144,13 @@ export class Notes {
         await getLoroManager(newNote.id);
       }
 
-      return newNote;
+      return newNote as MaybeFolder<IsFolder>;
     } catch (error) {
       console.error("Create note error:", error);
       throw error;
     }
   }
+
   /** Create folder (wrapper for createNote). */
   async createFolder(
     title: string,
@@ -162,14 +159,11 @@ export class Notes {
   ): Promise<Folder> {
     return await this.createNote(title, parentId, true, publicKey);
   }
-  /** Delete note. */
-  async deleteNote(noteId: string) {
-    try {
-      const res = await fetch(`/api/notes/${noteId}`, {
-        method: "DELETE",
-      });
 
-      if (!res.ok) throw new Error("Failed to delete note");
+  /** Delete note. */
+  async deleteNote(noteId: string): Promise<void> {
+    try {
+      await this.deleteNote(noteId);
 
       this.#notesList = this.#notesList.filter((note) => note.id !== noteId);
 
@@ -189,8 +183,13 @@ export class Notes {
       throw error;
     }
   }
+
   /** Update note content (wrapper for updating specific fields). */
-  async updateNoteContent(noteId: string, title?: string, content?: string) {
+  async updateNoteContent(
+    noteId: string,
+    title?: string,
+    content?: string,
+  ): Promise<void> {
     if (title !== undefined) {
       await this.updateNoteTitle(noteId, title);
     }
@@ -201,66 +200,52 @@ export class Notes {
       }
     }
   }
+
   /** Update note title. */
-  async updateNoteTitle(noteId: string, title: string) {
+  async updateNoteTitle(noteId: string, title: string): Promise<void> {
     try {
-      const res = await fetch(`/api/notes/${noteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title }),
-      });
+      const newlyUpdatedNote = await updateNote({ noteId, title });
 
-      if (!res.ok) throw new Error("Failed to update note");
-
-      this.#notesList = this.#notesList.map((note) =>
-        note.id === noteId ? { ...note, title } : note,
-      );
+      // TODO: Switch to Effect/Optic?
+      const note = this.#notesList.find((n) => n.id === noteId);
+      if (note) note.title = newlyUpdatedNote.title;
     } catch (error) {
       console.error("Update note title error:", error);
       throw error;
     }
   }
+
   /** Move note to folder (update parentId). */
   async moveNoteToFolder(noteId: string, newParentId: string | null) {
     try {
-      const res = await fetch(`/api/notes/${noteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ parentId: newParentId }),
+      const newlyUpdatedNote = await updateNote({
+        noteId,
+        parentId: newParentId,
       });
 
-      if (!res.ok) throw new Error("Failed to move note");
-
-      this.#notesList = this.#notesList.map((note) =>
-        note.id === noteId ? { ...note, parentId: newParentId } : note,
-      );
+      // TODO: Switch to Effect/Optic?
+      const note = this.#notesList.find((n) => n.id === noteId);
+      if (note) note.parentId = newlyUpdatedNote.parentId;
     } catch (error) {
-      console.error("Move note error:", error);
+      console.error("Update note title error:", error);
       throw error;
     }
   }
+
   /** Helper function for API updates. */
   async apiUpdateNote(noteId: string, loroSnapshot: string) {
     try {
-      await fetch(`/api/notes/${noteId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ loroSnapshot }),
-      });
+      await updateNote({ noteId, loroSnapshot });
     } catch (error) {
-      console.error("API update error:", error);
+      console.error("Update note title error:", error);
+      throw error;
     }
   }
-  /** Reorder notes. */
-  async reorderNotes(updates: { id: string; order: number }[]) {
-    try {
-      const res = await fetch("/api/notes/reorder", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates }),
-      });
 
-      if (!res.ok) throw new Error("Failed to reorder notes");
+  /** Reorder notes. */
+  async reorderNotes(updates: ReorderNotes) {
+    try {
+      await reorderNotes(updates);
 
       // Update local state
       this.#notesList = this.#notesList.map((note) => {
@@ -272,6 +257,7 @@ export class Notes {
       throw error;
     }
   }
+
   /** @internal */
   updateContent(noteId: string, content: string) {
     for (const [i, note] of this.#notesList.entries()) {
@@ -319,9 +305,8 @@ export async function getLoroManager(
   noteId: string,
 ): Promise<LoroNoteManager | undefined> {
   // Return existing manager if available
-  if (loroManagers.has(noteId)) {
-    return loroManagers.get(noteId)!;
-  }
+  const preexistingLoroManager = loroManagers.get(noteId);
+  if (preexistingLoroManager) return preexistingLoroManager;
 
   // Find the note
   const note = notes.notesList.find((n) => n.id === noteId);

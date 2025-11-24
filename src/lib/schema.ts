@@ -13,15 +13,19 @@ const NoteBaseSchema = Schema.Struct({
   updatedAt: Schema.Date,
 });
 
-export const NoteSchema = Schema.Struct({
-  ...NoteBaseSchema.fields,
-  isFolder: Schema.Literal(false),
-});
+export const NoteSchema = Schema.extend(
+  NoteBaseSchema,
+  Schema.Struct({
+    isFolder: Schema.tag(false),
+  }),
+).pipe(Schema.mutable);
 
-export const FolderSchema = Schema.Struct({
-  ...NoteBaseSchema.fields,
-  isFolder: Schema.Literal(true),
-});
+export const FolderSchema = Schema.extend(
+  NoteBaseSchema,
+  Schema.Struct({
+    isFolder: Schema.tag(true),
+  }),
+).pipe(Schema.mutable);
 
 export const NoteOrFolderSchema = Schema.Union(NoteSchema, FolderSchema);
 

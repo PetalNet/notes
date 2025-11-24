@@ -106,21 +106,13 @@
   // Handle reordering at root level
   async function handleRootReorder(sourceId: string, targetIndex: number) {
     const rootItems = notes.notesTree;
-    const sourceIndex = rootItems.findIndex((item) => item.id === sourceId);
+    const itemToMove = notes.notesList.find((n) => n.id === sourceId);
 
-    let adjustedTargetIndex = targetIndex;
-    // If moving down in the same list, decrement target index because removal shifts items
-    if (sourceIndex !== -1 && sourceIndex < targetIndex) {
-      adjustedTargetIndex -= 1;
-    }
+    if (!itemToMove) return;
 
     const updates = rootItems
       .filter((item) => item.id !== sourceId)
-      .toSpliced(
-        adjustedTargetIndex,
-        0,
-        rootItems.find((item) => item.id === sourceId)!,
-      )
+      .toSpliced(targetIndex, 0, { ...itemToMove, children: [] })
       .map((item, i) => ({ id: item.id, order: i }));
 
     await notes.reorderNotes(updates);

@@ -1,16 +1,21 @@
-import { query, getRequestEvent } from "$app/server";
+import { query, getRequestEvent, command } from "$app/server";
 import type { NoteOrFolder } from "$lib/schema.ts";
 import { db } from "$lib/server/db/index.ts";
+import { notes } from "$lib/server/db/schema.ts";
 import { error } from "@sveltejs/kit";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import {
+  createNoteSchema,
+  deleteNoteSchema,
+  updateNoteSchema,
+  reorderNotesSchema,
+} from "./notes.schemas.ts";
 
 export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   const { locals } = getRequestEvent();
   const user = locals.user;
 
-  if (!user) {
-    error(401, "Unauthorized");
-  }
+  if (!user) error(401, "Unauthorized");
 
   const userNotes = await db.query.notes.findMany({
     where: (notes) => eq(notes.ownerId, user.id),
@@ -24,6 +29,157 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
         order: n.order,
         createdAt: new Date(n.createdAt),
         updatedAt: new Date(n.updatedAt),
-      }) as NoteOrFolder,
+      }) satisfies NoteOrFolder,
   );
 });
+
+/** @todo Switch to form? */
+export const createNote = command(
+  createNoteSchema,
+  async ({
+    title,
+    encryptedKey,
+    parentId,
+    isFolder,
+  }): Promise<Omit<NoteOrFolder, "content">> => {
+    const { locals } = getRequestEvent();
+    const user = locals.user;
+
+    if (!user) error(401, "Unauthorized");
+
+    try {
+      if (!title || !encryptedKey) {
+        error(400, "Missing required fields");
+      }
+
+      const id = crypto.randomUUID();
+
+      await db.insert(notes).values({
+        id,
+        title,
+        ownerId: user.id,
+        encryptedKey,
+        loroSnapshot: null,
+        parentId,
+        isFolder,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const note = await db.query.notes.findFirst({
+        where: (notes) => eq(notes.id, id),
+      });
+
+      if (!note) throw new Error("Failed to find newly created note!");
+
+      return note;
+    } catch (err) {
+      console.error("Create note error:", err);
+      return error(500, "Failed to create note");
+    }
+  },
+);
+
+/** @todo Switch to form? */
+export const deleteNote = command(
+  deleteNoteSchema,
+  async (noteId): Promise<void> => {
+    const { locals } = getRequestEvent();
+    const user = locals.user;
+
+    if (!user) error(401, "Unauthorized");
+
+    try {
+      // Verify ownership
+      const note = await db.query.notes.findFirst({
+        where: eq(notes.id, noteId),
+      });
+
+      if (!note || note.ownerId !== user.id) error(404, "Not found");
+
+      await db.delete(notes).where(eq(notes.id, noteId));
+    } catch (err) {
+      console.error("Delete note error:", err);
+      error(500, "Failed to delete note");
+    }
+  },
+);
+
+export const updateNote = command(
+  updateNoteSchema,
+  async ({
+    noteId,
+    title,
+    loroSnapshot,
+    parentId,
+  }): Promise<Omit<NoteOrFolder, "content">> => {
+    const { locals } = getRequestEvent();
+    const user = locals.user;
+
+    if (!user) error(401, "Unauthorized");
+
+    try {
+      // Verify ownership
+      const existingNote = await db.query.notes.findFirst({
+        where: eq(notes.id, noteId),
+      });
+
+      if (!existingNote || existingNote.ownerId !== user.id) {
+        error(404, "Not found");
+      }
+
+      // Update note
+      await db
+        .update(notes)
+        .set({
+          loroSnapshot: loroSnapshot ?? existingNote.loroSnapshot,
+          title: title ?? existingNote.title,
+          parentId: parentId ?? existingNote.parentId,
+          updatedAt: new Date(),
+        })
+        .where(eq(notes.id, noteId));
+
+      const updated = await db.query.notes.findFirst({
+        where: eq(notes.id, noteId),
+      });
+
+      if (!updated) throw new Error("Failed to find newly created note!");
+
+      return updated;
+    } catch (err) {
+      console.error("[API] Update error:", err);
+      error(500, "Failed to update note");
+    }
+  },
+);
+
+function isTuple<T>(array: T[]): array is [T, ...T[]] {
+  return array.length > 0;
+}
+
+export const reorderNotes = command(
+  reorderNotesSchema,
+  async (updates): Promise<void> => {
+    const { locals } = getRequestEvent();
+    const user = locals.user;
+
+    if (!user) error(401, "Unauthorized");
+
+    try {
+      const updateStatements = updates.map(({ id, order: newOrder }) =>
+        db
+          .update(notes)
+          .set({ order: newOrder, updatedAt: new Date() })
+          .where(and(eq(notes.id, id))),
+      );
+
+      // If no notes exist, do nothing.
+      if (!isTuple(updateStatements)) return;
+
+      await db.batch(updateStatements);
+    } catch (err) {
+      console.error("Reorder error:", err);
+      error(500, "Failed to reorder notes");
+    }
+  },
+);

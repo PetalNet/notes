@@ -5,54 +5,54 @@ import { Encoding, Function, Either } from "effect";
 import { sync } from "./remote/sync.remote.ts";
 
 export class LoroNoteManager {
-  private noteId: string;
-  private noteKey: string;
-  private doc: LoroDoc;
-  private text: LoroText;
-  private onUpdate: (snapshot: Uint8Array) => void;
-  private eventSource: EventSource | null = null;
-  private isSyncing = false;
+  #noteId: string;
+  #noteKey: string;
+  #doc: LoroDoc;
+  #text: LoroText;
+  #onUpdate: (snapshot: Uint8Array) => void;
+  #eventSource: EventSource | null = null;
+  #isSyncing = false;
 
   constructor(
     noteId: string,
     noteKey: string,
     onUpdate?: (snapshot: Uint8Array) => void,
   ) {
-    this.noteId = noteId;
-    this.noteKey = noteKey;
-    this.doc = new LoroDoc();
-    this.text = this.doc.getText("content");
-    this.onUpdate = onUpdate ?? Function.constVoid;
+    this.#noteId = noteId;
+    this.#noteKey = noteKey;
+    this.#doc = new LoroDoc();
+    this.#text = this.#doc.getText("content");
+    this.#onUpdate = onUpdate ?? Function.constVoid;
 
     // Initialize frontiers
-    this.lastFrontiers = this.doc.frontiers();
+    this.#lastFrontiers = this.#doc.frontiers();
 
     // Subscribe to changes
-    this.doc.subscribe((event) => {
+    this.#doc.subscribe((event) => {
       // Notify content listeners
-      const content = this.text.toString();
-      this.contentListeners.forEach((listener) => {
+      const content = this.#text.toString();
+      this.#contentListeners.forEach((listener) => {
         listener(content);
       });
 
       // Only trigger update if the change is local or we need to persist remote changes
       // For now, we persist everything to be safe
-      const snapshot = this.doc.export({ mode: "snapshot" });
-      this.onUpdate(snapshot);
+      const snapshot = this.#doc.export({ mode: "snapshot" });
+      this.#onUpdate(snapshot);
 
       // Send update to server if syncing and change is local
-      if (this.isSyncing && event.by === "local") {
-        const frontiers = this.doc.frontiers();
+      if (this.#isSyncing && event.by === "local") {
+        const frontiers = this.#doc.frontiers();
         // We need to be careful with export updates.
         // For this MVP, let's just export the delta since last sync point if possible,
         // or just export the whole update since last frontiers.
         try {
-          const update = this.doc.export({
+          const update = this.#doc.export({
             mode: "shallow-snapshot",
-            frontiers: this.lastFrontiers,
+            frontiers: this.#lastFrontiers,
           });
-          this.lastFrontiers = frontiers;
-          void this.sendUpdate(update);
+          this.#lastFrontiers = frontiers;
+          void this.#sendUpdate(update);
         } catch (e) {
           console.error("Error exporting update", e);
         }
@@ -60,16 +60,16 @@ export class LoroNoteManager {
     });
   }
 
-  private contentListeners: ((content: string) => void)[] = [];
+  #contentListeners: ((content: string) => void)[] = [];
 
   /**
    * Subscribe to content changes
    */
   subscribeToContent(listener: (content: string) => void) {
-    this.contentListeners.push(listener);
+    this.#contentListeners.push(listener);
     // Return unsubscribe function
     return () => {
-      this.contentListeners = this.contentListeners.filter(
+      this.#contentListeners = this.#contentListeners.filter(
         (l) => l !== listener,
       );
     };
@@ -84,19 +84,19 @@ export class LoroNoteManager {
     }
   }
 
-  private lastFrontiers: Frontiers;
+  #lastFrontiers: Frontiers;
 
   /**
    * Start real-time sync
    */
   startSync() {
-    if (this.isSyncing) return;
-    this.isSyncing = true;
+    if (this.#isSyncing) return;
+    this.#isSyncing = true;
 
     // Connect to SSE endpoint
-    this.eventSource = new EventSource(`/api/sync/${this.noteId}`);
+    this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
 
-    this.eventSource.onmessage = (event: MessageEvent<string>) => {
+    this.#eventSource.onmessage = (event: MessageEvent<string>) => {
       try {
         const data = JSON.parse(event.data) as unknown as { update: string };
         if (data.update) {
@@ -104,17 +104,17 @@ export class LoroNoteManager {
           const updateBytes = Encoding.decodeBase64(data.update).pipe(
             Either.getOrThrow,
           ) as Uint8Array<ArrayBuffer>;
-          this.doc.import(updateBytes);
+          this.#doc.import(updateBytes);
         }
       } catch (error) {
         console.error("Failed to process sync message:", error);
       }
     };
 
-    this.eventSource.onerror = (error) => {
+    this.#eventSource.onerror = (error) => {
       console.error("SSE connection error:", error);
-      this.eventSource?.close();
-      this.isSyncing = false;
+      this.#eventSource?.close();
+      this.#isSyncing = false;
       // Retry logic could go here
     };
   }
@@ -123,20 +123,20 @@ export class LoroNoteManager {
    * Stop real-time sync
    */
   stopSync() {
-    if (this.eventSource) {
-      this.eventSource.close();
-      this.eventSource = null;
+    if (this.#eventSource) {
+      this.#eventSource.close();
+      this.#eventSource = null;
     }
-    this.isSyncing = false;
+    this.#isSyncing = false;
   }
 
   /**
    * Send update to server
    */
-  private async sendUpdate(updates: Uint8Array) {
+  async #sendUpdate(updates: Uint8Array) {
     try {
       await sync({
-        noteId: this.noteId,
+        noteId: this.#noteId,
         update: Encoding.encodeBase64(updates),
       });
     } catch (error) {
@@ -148,14 +148,14 @@ export class LoroNoteManager {
    * Get current text content
    */
   getContent(): string {
-    return this.text.toString();
+    return this.#text.toString();
   }
 
   /**
    * Update text content using diffs
    */
   updateContent(newContent: string) {
-    const currentContent = this.text.toString();
+    const currentContent = this.#text.toString();
     if (currentContent === newContent) return;
 
     console.log("[Loro] Updating content with diff...");
@@ -168,7 +168,7 @@ export class LoroNoteManager {
       switch (type) {
         // DELETE
         case -1: {
-          this.text.delete(index, text.length);
+          this.#text.delete(index, text.length);
           break;
         }
 
@@ -180,24 +180,24 @@ export class LoroNoteManager {
 
         // INSERT
         case 1: {
-          this.text.insert(index, text);
+          this.#text.insert(index, text);
           index += text.length;
           break;
         }
       }
     }
 
-    this.doc.commit();
+    this.commit();
   }
 
   /**
    * Get encrypted snapshot for storage
    */
   async getEncryptedSnapshot(): Promise<string> {
-    const snapshot = this.doc.export({
+    const snapshot = this.#doc.export({
       mode: "snapshot",
     }) as Uint8Array<ArrayBuffer>;
-    const encrypted = await encryptData(snapshot, this.noteKey);
+    const encrypted = await encryptData(snapshot, this.#noteKey);
     return Encoding.encodeBase64(encrypted);
   }
 
@@ -209,8 +209,8 @@ export class LoroNoteManager {
       const encryptedBytes = Encoding.decodeBase64(encryptedSnapshot).pipe(
         Either.getOrThrow,
       ) as Uint8Array<ArrayBuffer>;
-      const decrypted = await decryptData(encryptedBytes, this.noteKey);
-      this.doc.import(decrypted);
+      const decrypted = await decryptData(encryptedBytes, this.#noteKey);
+      this.#doc.import(decrypted);
     } catch (error) {
       console.error("Failed to load encrypted snapshot:", error);
       throw error;
@@ -221,13 +221,13 @@ export class LoroNoteManager {
    * Apply update from another peer
    */
   applyUpdate(update: Uint8Array) {
-    this.doc.import(update);
+    this.#doc.import(update);
   }
 
   /**
    * Commit current changes
    */
   commit() {
-    this.doc.commit();
+    this.#doc.commit();
   }
 }

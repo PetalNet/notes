@@ -31,6 +31,14 @@ export default defineConfig(
       "no-undef": "off",
 
       "@typescript-eslint/parameter-properties": "error",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            ':matches(PropertyDefinition, MethodDefinition)[accessibility="private"]',
+          message: "Use #private instead",
+        },
+      ],
       "@typescript-eslint/no-floating-promises": [
         "error",
         {

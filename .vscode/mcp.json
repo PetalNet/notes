@@ -1,7 +1,63 @@
 {
   "servers": {
     "svelte": {
+      "type": "http",
       "url": "https://mcp.svelte.dev/mcp"
+    },
+    "ESLint": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@eslint/mcp@latest"]
+    },
+    "io.github.upstash/context7": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest",
+        "--api-key",
+        "${input:CONTEXT7_API_KEY}"
+      ]
+    },
+    "io.github.ChromeDevTools/chrome-devtools-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["chrome-devtools-mcp@0.10.2"]
+    },
+    "oraios/serena": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/oraios/serena",
+        "serena",
+        "start-mcp-server",
+        "serena==latest",
+        "--context",
+        "ide-assistant"
+      ]
+    },
+    "socket-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@socketsecurity/mcp@latest"],
+      "env": {
+        "SOCKET_API_KEY": "${input:socket_api_key}"
+      }
     }
-  }
+  },
+  "inputs": [
+    {
+      "id": "CONTEXT7_API_KEY",
+      "type": "promptString",
+      "description": "API key for authentication",
+      "password": true
+    },
+    {
+      "type": "promptString",
+      "id": "socket_api_key",
+      "description": "Socket API Key",
+      "password": true
+    }
+  ]
 }

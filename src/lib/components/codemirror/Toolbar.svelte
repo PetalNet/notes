@@ -16,7 +16,7 @@
   const { tools }: Props = $props();
 </script>
 
-<div class="flex items-center gap-4 border-b border-base-content/10 px-4 py-2">
+<div class="flex items-center gap-2 border-b border-base-content/10 px-4 py-2">
   {#each tools as toolset, index (index)}
     <div class="flex items-center gap-0.5 rounded-lg bg-base-300 p-1 shadow">
       {#each toolset as tool (tool.title)}
@@ -26,7 +26,6 @@
         </button>
       {/each}
     </div>
+    <div class="mx-2 h-6 w-px bg-base-content last:hidden"></div>
   {/each}
-
-  <div class="mx-2 h-6 w-px bg-gray-200"></div>
 </div>

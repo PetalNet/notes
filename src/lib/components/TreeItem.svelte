@@ -165,13 +165,7 @@
   });
 </script>
 
-<div
-  bind:this={element}
-  class={{
-    relative: true,
-    "opacity-50": isDragging,
-  }}
->
+<div bind:this={element} class={["relative", isDragging && "opacity-50"]}>
   <!-- Drop Indicators -->
   {#if closestEdge === "top"}
     <div
@@ -186,16 +180,10 @@
 
   <!-- Drop Into Highlight -->
   <div
-    class={{
-      "pointer-events-none": true,
-      absolute: true,
-      "inset-0": true,
-      "rounded-md": true,
-      "bg-indigo-100/50": true,
-      "transition-opacity duration-200": true,
-      "opacity-100": isDropTarget,
-      "opacity-0": !isDropTarget,
-    }}
+    class={[
+      "pointer-events-none absolute inset-0 rounded-md bg-indigo-100/50 transition-opacity duration-200",
+      isDropTarget ? "opacity-100" : "opacity-0",
+    ]}
   ></div>
 
   {#if item.isFolder}

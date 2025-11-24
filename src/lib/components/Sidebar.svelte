@@ -160,8 +160,7 @@
 
         await notes.createNote("Untitled Note", null, false, user.publicKey);
       }}
-      class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
-      ><FilePlus /> Note</button
+      class="btn"><FilePlus /> Note</button
     >
     <button
       onclick={async () => {
@@ -171,26 +170,17 @@
 
         await notes.createFolder("New Folder", null, user.publicKey);
       }}
-      class="flex cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition-all hover:border-indigo-300 hover:text-indigo-600 hover:shadow-md"
-      ><FolderPlus /> Folder</button
+      class="btn"><FolderPlus /> Folder</button
     >
   </div>
 
   <!-- Note Tree -->
   <div
     bind:this={rootContainer}
-    class={{
-      "flex-1": true,
-      "space-y-0.5": true,
-      "overflow-y-auto": true,
-      "px-2": true,
-      "py-2": true,
-      "transition-all": true,
-      "ring-2": isRootDropTarget,
-      "ring-indigo-400": isRootDropTarget,
-      "ring-inset": isRootDropTarget,
-      "bg-indigo-50": isRootDropTarget,
-    }}
+    class={[
+      "flex-1 space-y-0.5 overflow-y-auto px-2 py-2 transition-all",
+      isRootDropTarget && "bg-indigo-50 ring-2 ring-indigo-400 ring-inset",
+    ]}
   >
     {#each notes.notesTree as item, idx (item.id)}
       <TreeItem

@@ -10,6 +10,7 @@
   } from "$lib/store.svelte.ts";
   import type { LoroNoteManager } from "$lib/loro.js";
   import { FilePlus, Folder } from "@lucide/svelte";
+  import { dev } from "$app/environment";
 
   let { data } = $props();
 
@@ -109,7 +110,7 @@
             <Folder class="inline-block" />
             {selectedNote.title}
           </p>
-          <p class="text-sm">Select a note inside to start editing</p>
+          <p class="text-sm">Select a note inside to start editing.</p>
         </div>
       </div>
     {:else}
@@ -122,7 +123,7 @@
           </div>
           <p class="mb-2 text-xl font-medium">No note selected</p>
           <p class="text-sm">
-            Select a note from the sidebar or create a new one
+            Select a note from the sidebar or create a new one.
           </p>
         </div>
       </div>
@@ -130,12 +131,14 @@
   </div>
 
   <!-- Debug Overlay -->
-  <div
-    class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
-  >
-    <p>Selected Note: {notes.selectedNoteId}</p>
-    <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
-    <p>Content Length: {editorContent.length}</p>
-    <p>Content Preview: {editorContent.slice(0, 50)}</p>
-  </div>
+  {#if dev}
+    <div
+      class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
+    >
+      <p>Selected Note: {notes.selectedNoteId}</p>
+      <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
+      <p>Content Length: {editorContent.length}</p>
+      <p>Content Preview: {editorContent.slice(0, 50)}</p>
+    </div>
+  {/if}
 </div>

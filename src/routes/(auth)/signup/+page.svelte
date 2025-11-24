@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { generateUserKeys } from "$lib/crypto";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
+  import { generateUserKeys } from "$lib/crypto";
 
   let username = $state("");
   let password = $state("");

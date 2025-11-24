@@ -1,8 +1,10 @@
-import { json } from "@sveltejs/kit";
+import { syncSchemaJson } from "$lib/remote/notes.schemas.js";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
-import { eq } from "drizzle-orm";
 import { addClient, removeClient } from "$lib/server/real-time";
+import { json } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
+import { Schema } from "effect";
 
 export const GET = async ({ params, locals }) => {
   if (!locals.user) {
@@ -33,7 +35,9 @@ export const GET = async ({ params, locals }) => {
       // Send initial connection message
       const encoder = new TextEncoder();
       c.enqueue(
-        encoder.encode('event: connected\ndata: {"status":"connected"}\n\n'),
+        encoder.encode(
+          `event: connected\ndata: ${Schema.encodeSync(syncSchemaJson)({ noteId, updates: [] })}\n\n`,
+        ),
       );
     },
     cancel() {

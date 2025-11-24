@@ -1,19 +1,19 @@
-import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
-import diff from "fast-diff";
-import { encryptData, decryptData } from "./crypto";
 import {
-  Encoding,
-  Function,
-  Either,
-  Stream,
-  Effect,
-  Fiber,
   Chunk,
+  Effect,
+  Either,
+  Encoding,
+  Fiber,
+  Function,
   PubSub,
   Schema,
+  Stream,
 } from "effect";
+import diff from "fast-diff";
+import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
+import { decryptData, encryptData } from "./crypto";
+import { syncSchemaJson } from "./remote/notes.schemas.ts";
 import { sync } from "./remote/sync.remote.ts";
-import { SyncSchema } from "./remote/notes.schemas.ts";
 
 export class LoroNoteManager {
   #noteId: string;
@@ -117,6 +117,7 @@ export class LoroNoteManager {
   async init(encryptedSnapshot?: string) {
     if (encryptedSnapshot) {
       await this.loadEncryptedSnapshot(encryptedSnapshot);
+      this.#lastFrontiers = this.#doc.frontiers();
     }
   }
 
@@ -129,14 +130,14 @@ export class LoroNoteManager {
     if (this.#isSyncing) return;
     this.#isSyncing = true;
 
+    this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
+
     // 3. Incoming Loop (Remote -> Loro)
     const incomingStream = Stream.async<Uint8Array>((emit) => {
       if (this.#eventSource) {
-        this.#eventSource.onmessage = (event) => {
+        this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
           try {
-            const data = Schema.decodeUnknownSync(Schema.parseJson(SyncSchema))(
-              event.data,
-            );
+            const data = Schema.decodeSync(syncSchemaJson)(event.data);
 
             for (const update of data.updates) {
               const updateBytes = Encoding.decodeBase64(update).pipe(

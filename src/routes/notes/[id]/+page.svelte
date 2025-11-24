@@ -65,7 +65,7 @@
           // Subscribe to content changes
           unsubscribeContent = manager.subscribeToContent((content) => {
             console.log(
-              "[Page] Content update received:",
+              "[Page] Content update received. Preview:",
               content.slice(0, 20),
             );
             editorContent = content;

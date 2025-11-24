@@ -51,8 +51,32 @@
     ".cm-content": {
       height: "100%",
       margin: "0 auto",
-      caretColor: "var(--pm-cursor-color, black)",
       padding: "0",
+
+      // ProseMark syntax highlighting
+      "--pm-header-mark-color": "var(--color-primary)",
+      "--pm-link-color": "var(--color-primary)",
+      "--pm-muted-color":
+        "color-mix(in srgb, var(--color-base-content), transparent 50%)",
+      "--pm-code-background-color": "var(--color-base-200)",
+      "--pm-code-btn-background-color": "var(--color-base-300)",
+      "--pm-code-btn-hover-background-color": "var(--color-base-content)",
+      "--pm-blockquote-vertical-line-background-color": "var(--color-base-300)",
+      "--pm-syntax-link": "var(--color-primary)",
+      "--pm-syntax-keyword": "var(--color-secondary)",
+      "--pm-syntax-atom": "var(--color-accent)",
+      "--pm-syntax-literal": "var(--color-accent)",
+      "--pm-syntax-string": "var(--color-success)",
+      "--pm-syntax-regexp": "var(--color-warning)",
+      "--pm-syntax-definition-variable": "var(--color-base-content)",
+      "--pm-syntax-local-variable": "var(--color-base-content)",
+      "--pm-syntax-type-namespace": "var(--color-secondary)",
+      "--pm-syntax-class-name": "var(--color-secondary)",
+      "--pm-syntax-special-variable-macro": "var(--color-accent)",
+      "--pm-syntax-definition-property": "var(--color-base-content)",
+      "--pm-syntax-comment":
+        "color-mix(in srgb, var(--color-base-content), transparent 50%)",
+      "--pm-syntax-invalid": "var(--color-error)",
     },
     ".cm-line": {
       padding: "0",
@@ -69,7 +93,10 @@
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newContent = update.state.doc.toString();
-        console.log("[Prosemark] Content updated:", newContent.slice(0, 50));
+        console.log(
+          "[Prosemark] Content updated. Preview:",
+          newContent.slice(0, 50),
+        );
         onchange(newContent);
       }
     }),

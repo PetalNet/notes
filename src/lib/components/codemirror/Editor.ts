@@ -4,7 +4,7 @@ import { EditorView, keymap, type KeyBinding } from "@codemirror/view";
 import { GFM } from "@lezer/markdown";
 import {
   prosemarkBasicSetup,
-  prosemarkLightThemeSetup,
+  prosemarkBaseThemeSetup,
   prosemarkMarkdownSyntaxExtensions,
 } from "@prosemark/core";
 import {
@@ -114,7 +114,7 @@ export const coreExtensions = [
   // Basic prosemark extensions
   prosemarkBasicSetup(),
   // Theme extensions
-  prosemarkLightThemeSetup(),
+  prosemarkBaseThemeSetup(),
   htmlBlockExtension,
   pasteRichTextExtension(),
   pastePlainTextExtension(),

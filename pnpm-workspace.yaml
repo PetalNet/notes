@@ -1,7 +1,8 @@
+engineStrict: true
+
 onlyBuiltDependencies:
   - "@swc/core"
   - "@tailwindcss/oxide"
   - better-sqlite3
   - esbuild
-
-engineStrict: true
+  - msgpackr-extract

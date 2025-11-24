@@ -17,8 +17,16 @@
   import Codemirror from "./Codemirror.svelte";
   import {
     coreExtensions,
-    insertAtLineStart,
-    wrapSelection,
+    boldCommand,
+    italicCommand,
+    strikethroughCommand,
+    codeCommand,
+    linkCommand,
+    heading1Command,
+    heading2Command,
+    heading3Command,
+    bulletListCommand,
+    orderedListCommand,
   } from "./Editor.ts";
   import Toolbar from "./Toolbar.svelte";
 
@@ -123,59 +131,59 @@
     tools={[
       [
         {
-          title: "Bold (Cmd+B)",
-          onclick: () => wrapSelection(editorView, "**"),
+          title: "Bold (⌘+B)",
+          onclick: () => boldCommand(editorView),
           icon: Bold,
         },
         {
-          title: "Italic (Cmd+I)",
-          onclick: () => wrapSelection(editorView, "*"),
+          title: "Italic (⌘+I)",
+          onclick: () => italicCommand(editorView),
           icon: Italic,
         },
         {
-          title: "Strikethrough (Cmd+Shift+X)",
-          onclick: () => wrapSelection(editorView, "~~"),
+          title: "Strikethrough (⌘+Shift+X)",
+          onclick: () => strikethroughCommand(editorView),
           icon: Strikethrough,
         },
         {
-          title: "Code (Cmd+E)",
-          onclick: () => wrapSelection(editorView, "`"),
+          title: "Code (⌘+E)",
+          onclick: () => codeCommand(editorView),
           icon: Code,
         },
       ],
       [
         {
-          title: "Link (Cmd+K)",
-          onclick: () => wrapSelection(editorView, "[", "](url)"),
+          title: "Link (⌘+K)",
+          onclick: () => linkCommand(editorView),
           icon: Link,
         },
       ],
       [
         {
           title: "Heading 1",
-          onclick: () => insertAtLineStart(editorView, "# "),
+          onclick: () => heading1Command(editorView),
           icon: Heading1,
         },
         {
           title: "Heading 2",
-          onclick: () => insertAtLineStart(editorView, "## "),
+          onclick: () => heading2Command(editorView),
           icon: Heading2,
         },
         {
           title: "Heading 3",
-          onclick: () => insertAtLineStart(editorView, "### "),
+          onclick: () => heading3Command(editorView),
           icon: Heading3,
         },
       ],
       [
         {
-          onclick: () => insertAtLineStart(editorView, "- "),
+          onclick: () => bulletListCommand(editorView),
           title: "Bullet List",
 
           icon: List,
         },
         {
-          onclick: () => insertAtLineStart(editorView, "1. "),
+          onclick: () => orderedListCommand(editorView),
           title: "Numbered List",
 
           icon: ListOrdered,

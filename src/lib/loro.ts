@@ -1,22 +1,40 @@
 import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
 import diff from "fast-diff";
 import { encryptData, decryptData } from "./crypto";
-import { Encoding, Function, Either } from "effect";
+import {
+  Encoding,
+  Function,
+  Either,
+  Stream,
+  Effect,
+  Fiber,
+  Chunk,
+  PubSub,
+  Schema,
+} from "effect";
 import { sync } from "./remote/sync.remote.ts";
+import { SyncSchema } from "./remote/notes.schemas.ts";
 
 export class LoroNoteManager {
   #noteId: string;
   #noteKey: string;
   #doc: LoroDoc;
   #text: LoroText;
-  #onUpdate: (snapshot: Uint8Array) => void;
+  #onUpdate: (snapshot: Uint8Array) => void | Promise<void>;
   #eventSource: EventSource | null = null;
   #isSyncing = false;
+
+  #outgoingHub: PubSub.PubSub<Uint8Array>;
+  #persistenceHub: PubSub.PubSub<null>;
+
+  #persistenceFiber: Fiber.RuntimeFiber<void, void>;
+  #outgoingFiber: Fiber.RuntimeFiber<void, void> | null = null;
+  #incomingFiber: Fiber.RuntimeFiber<void, void> | null = null;
 
   constructor(
     noteId: string,
     noteKey: string,
-    onUpdate?: (snapshot: Uint8Array) => void,
+    onUpdate?: (snapshot: Uint8Array) => void | Promise<void>,
   ) {
     this.#noteId = noteId;
     this.#noteKey = noteKey;
@@ -27,6 +45,22 @@ export class LoroNoteManager {
     // Initialize frontiers
     this.#lastFrontiers = this.#doc.frontiers();
 
+    // 1. Init Hubs
+    this.#outgoingHub = Effect.runSync(PubSub.unbounded<Uint8Array>());
+    this.#persistenceHub = Effect.runSync(PubSub.unbounded<null>());
+
+    // 2. Persistence Loop (Debounced Snapshot)
+    const persistenceStream = Stream.fromPubSub(this.#persistenceHub).pipe(
+      Stream.debounce("500 millis"),
+      Stream.runForEach(() =>
+        Effect.promise(async () => {
+          const snapshot = this.#doc.export({ mode: "snapshot" });
+          await this.#onUpdate(snapshot);
+        }),
+      ),
+    );
+    this.#persistenceFiber = Effect.runFork(persistenceStream);
+
     // Subscribe to changes
     this.#doc.subscribe((event) => {
       // Notify content listeners
@@ -35,29 +69,31 @@ export class LoroNoteManager {
         listener(content);
       });
 
-      // Only trigger update if the change is local or we need to persist remote changes
-      // For now, we persist everything to be safe
-      const snapshot = this.#doc.export({ mode: "snapshot" });
-      this.#onUpdate(snapshot);
+      // Publish persistence signal
+      Effect.runSync(this.#persistenceHub.publish(null));
 
-      // Send update to server if syncing and change is local
-      if (this.#isSyncing && event.by === "local") {
+      // Publish local ops for sync
+      if (event.by === "local") {
         const frontiers = this.#doc.frontiers();
-        // We need to be careful with export updates.
-        // For this MVP, let's just export the delta since last sync point if possible,
-        // or just export the whole update since last frontiers.
         try {
           const update = this.#doc.export({
             mode: "shallow-snapshot",
             frontiers: this.#lastFrontiers,
           });
           this.#lastFrontiers = frontiers;
-          void this.#sendUpdate(update);
+          if (update.length > 0) {
+            Effect.runSync(this.#outgoingHub.publish(update));
+          }
         } catch (e) {
           console.error("Error exporting update", e);
         }
       }
     });
+  }
+
+  destroy() {
+    this.stopSync();
+    Effect.runSync(Fiber.interrupt(this.#persistenceFiber));
   }
 
   #contentListeners: ((content: string) => void)[] = [];
@@ -93,30 +129,52 @@ export class LoroNoteManager {
     if (this.#isSyncing) return;
     this.#isSyncing = true;
 
-    // Connect to SSE endpoint
-    this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
+    // 3. Incoming Loop (Remote -> Loro)
+    const incomingStream = Stream.async<Uint8Array>((emit) => {
+      if (this.#eventSource) {
+        this.#eventSource.onmessage = (event) => {
+          try {
+            const data = Schema.decodeUnknownSync(Schema.parseJson(SyncSchema))(
+              event.data,
+            );
 
-    this.#eventSource.onmessage = (event: MessageEvent<string>) => {
-      try {
-        const data = JSON.parse(event.data) as unknown as { update: string };
-        if (data.update) {
-          // Apply remote update
-          const updateBytes = Encoding.decodeBase64(data.update).pipe(
-            Either.getOrThrow,
-          ) as Uint8Array<ArrayBuffer>;
-          this.#doc.import(updateBytes);
-        }
-      } catch (error) {
-        console.error("Failed to process sync message:", error);
+            for (const update of data.updates) {
+              const updateBytes = Encoding.decodeBase64(update).pipe(
+                Either.getOrThrow,
+              ) as Uint8Array<ArrayBuffer>;
+              void emit(Effect.succeed(Chunk.make(updateBytes)));
+            }
+          } catch (error) {
+            console.error("Failed to process sync message:", error);
+          }
+        };
+
+        this.#eventSource.onerror = (error) => {
+          console.error("SSE connection error:", error);
+          this.#eventSource?.close();
+          this.#isSyncing = false;
+        };
       }
-    };
+    }).pipe(
+      Stream.runForEach((update) =>
+        Effect.sync(() => {
+          this.#doc.import(update);
+        }),
+      ),
+    );
+    this.#incomingFiber = Effect.runFork(incomingStream);
 
-    this.#eventSource.onerror = (error) => {
-      console.error("SSE connection error:", error);
-      this.#eventSource?.close();
-      this.#isSyncing = false;
-      // Retry logic could go here
-    };
+    // 4. Outgoing Loop (Local -> Network)
+    const outgoingStream = Stream.fromPubSub(this.#outgoingHub).pipe(
+      Stream.groupedWithin(100, "500 millis"),
+      Stream.runForEach((chunk) =>
+        Effect.promise(async () => {
+          if (Chunk.isEmpty(chunk)) return;
+          await this.#sendUpdates(Chunk.toReadonlyArray(chunk));
+        }),
+      ),
+    );
+    this.#outgoingFiber = Effect.runFork(outgoingStream);
   }
 
   /**
@@ -127,17 +185,25 @@ export class LoroNoteManager {
       this.#eventSource.close();
       this.#eventSource = null;
     }
+    if (this.#incomingFiber) {
+      Effect.runSync(Fiber.interrupt(this.#incomingFiber));
+      this.#incomingFiber = null;
+    }
+    if (this.#outgoingFiber) {
+      Effect.runSync(Fiber.interrupt(this.#outgoingFiber));
+      this.#outgoingFiber = null;
+    }
     this.#isSyncing = false;
   }
 
   /**
    * Send update to server
    */
-  async #sendUpdate(updates: Uint8Array) {
+  async #sendUpdates(updates: readonly Uint8Array[]) {
     try {
       await sync({
         noteId: this.#noteId,
-        update: Encoding.encodeBase64(updates),
+        updates: updates.map((u) => Encoding.encodeBase64(u)),
       });
     } catch (error) {
       console.error("Failed to send update:", error);

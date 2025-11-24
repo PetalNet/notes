@@ -4,15 +4,9 @@ import { notes } from "$lib/server/db/schema.ts";
 import { broadcast } from "$lib/server/real-time.ts";
 import { error } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
-import { Schema } from "effect";
+import { syncSchema } from "./notes.schemas.ts";
 
-const SyncSchema = Schema.Struct({
-  noteId: Schema.String,
-  update: Schema.String,
-});
-const syncSchema = SyncSchema.pipe(Schema.standardSchemaV1);
-
-export const sync = command(syncSchema, async ({ noteId, update }) => {
+export const sync = command(syncSchema, async ({ noteId, updates }) => {
   const { locals } = getRequestEvent();
   const user = locals.user;
 
@@ -28,7 +22,7 @@ export const sync = command(syncSchema, async ({ noteId, update }) => {
 
     // Broadcast update to all connected clients
     // The update is expected to be a base64 string of the binary update
-    broadcast(noteId, JSON.stringify({ update }));
+    broadcast(noteId, JSON.stringify({ updates }));
   } catch (err) {
     console.error("Sync update error:", err);
     error(500, "Failed to process update");

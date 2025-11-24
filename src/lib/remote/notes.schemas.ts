@@ -27,3 +27,9 @@ export type ReorderNotes = typeof ReorderNotesSchema.Type;
 export const reorderNotesSchema = ReorderNotesSchema.pipe(
   Schema.standardSchemaV1,
 );
+
+export const SyncSchema = Schema.Struct({
+  noteId: Schema.String,
+  updates: Schema.Array(Schema.String),
+});
+export const syncSchema = SyncSchema.pipe(Schema.standardSchemaV1);

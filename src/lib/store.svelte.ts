@@ -170,7 +170,7 @@ export class Notes {
       // Clean up Loro manager
       const manager = loroManagers.get(noteId);
       if (manager) {
-        manager.stopSync();
+        manager.destroy();
         loroManagers.delete(noteId);
       }
     } catch (error) {

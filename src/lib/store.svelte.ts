@@ -1,12 +1,7 @@
 import { generateNoteKey, encryptKeyForUser, decryptKey } from "$lib/crypto";
 import { LoroNoteManager } from "$lib/loro";
 import { Order } from "effect";
-import {
-  createNote,
-  getNotes,
-  reorderNotes,
-  updateNote,
-} from "./remote/notes.remote.ts";
+import * as notesApi from "./remote/notes.remote.ts";
 import type { Folder, Note, NoteOrFolder } from "./schema.ts";
 import { page } from "$app/state";
 import { goto } from "$app/navigation";
@@ -108,7 +103,7 @@ export class Notes {
   /** Load current user's notes from the API. */
   async load(): Promise<void> {
     // TODO: Why do we waterfall? Shouldn't we SSR this?
-    this.#notesList = await getNotes();
+    this.#notesList = await notesApi.getNotes();
   }
 
   /** Create new note with encryption. */
@@ -127,7 +122,7 @@ export class Notes {
       // Encrypt note key with user's public key
       const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
 
-      const data = await createNote({
+      const data = await notesApi.createNote({
         title,
         encryptedKey,
         parentId,
@@ -163,7 +158,7 @@ export class Notes {
   /** Delete note. */
   async deleteNote(noteId: string): Promise<void> {
     try {
-      await this.deleteNote(noteId);
+      await notesApi.deleteNote(noteId);
 
       this.#notesList = this.#notesList.filter((note) => note.id !== noteId);
 
@@ -204,7 +199,7 @@ export class Notes {
   /** Update note title. */
   async updateNoteTitle(noteId: string, title: string): Promise<void> {
     try {
-      const newlyUpdatedNote = await updateNote({ noteId, title });
+      const newlyUpdatedNote = await notesApi.updateNote({ noteId, title });
 
       // TODO: Switch to Effect/Optic?
       const note = this.#notesList.find((n) => n.id === noteId);
@@ -218,7 +213,7 @@ export class Notes {
   /** Move note to folder (update parentId). */
   async moveNoteToFolder(noteId: string, newParentId: string | null) {
     try {
-      const newlyUpdatedNote = await updateNote({
+      const newlyUpdatedNote = await notesApi.updateNote({
         noteId,
         parentId: newParentId,
       });
@@ -233,9 +228,9 @@ export class Notes {
   }
 
   /** Helper function for API updates. */
-  async apiUpdateNote(noteId: string, loroSnapshot: string) {
+  async updateNote(noteId: string, loroSnapshot: string) {
     try {
-      await updateNote({ noteId, loroSnapshot });
+      await notesApi.updateNote({ noteId, loroSnapshot });
     } catch (error) {
       console.error("Update note title error:", error);
       throw error;
@@ -245,7 +240,7 @@ export class Notes {
   /** Reorder notes. */
   async reorderNotes(updates: ReorderNotes) {
     try {
-      await reorderNotes(updates);
+      await notesApi.reorderNotes(updates);
 
       // Update local state
       this.#notesList = this.#notesList.map((note) => {
@@ -326,7 +321,7 @@ export async function getLoroManager(
     const manager = new LoroNoteManager(noteId, noteKey, async (snapshot) => {
       // Auto-save on changes
       const encryptedSnapshot = await manager.getEncryptedSnapshot();
-      await notes.apiUpdateNote(noteId, encryptedSnapshot);
+      await notes.updateNote(noteId, encryptedSnapshot);
     });
 
     // Initialize with encrypted snapshot

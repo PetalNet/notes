@@ -186,6 +186,8 @@ export class LoroNoteManager {
         }
       }
     }
+
+    this.doc.commit();
   }
 
   /**

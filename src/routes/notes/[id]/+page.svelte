@@ -23,6 +23,7 @@
         setUserPrivateKey(data.user.privateKeyEncrypted);
       }
 
+      // TODO: SSR
       await notes.load();
     }
   });

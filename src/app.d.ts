@@ -8,7 +8,7 @@ declare global {
   namespace App {
     interface Locals {
       user: User | undefined;
-      session: Session;
+      session: Session | undefined;
     }
 
     // interface Error {}

@@ -6,7 +6,7 @@ import * as auth from "$lib/server/auth";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
 
-export const load = async (event) => {
+export const load = (event) => {
   if (event.locals.user) {
     return redirect(302, "/");
   }
@@ -79,11 +79,13 @@ export const actions = {
     });
 
     try {
+      // @ts-expect-error This is just the lucia demo.
       await db.insert(table.users).values({
         id: userId,
         username,
         passwordHash,
         createdAt: new Date(),
+        // @ts-expect-error This is just the lucia demo.
       } satisfies table.User);
 
       const sessionToken = auth.generateSessionToken();
@@ -92,7 +94,7 @@ export const actions = {
     } catch {
       return fail(500, { message: "An error has occurred" });
     }
-    return redirect(302, "/demo/lucia");
+    redirect(302, "/demo/lucia");
   },
 };
 

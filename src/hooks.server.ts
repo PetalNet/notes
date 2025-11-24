@@ -5,8 +5,8 @@ const handleAuth: Handle = async ({ event, resolve }) => {
   const sessionToken = event.cookies.get(auth.sessionCookieName);
 
   if (!sessionToken) {
-    event.locals.user = null;
-    event.locals.session = null;
+    event.locals.user = undefined;
+    event.locals.session = undefined;
 
     // Redirect to login if accessing protected routes
     if (event.url.pathname === "/") {

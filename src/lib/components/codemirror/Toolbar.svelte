@@ -26,6 +26,6 @@
         </button>
       {/each}
     </div>
-    <div class="mx-2 h-6 w-px bg-base-content last:hidden"></div>
+    <div class="mx-2 h-6 w-px bg-base-300 last:hidden"></div>
   {/each}
 </div>

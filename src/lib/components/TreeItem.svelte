@@ -14,7 +14,6 @@
   import Self from "./TreeItem.svelte";
   import { ChevronRight, Folder, FileText } from "@lucide/svelte";
   import { clsx } from "clsx";
-  import { page } from "$app/state";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
 
@@ -255,7 +254,7 @@
       }}
       class={[
         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-primary-content hover:text-primary hover:shadow-sm",
-        page.params.id === item.id
+        notes.selectedNoteId === item.id
           ? "bg-primary-content text-primary shadow-sm"
           : "text-base-content",
       ]}

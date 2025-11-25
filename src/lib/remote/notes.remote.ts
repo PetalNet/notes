@@ -1,5 +1,6 @@
-import { query, command } from "$app/server";
+import { command, query } from "$app/server";
 import type { NoteOrFolder } from "$lib/schema.ts";
+import { requireLogin } from "$lib/server/auth.ts";
 import { db } from "$lib/server/db/index.ts";
 import { notes } from "$lib/server/db/schema.ts";
 import { error } from "@sveltejs/kit";
@@ -7,10 +8,9 @@ import { and, eq } from "drizzle-orm";
 import {
   createNoteSchema,
   deleteNoteSchema,
-  updateNoteSchema,
   reorderNotesSchema,
+  updateNoteSchema,
 } from "./notes.schemas.ts";
-import { requireLogin } from "$lib/server/auth.ts";
 
 export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   const { user } = requireLogin();

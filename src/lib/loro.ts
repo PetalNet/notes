@@ -1,3 +1,6 @@
+import { decryptData, encryptData } from "$lib/crypto";
+import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
+import { sync } from "$lib/remote/sync.remote.ts";
 import {
   Chunk,
   Effect,
@@ -11,9 +14,6 @@ import {
 } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
-import { decryptData, encryptData } from "./crypto";
-import { syncSchemaJson } from "./remote/notes.schemas.ts";
-import { sync } from "./remote/sync.remote.ts";
 
 export class LoroNoteManager {
   #noteId: string;

@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { notes } from "$lib/store.svelte.ts";
   import { fade } from "svelte/transition";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
@@ -16,6 +15,7 @@
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
   import { logout } from "$lib/remote/accounts.remote.ts";
+  import type { Notes } from "$lib/store.svelte.ts";
 
   interface ContextState {
     x: number;
@@ -26,9 +26,10 @@
 
   interface Props {
     user: User | undefined;
+    notes: Notes;
   }
 
-  let { user }: Props = $props();
+  let { user, notes }: Props = $props();
   let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");

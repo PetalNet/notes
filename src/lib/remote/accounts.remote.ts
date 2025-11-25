@@ -1,12 +1,12 @@
 import { form, getRequestEvent } from "$app/server";
-import { fail, invalid, redirect } from "@sveltejs/kit";
-import { loginSchema, signupSchema } from "./accounts.schema.ts";
 import * as auth from "$lib/server/auth.ts";
 import { db } from "$lib/server/db/index.ts";
 import * as table from "$lib/server/db/schema.ts";
 import { hash, verify } from "@node-rs/argon2";
+import { fail, invalid, redirect } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { Redacted, Schema } from "effect";
+import { loginSchema, signupSchema } from "./accounts.schema.ts";
 
 export const login = form(
   loginSchema,

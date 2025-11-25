@@ -1,8 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-  import type { PageData } from "./$types";
 
-  let { data }: { data: PageData } = $props();
+  let { data } = $props();
 </script>
 
 <div class="min-h-screen bg-base-100 p-8">

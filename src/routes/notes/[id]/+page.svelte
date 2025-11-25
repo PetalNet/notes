@@ -1,14 +1,10 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
-  import Editor from "$lib/components/codemirror/Editor.svelte";
-  import {
-    getLoroManager,
-    notes,
-    syncSelectedNote,
-  } from "$lib/store.svelte.ts";
-  import type { LoroNoteManager } from "$lib/loro.js";
-  import { FilePlus, Folder } from "@lucide/svelte";
   import { dev } from "$app/environment";
+  import Editor from "$lib/components/codemirror/Editor.svelte";
+  import type { LoroNoteManager } from "$lib/loro.js";
+  import { notes } from "$lib/store.svelte.js";
+  import { FilePlus, Folder } from "@lucide/svelte";
+  import { onDestroy } from "svelte";
 
   // TODO: SSR
   await notes.load();
@@ -33,9 +29,9 @@
     }
 
     if (selectedId && selectedNote && !selectedNote.isFolder) {
-      void syncSelectedNote(selectedId);
+      void notes.syncSelectedNote(selectedId);
       console.log("[Page] Loading Loro manager for note:", selectedId);
-      void getLoroManager(selectedId).then((manager) => {
+      void notes.getLoroManager(selectedId).then((manager) => {
         console.log(
           "[Page] Loro manager loaded:",
           manager ? "Success" : "Failed",

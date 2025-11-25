@@ -1,13 +1,13 @@
-import { generateNoteKey, encryptKeyForUser, decryptKey } from "$lib/crypto";
-import { LoroNoteManager } from "$lib/loro";
-import { Order } from "effect";
-import * as notesApi from "./remote/notes.remote.ts";
-import type { Folder, Note, NoteOrFolder } from "./schema.ts";
-import { page } from "$app/state";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
+import { page } from "$app/state";
+import { decryptKey, encryptKeyForUser, generateNoteKey } from "$lib/crypto";
+import { LoroNoteManager } from "$lib/loro";
+import * as notesApi from "$lib/remote/notes.remote.ts";
+import type { ReorderNotes } from "$lib/remote/notes.schemas.ts";
+import type { Folder, Note, NoteOrFolder } from "$lib/schema.ts";
+import { Order } from "effect";
 import { SvelteMap } from "svelte/reactivity";
-import type { ReorderNotes } from "./remote/notes.schemas.ts";
 
 //#region Tree
 export type TreeNode = NoteOrFolder & { children: TreeNode[] };
@@ -27,51 +27,62 @@ function treeToSorted(tree: readonly TreeNode[]): TreeNode[] {
 }
 //#endregion
 
-//#region Auth
-interface AuthStore {
-  // TODO: Audit
-  userPrivateKey?: string | undefined;
-}
-
-export const auth = $state<AuthStore>({});
-
-export function setUserPrivateKey(privateKey: string) {
-  auth.userPrivateKey = privateKey;
-}
+//#region Notes
 type MaybeFolder<IsFolder extends boolean> = IsFolder extends true
   ? Folder
   : IsFolder extends false
     ? Note
     : NoteOrFolder;
 
-//#endregion
-
-//#region Notes
-
 export class Notes {
-  #notesList = $state<NoteOrFolder[]>([]);
+  userPrivateKey = $state<string>();
+  notesList = $state<NoteOrFolder[]>([]);
+  selectedNoteId = $derived(page.params.id);
 
-  #selectedNoteId = $derived(page.params.id);
+  /** Loro managers per note. */
+  #loroManagers = new SvelteMap<string, LoroNoteManager>();
+
+  constructor() {
+    // Subscribe to selected note changes to manage sync
+    $effect.root(() => {
+      $effect(() => {
+        const noteId = this.selectedNoteId;
+        if (!noteId) return;
+
+        const manager = this.#loroManagers.get(noteId);
+        if (manager) {
+          manager.startSync();
+        } else {
+          // Manager might not be created yet, getLoroManager will handle it
+          void this.getLoroManager(noteId);
+        }
+
+        return () => {
+          this.#loroManagers.get(noteId)?.stopSync();
+        };
+      });
+    });
+  }
 
   /** Derived note tree for sidebar. */
-  #notesTree = $derived.by(() => {
+  notesTree = $derived.by(() => {
     console.log("Recalculating note tree");
 
     const map = new SvelteMap<string, TreeNode>();
     const roots: TreeNode[] = [];
 
     // First pass: create map entries
-    for (const note of this.#notesList) {
+    for (const note of this.notesList) {
       map.set(note.id, { ...note, children: [] });
     }
 
     // Second pass: build tree
-    for (const note of this.#notesList) {
+    for (const note of this.notesList) {
       const current = map.get(note.id)!;
 
       if (note.parentId) {
         const parent = map.get(note.parentId);
-        if (parent?.isFolder) {
+        if (parent) {
           parent.children.push(current);
         } else {
           // Parent not found (maybe deleted?), treat as root or orphan
@@ -89,21 +100,10 @@ export class Notes {
     return tree;
   });
 
-  get notesList(): NoteOrFolder[] {
-    return this.#notesList;
-  }
-  get notesTree(): TreeNode[] {
-    return this.#notesTree;
-  }
-
-  get selectedNoteId(): string | undefined {
-    return this.#selectedNoteId;
-  }
-
   /** Load current user's notes from the API. */
   async load(): Promise<void> {
     // TODO: Why do we waterfall? Shouldn't we SSR this?
-    this.#notesList = await notesApi.getNotes();
+    this.notesList = await notesApi.getNotes();
   }
 
   /** Create new note with encryption. */
@@ -131,12 +131,12 @@ export class Notes {
 
       const newNote: NoteOrFolder = { ...data, content: "" };
 
-      this.#notesList.push(newNote);
+      this.notesList.push(newNote);
       goto(resolve("/notes/[id]", { id: newNote.id }));
 
       // Create Loro manager for the new note
       if (!isFolder) {
-        await getLoroManager(newNote.id);
+        await this.getLoroManager(newNote.id);
       }
 
       return newNote as MaybeFolder<IsFolder>;
@@ -160,18 +160,18 @@ export class Notes {
     try {
       await notesApi.deleteNote(noteId);
 
-      this.#notesList = this.#notesList.filter((note) => note.id !== noteId);
+      this.notesList = this.notesList.filter((note) => note.id !== noteId);
 
       // Clear selection if deleted note was selected
-      if (page.params.id === noteId) {
+      if (this.selectedNoteId === noteId) {
         goto(resolve("/"));
       }
 
       // Clean up Loro manager
-      const manager = loroManagers.get(noteId);
+      const manager = this.#loroManagers.get(noteId);
       if (manager) {
         manager.destroy();
-        loroManagers.delete(noteId);
+        this.#loroManagers.delete(noteId);
       }
     } catch (error) {
       console.error("Delete note error:", error);
@@ -189,7 +189,7 @@ export class Notes {
       await this.updateNoteTitle(noteId, title);
     }
     if (content !== undefined) {
-      const manager = loroManagers.get(noteId);
+      const manager = this.#loroManagers.get(noteId);
       if (manager) {
         manager.updateContent(content);
       }
@@ -202,7 +202,7 @@ export class Notes {
       const newlyUpdatedNote = await notesApi.updateNote({ noteId, title });
 
       // TODO: Switch to Effect/Optic?
-      const note = this.#notesList.find((n) => n.id === noteId);
+      const note = this.notesList.find((n) => n.id === noteId);
       if (note) note.title = newlyUpdatedNote.title;
     } catch (error) {
       console.error("Update note title error:", error);
@@ -211,7 +211,10 @@ export class Notes {
   }
 
   /** Move note to folder (update parentId). */
-  async moveNoteToFolder(noteId: string, newParentId: string | null) {
+  async moveNoteToFolder(
+    noteId: string,
+    newParentId: string | null,
+  ): Promise<void> {
     try {
       const newlyUpdatedNote = await notesApi.updateNote({
         noteId,
@@ -219,7 +222,7 @@ export class Notes {
       });
 
       // TODO: Switch to Effect/Optic?
-      const note = this.#notesList.find((n) => n.id === noteId);
+      const note = this.notesList.find((n) => n.id === noteId);
       if (note) note.parentId = newlyUpdatedNote.parentId;
     } catch (error) {
       console.error("Update note title error:", error);
@@ -228,7 +231,7 @@ export class Notes {
   }
 
   /** Helper function for API updates. */
-  async updateNote(noteId: string, loroSnapshot: string) {
+  async updateNote(noteId: string, loroSnapshot: string): Promise<void> {
     try {
       await notesApi.updateNote({ noteId, loroSnapshot });
     } catch (error) {
@@ -237,13 +240,13 @@ export class Notes {
     }
   }
 
-  /** Reorder notes. */
-  async reorderNotes(updates: ReorderNotes) {
+  /** Reorder this. */
+  async reorderNotes(updates: ReorderNotes): Promise<void> {
     try {
       await notesApi.reorderNotes(updates);
 
       // Update local state
-      this.#notesList = this.#notesList.map((note) => {
+      this.notesList = this.notesList.map((note) => {
         const update = updates.find((u) => u.id === note.id);
         return update ? { ...note, order: update.order } : note;
       });
@@ -254,91 +257,88 @@ export class Notes {
   }
 
   /** @internal */
-  updateContent(noteId: string, content: string) {
-    for (const [i, note] of this.#notesList.entries()) {
-      if (note.id == noteId) this.#notesList[i] = { ...note, content };
+  updateContent(noteId: string, content: string): void {
+    for (const [i, note] of this.notesList.entries()) {
+      if (note.id == noteId) this.notesList[i] = { ...note, content };
+    }
+  }
+
+  async syncSelectedNote(selectedId: string | undefined): Promise<void> {
+    for (const [id, manager] of this.#loroManagers) {
+      if (id !== selectedId) {
+        manager.stopSync();
+      }
+    }
+
+    if (!selectedId) {
+      return;
+    }
+
+    const manager = this.#loroManagers.get(selectedId);
+    if (manager) {
+      manager.startSync();
+      return;
+    }
+
+    await this.getLoroManager(selectedId);
+  }
+
+  // Decrypt note key with user's private key
+  async decryptNoteKey(
+    encryptedKey: string,
+    privateKey: string,
+  ): Promise<string> {
+    return await decryptKey(encryptedKey, privateKey);
+  }
+
+  // Get or create Loro manager for a note
+  async getLoroManager(noteId: string): Promise<LoroNoteManager | undefined> {
+    // Return existing manager if available
+    const preexistingLoroManager = this.#loroManagers.get(noteId);
+    if (preexistingLoroManager) return preexistingLoroManager;
+
+    // Find the note
+    const note = this.notesList.find((n) => n.id === noteId);
+    if (!note) return undefined;
+
+    if (!this.userPrivateKey) {
+      console.error("No private key available");
+      return undefined;
+    }
+
+    try {
+      // Decrypt the note's encryption key
+      const noteKey = await this.decryptNoteKey(
+        note.encryptedKey,
+        this.userPrivateKey,
+      );
+
+      // Create Loro manager with auto-save
+      const manager = new LoroNoteManager(noteId, noteKey, async (snapshot) => {
+        await this.updateNote(noteId, snapshot);
+      });
+
+      // Initialize with encrypted snapshot
+      if (note.loroSnapshot) {
+        await manager.init(note.loroSnapshot);
+      }
+
+      // Update note content
+      const content = manager.getContent();
+      this.updateContent(noteId, content);
+
+      this.#loroManagers.set(noteId, manager);
+
+      if (this.selectedNoteId === noteId) {
+        manager.startSync();
+      }
+
+      return manager;
+    } catch (error) {
+      throw new Error("Failed to decrypt note", { cause: error });
     }
   }
 }
 
 export const notes = new Notes();
 //#endregion
-
-// Loro managers per note
-const loroManagers = new SvelteMap<string, LoroNoteManager>();
-
-export async function syncSelectedNote(selectedId: string | undefined) {
-  for (const [id, manager] of loroManagers) {
-    if (id !== selectedId) {
-      manager.stopSync();
-    }
-  }
-
-  if (!selectedId) {
-    return;
-  }
-
-  const manager = loroManagers.get(selectedId);
-  if (manager) {
-    manager.startSync();
-    return;
-  }
-
-  await getLoroManager(selectedId);
-}
-
-// Decrypt note key with user's private key
-async function decryptNoteKey(
-  encryptedKey: string,
-  privateKey: string,
-): Promise<string> {
-  return await decryptKey(encryptedKey, privateKey);
-}
-
-// Get or create Loro manager for a note
-export async function getLoroManager(
-  noteId: string,
-): Promise<LoroNoteManager | undefined> {
-  // Return existing manager if available
-  const preexistingLoroManager = loroManagers.get(noteId);
-  if (preexistingLoroManager) return preexistingLoroManager;
-
-  // Find the note
-  const note = notes.notesList.find((n) => n.id === noteId);
-  if (!note) return undefined;
-
-  const privateKey = auth.userPrivateKey;
-  if (!privateKey) {
-    console.error("No private key available");
-    return undefined;
-  }
-
-  try {
-    // Decrypt the note's encryption key
-    const noteKey = await decryptNoteKey(note.encryptedKey, privateKey);
-
-    // Create Loro manager with auto-save
-    const manager = new LoroNoteManager(noteId, noteKey, async (snapshot) => {
-      await notes.updateNote(noteId, snapshot);
-    });
-
-    // Initialize with encrypted snapshot
-    if (note.loroSnapshot) {
-      await manager.init(note.loroSnapshot);
-    }
-
-    // Update note content
-    const content = manager.getContent();
-    notes.updateContent(noteId, content);
-
-    loroManagers.set(noteId, manager);
-
-    if (notes.selectedNoteId === noteId) {
-      manager.startSync();
-    }
-
-    return manager;
-  } catch (error) {
-    throw new Error("Failed to decrypt note", { cause: error });
-  }
-}

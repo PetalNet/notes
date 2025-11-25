@@ -14,6 +14,7 @@ import {
 } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
+import { unawaited } from "./unawaited.ts";
 
 export class LoroNoteManager {
   #noteId: string;
@@ -143,7 +144,7 @@ export class LoroNoteManager {
               const updateBytes = Encoding.decodeBase64(update).pipe(
                 Either.getOrThrow,
               ) as Uint8Array<ArrayBuffer>;
-              void emit(Effect.succeed(Chunk.make(updateBytes)));
+              unawaited(emit(Effect.succeed(Chunk.make(updateBytes))));
             }
           } catch (error) {
             console.error("Failed to process sync message:", error);

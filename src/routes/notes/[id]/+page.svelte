@@ -3,6 +3,7 @@
   import Editor from "$lib/components/codemirror/Editor.svelte";
   import type { LoroNoteManager } from "$lib/loro.js";
   import { notes } from "$lib/store.svelte.js";
+  import { unawaited } from "$lib/unawaited.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
   import { onDestroy } from "svelte";
 
@@ -29,30 +30,38 @@
     }
 
     if (selectedId && selectedNote && !selectedNote.isFolder) {
-      void notes.syncSelectedNote(selectedId);
-      console.log("[Page] Loading Loro manager for note:", selectedId);
-      void notes.getLoroManager(selectedId).then((manager) => {
-        console.log(
-          "[Page] Loro manager loaded:",
-          manager ? "Success" : "Failed",
-        );
-        loroManager = manager;
-        if (manager) {
-          // Set initial content
-          const initialContent = manager.getContent();
-          console.log("[Page] Initial content:", initialContent);
-          editorContent = initialContent;
+      unawaited(
+        (async () => {
+          await notes.syncSelectedNote(selectedId);
 
-          // Subscribe to content changes
-          unsubscribeContent = manager.subscribeToContent((content) => {
-            console.log(
-              "[Page] Content update received. Preview:",
-              content.slice(0, 20),
-            );
-            editorContent = content;
-          });
-        }
-      });
+          console.log("[Page] Loading Loro manager for note:", selectedId);
+
+          const manager = await notes.getLoroManager(selectedId);
+
+          console.log(
+            "[Page] Loro manager loaded:",
+            manager ? "Success" : "Failed",
+          );
+
+          loroManager = manager;
+
+          if (manager) {
+            // Set initial content
+            const initialContent = manager.getContent();
+            console.log("[Page] Initial content:", initialContent);
+            editorContent = initialContent;
+
+            // Subscribe to content changes
+            unsubscribeContent = manager.subscribeToContent((content) => {
+              console.log(
+                "[Page] Content update received. Preview:",
+                content.slice(0, 20),
+              );
+              editorContent = content;
+            });
+          }
+        })(),
+      );
     } else {
       console.log("[Page] No valid note selected or is folder");
       loroManager = undefined;

@@ -16,6 +16,7 @@
   import ProfilePicture from "./ProfilePicture.svelte";
   import { logout } from "$lib/remote/accounts.remote.ts";
   import type { Notes } from "$lib/store.svelte.ts";
+  import { unawaited } from "$lib/unawaited.ts";
 
   interface ContextState {
     x: number;
@@ -56,7 +57,7 @@
 
         // Move to root if it's not already there
         if (sourceParentId !== null) {
-          void notes.moveNoteToFolder(sourceId, null);
+          unawaited(notes.moveNoteToFolder(sourceId, null));
         }
       },
     });
@@ -216,11 +217,13 @@
             throw new Error("Cannot create note whilst logged out.");
           }
 
-          void notes.createNote(
-            "Untitled Note",
-            clickedId,
-            false,
-            user.publicKey,
+          unawaited(
+            notes.createNote(
+              "An Untitled Note",
+              clickedId,
+              false,
+              user.publicKey,
+            ),
           );
           closeContextMenu();
         }}><Plus /> New Note Inside</button

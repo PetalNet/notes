@@ -8,6 +8,7 @@ import type { ReorderNotes } from "$lib/remote/notes.schemas.ts";
 import type { Folder, Note, NoteOrFolder } from "$lib/schema.ts";
 import { Order } from "effect";
 import { SvelteMap } from "svelte/reactivity";
+import { unawaited } from "./unawaited.ts";
 
 //#region Tree
 export type TreeNode = NoteOrFolder & { children: TreeNode[] };
@@ -54,7 +55,7 @@ export class Notes {
           manager.startSync();
         } else {
           // Manager might not be created yet, getLoroManager will handle it
-          void this.getLoroManager(noteId);
+          unawaited(this.getLoroManager(noteId));
         }
 
         return () => {

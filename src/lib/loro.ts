@@ -94,7 +94,7 @@ export class LoroNoteManager {
 
   destroy() {
     this.stopSync();
-    Effect.runSync(Fiber.interrupt(this.#persistenceFiber));
+    Effect.runFork(Fiber.interrupt(this.#persistenceFiber));
   }
 
   #contentListeners: ((content: string) => void)[] = [];

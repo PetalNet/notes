@@ -18,8 +18,8 @@ const config = {
 
     typescript: {
       config(config) {
-        config.include = /** @type {string[]} */ (config.include).map((path) =>
-          path.replace("vite.config", "*.config"),
+        config["include"] = /** @type {string[]} */ (config["include"]).map(
+          (path) => path.replace("vite.config", "*.config"),
         );
       },
     },

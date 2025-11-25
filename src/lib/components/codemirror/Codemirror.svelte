@@ -5,14 +5,18 @@
   import type { ClassValue } from "svelte/elements";
 
   interface Props {
-    doc: string | Text | undefined;
+    doc: string | Text;
     extensions: Extension | undefined;
     class?: ClassValue;
-
     editorView: EditorView;
   }
 
-  let { doc, extensions, editorView = $bindable(), ...props }: Props = $props();
+  let {
+    doc,
+    extensions = [],
+    editorView = $bindable(),
+    ...props
+  }: Props = $props();
 
   let editorElement: HTMLElement;
 

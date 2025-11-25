@@ -124,73 +124,73 @@
       });
     }
   });
+
+  const tools = [
+    [
+      {
+        title: "Bold (⌘+B)",
+        onclick: () => boldCommand(editorView),
+        icon: Bold,
+      },
+      {
+        title: "Italic (⌘+I)",
+        onclick: () => italicCommand(editorView),
+        icon: Italic,
+      },
+      {
+        title: "Strikethrough (⌘+Shift+X)",
+        onclick: () => strikethroughCommand(editorView),
+        icon: Strikethrough,
+      },
+      {
+        title: "Code (⌘+E)",
+        onclick: () => codeCommand(editorView),
+        icon: Code,
+      },
+    ],
+    [
+      {
+        title: "Link (⌘+K)",
+        onclick: () => linkCommand(editorView),
+        icon: Link,
+      },
+    ],
+    [
+      {
+        title: "Heading 1",
+        onclick: () => heading1Command(editorView),
+        icon: Heading1,
+      },
+      {
+        title: "Heading 2",
+        onclick: () => heading2Command(editorView),
+        icon: Heading2,
+      },
+      {
+        title: "Heading 3",
+        onclick: () => heading3Command(editorView),
+        icon: Heading3,
+      },
+    ],
+    [
+      {
+        onclick: () => bulletListCommand(editorView),
+        title: "Bullet List",
+
+        icon: List,
+      },
+      {
+        onclick: () => orderedListCommand(editorView),
+        title: "Numbered List",
+
+        icon: ListOrdered,
+      },
+    ],
+  ];
 </script>
 
 <div class="flex h-full flex-col">
-  <Toolbar
-    tools={[
-      [
-        {
-          title: "Bold (⌘+B)",
-          onclick: () => boldCommand(editorView),
-          icon: Bold,
-        },
-        {
-          title: "Italic (⌘+I)",
-          onclick: () => italicCommand(editorView),
-          icon: Italic,
-        },
-        {
-          title: "Strikethrough (⌘+Shift+X)",
-          onclick: () => strikethroughCommand(editorView),
-          icon: Strikethrough,
-        },
-        {
-          title: "Code (⌘+E)",
-          onclick: () => codeCommand(editorView),
-          icon: Code,
-        },
-      ],
-      [
-        {
-          title: "Link (⌘+K)",
-          onclick: () => linkCommand(editorView),
-          icon: Link,
-        },
-      ],
-      [
-        {
-          title: "Heading 1",
-          onclick: () => heading1Command(editorView),
-          icon: Heading1,
-        },
-        {
-          title: "Heading 2",
-          onclick: () => heading2Command(editorView),
-          icon: Heading2,
-        },
-        {
-          title: "Heading 3",
-          onclick: () => heading3Command(editorView),
-          icon: Heading3,
-        },
-      ],
-      [
-        {
-          onclick: () => bulletListCommand(editorView),
-          title: "Bullet List",
-
-          icon: List,
-        },
-        {
-          onclick: () => orderedListCommand(editorView),
-          title: "Numbered List",
-
-          icon: ListOrdered,
-        },
-      ],
-    ]}
-  />
+  <Toolbar {tools} />
 
   <Codemirror
     bind:editorView

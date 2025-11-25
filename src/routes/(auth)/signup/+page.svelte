@@ -1,49 +1,11 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
-  import { generateUserKeys } from "$lib/crypto";
+  import { generateUserKeys } from "$lib/crypto.ts";
+  import { signup } from "$lib/remote/accounts.remote.ts";
+  import { signupSchema } from "$lib/remote/accounts.schema.ts";
 
-  let username = $state("");
-  let password = $state("");
-  let error = $state("");
-  let loading = $state(false);
-
-  async function handleSignup() {
-    if (!username || !password) {
-      error = "Username and password are required";
-      return;
-    }
-
-    loading = true;
-    error = "";
-
-    try {
-      // Generate encryption keys
-      const { publicKey, privateKey } = await generateUserKeys();
-
-      const res = await fetch("/api/auth/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username,
-          password,
-          publicKey,
-          privateKeyEncrypted: privateKey,
-        }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Signup failed");
-      }
-
-      goto(resolve("/"));
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
-  }
+  let publicKeyInput: HTMLInputElement;
+  let privateKeyInput: HTMLInputElement;
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
@@ -51,45 +13,73 @@
     <div class="card-body">
       <h2 class="card-title">Sign Up</h2>
 
-      {#if error}
+      {#each signup.fields.allIssues() as issue (issue.path)}
         <div class="alert alert-error">
-          <span>{error}</span>
+          <p>{issue.message}</p>
         </div>
-      {/if}
+      {/each}
 
-      <form
-        onsubmit={async (e) => {
-          e.preventDefault();
-          await handleSignup();
-        }}
-      >
-        <div class="form-control">
-          <label class="label" for="username">Username</label>
-          <input
-            id="username"
-            type="text"
-            bind:value={username}
-            class="input-bordered input"
-            disabled={loading}
-          />
-        </div>
+      <form {...signup.preflight(signupSchema)}>
+        <input type="hidden" name="publicKey" bind:this={publicKeyInput} />
+        <input
+          type="hidden"
+          name="privateKeyEncrypted"
+          bind:this={privateKeyInput}
+        />
+        <fieldset disabled={signup.pending !== 0}>
+          <div class="form-control">
+            <label>
+              <div class="label">
+                <span class="label-text">Username</span>
+              </div>
+              <input {...signup.fields.username.as("text")} class=" input" />
+            </label>
+          </div>
 
-        <div class="form-control">
-          <label class="label" for="password">Password</label>
-          <input
-            id="password"
-            type="password"
-            bind:value={password}
-            class="input-bordered input"
-            disabled={loading}
-          />
-        </div>
+          <div class="form-control">
+            <label>
+              <div class="label">
+                <span class="label-text">Password</span>
+              </div>
+              <input
+                {...signup.fields._password.as("password")}
+                class="input"
+              />
+            </label>
+          </div>
 
-        <div class="form-control mt-6">
-          <button type="submit" class="btn btn-primary" disabled={loading}>
-            {loading ? "Creating account..." : "Sign Up"}
-          </button>
-        </div>
+          <div class="form-control mt-6">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              disabled={signup.pending !== 0}
+              onclick={async (e) => {
+                // We require client-side JS to generate the key.
+                // SvelteKit enforces that enhance is purely for enhancement.
+                // Therefore, we have to submit the form from in here to make it explicit
+                // that there is no fallback.
+
+                e.preventDefault();
+                const submitter = e.currentTarget;
+
+                // Generate encryption keys
+                const { publicKey, privateKey } = await generateUserKeys();
+
+                publicKeyInput.value = publicKey;
+                privateKeyInput.value = privateKey;
+
+                await signup.validate({ preflightOnly: true });
+                console.log(signup.fields.allIssues());
+
+                if ((signup.fields.allIssues()?.length ?? 0) !== 0) return;
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- It is indeed a child of a form.
+                submitter.form!.requestSubmit(submitter);
+              }}
+            >
+              {signup.pending !== 0 ? "Logging in..." : "Log In"}
+            </button>
+          </div>
+        </fieldset>
       </form>
 
       <div class="divider">OR</div>

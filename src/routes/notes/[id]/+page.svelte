@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import Sidebar from "$lib/components/Sidebar.svelte";
+  import { onDestroy } from "svelte";
   import Editor from "$lib/components/codemirror/Editor.svelte";
   import {
-    setUserPrivateKey,
     getLoroManager,
     notes,
     syncSelectedNote,
@@ -12,29 +10,15 @@
   import { FilePlus, Folder } from "@lucide/svelte";
   import { dev } from "$app/environment";
 
-  let { data } = $props();
-
-  onMount(async () => {
-    if (data.user) {
-      // TODO: Decrypt private key with password
-      // For now, using the encrypted key as-is (needs proper PBKDF2 implementation)
-      if (data.user.privateKeyEncrypted) {
-        // In production, this should decrypt with user's password
-        // The crypto functions expect base64-encoded strings, so pass as-is
-        setUserPrivateKey(data.user.privateKeyEncrypted);
-      }
-
-      // TODO: SSR
-      await notes.load();
-    }
-  });
+  // TODO: SSR
+  await notes.load();
 
   let selectedNote = $derived(
     notes.notesList.find((n) => n.id === notes.selectedNoteId),
   );
   let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
-  let unsubscribeContent: (() => void) | undefined = undefined;
+  let unsubscribeContent: (() => void) | undefined;
 
   // Load Loro manager when note is selected
   $effect.pre(() => {
@@ -88,57 +72,52 @@
   });
 </script>
 
-<div class="flex h-screen overflow-hidden">
-  {#if data.user}
-    <Sidebar user={data.user} />
-  {/if}
-  <div class="relative h-full flex-1 overflow-hidden">
-    {#if selectedNote && loroManager}
-      <Editor
-        content={editorContent}
-        onchange={(newContent: string) => {
-          // Update local state immediately to avoid jitter
-          editorContent = newContent;
-          // Update Loro
-          loroManager?.updateContent(newContent);
-        }}
-      />
-    {:else if selectedNote?.isFolder}
-      <div class="flex h-full items-center justify-center text-slate-400">
-        <div class="text-center">
-          <p class="mb-2 text-xl font-medium">
-            <Folder class="inline-block" />
-            {selectedNote.title}
-          </p>
-          <p class="text-sm">Select a note inside to start editing.</p>
-        </div>
+<div class="relative h-full flex-1 overflow-hidden">
+  {#if selectedNote && loroManager}
+    <Editor
+      content={editorContent}
+      onchange={(newContent: string) => {
+        // Update local state immediately to avoid jitter
+        editorContent = newContent;
+        // Update Loro
+        loroManager?.updateContent(newContent);
+      }}
+    />
+  {:else if selectedNote?.isFolder}
+    <div class="flex h-full items-center justify-center text-slate-400">
+      <div class="text-center">
+        <p class="mb-2 text-xl font-medium">
+          <Folder class="inline-block" />
+          {selectedNote.title}
+        </p>
+        <p class="text-sm">Select a note inside to start editing.</p>
       </div>
-    {:else}
-      <div class="flex h-full items-center justify-center text-slate-400">
-        <div class="text-center">
-          <div
-            class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100"
-          >
-            <FilePlus />
-          </div>
-          <p class="mb-2 text-xl font-medium">No note selected</p>
-          <p class="text-sm">
-            Select a note from the sidebar or create a new one.
-          </p>
+    </div>
+  {:else}
+    <div class="flex h-full items-center justify-center text-slate-400">
+      <div class="text-center">
+        <div
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100"
+        >
+          <FilePlus />
         </div>
+        <p class="mb-2 text-xl font-medium">No note selected</p>
+        <p class="text-sm">
+          Select a note from the sidebar or create a new one.
+        </p>
       </div>
-    {/if}
-  </div>
-
-  <!-- Debug Overlay -->
-  {#if dev}
-    <div
-      class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
-    >
-      <p>Selected Note: {notes.selectedNoteId}</p>
-      <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
-      <p>Content Length: {editorContent.length}</p>
-      <p>Content Preview: {editorContent.slice(0, 50)}</p>
     </div>
   {/if}
 </div>
+
+<!-- Debug Overlay -->
+{#if dev}
+  <div
+    class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
+  >
+    <p>Selected Note: {notes.selectedNoteId}</p>
+    <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
+    <p>Content Length: {editorContent.length}</p>
+    <p>Content Preview: {editorContent.slice(0, 50)}</p>
+  </div>
+{/if}

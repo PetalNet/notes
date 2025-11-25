@@ -20,7 +20,7 @@ export class LoroNoteManager {
   #noteKey: string;
   #doc: LoroDoc;
   #text: LoroText;
-  #onUpdate: (snapshot: Uint8Array) => void | Promise<void>;
+  #onUpdate: (snapshot: string) => void | Promise<void>;
   #eventSource: EventSource | null = null;
   #isSyncing = false;
 
@@ -34,7 +34,7 @@ export class LoroNoteManager {
   constructor(
     noteId: string,
     noteKey: string,
-    onUpdate?: (snapshot: Uint8Array) => void | Promise<void>,
+    onUpdate?: (snapshot: string) => void | Promise<void>,
   ) {
     this.#noteId = noteId;
     this.#noteKey = noteKey;
@@ -54,7 +54,7 @@ export class LoroNoteManager {
       Stream.debounce("500 millis"),
       Stream.runForEach(() =>
         Effect.promise(async () => {
-          const snapshot = this.#doc.export({ mode: "snapshot" });
+          const snapshot = await this.getEncryptedSnapshot();
           await this.#onUpdate(snapshot);
         }),
       ),

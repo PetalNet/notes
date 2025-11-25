@@ -144,7 +144,7 @@ function headingCommandFactory(count: number) {
     const match = /^(#{1,6})\s/.exec(line.text);
 
     if (match) {
-      const currentCount = match[1].length;
+      const currentCount = match[1]?.length;
       const end = line.from + match[0].length;
 
       if (currentCount === count) {

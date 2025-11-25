@@ -1,40 +1,7 @@
 <script lang="ts">
-  import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
-
-  let username = $state("");
-  let password = $state("");
-  let error = $state("");
-  let loading = $state(false);
-
-  async function handleLogin() {
-    if (!username || !password) {
-      error = "Username and password are required";
-      return;
-    }
-
-    loading = true;
-    error = "";
-
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error ?? "Login failed");
-      }
-
-      goto(resolve("/"));
-    } catch (e) {
-      error = (e as Error).message;
-    } finally {
-      loading = false;
-    }
-  }
+  import { login } from "$lib/remote/accounts.remote.ts";
+  import { loginSchema } from "$lib/remote/accounts.schema.ts";
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
@@ -42,49 +9,38 @@
     <div class="card-body">
       <h2 class="card-title">Log In</h2>
 
-      {#if error}
+      {#each login.fields.allIssues() as issue (issue.path)}
         <div class="alert alert-error">
-          <span>{error}</span>
+          <p>{issue.message}</p>
         </div>
-      {/if}
+      {/each}
 
-      <form
-        onsubmit={async (e) => {
-          e.preventDefault();
-          await handleLogin();
-        }}
-      >
-        <div class="form-control">
-          <label class="label" for="username">
-            <span class="label-text">Username</span>
-          </label>
-          <input
-            id="username"
-            type="text"
-            bind:value={username}
-            class="input-bordered input"
-            disabled={loading}
-          />
-        </div>
+      <form {...login.preflight(loginSchema)}>
+        <fieldset disabled={login.pending !== 0}>
+          <div class="form-control">
+            <label>
+              <div class="label">
+                <span class="label-text">Username</span>
+              </div>
+              <input {...login.fields.username.as("text")} class=" input" />
+            </label>
+          </div>
 
-        <div class="form-control">
-          <label class="label" for="password">
-            <span class="label-text">Password</span>
-          </label>
-          <input
-            id="password"
-            type="password"
-            bind:value={password}
-            class="input-bordered input"
-            disabled={loading}
-          />
-        </div>
+          <div class="form-control">
+            <label>
+              <div class="label">
+                <span class="label-text">Password</span>
+              </div>
+              <input {...login.fields._password.as("password")} class="input" />
+            </label>
+          </div>
 
-        <div class="form-control mt-6">
-          <button type="submit" class="btn btn-primary" disabled={loading}>
-            {loading ? "Logging in..." : "Log In"}
-          </button>
-        </div>
+          <div class="form-control mt-6">
+            <button type="submit" class="btn btn-primary">
+              {login.pending !== 0 ? "Logging in..." : "Log In"}
+            </button>
+          </div>
+        </fieldset>
       </form>
 
       <div class="divider">OR</div>

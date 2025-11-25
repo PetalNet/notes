@@ -15,6 +15,7 @@
   } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
+  import { logout } from "$lib/remote/accounts.remote.ts";
 
   interface ContextState {
     x: number;
@@ -48,8 +49,9 @@
       },
       onDrop: ({ source }) => {
         isRootDropTarget = false;
-        const sourceId = source.data.id as string;
-        const sourceParentId = source.data.parentId as string | null;
+        // TODO: make this typesafe
+        const sourceId = source.data["id"] as string;
+        const sourceParentId = source.data["parentId"] as string | null;
 
         // Move to root if it's not already there
         if (sourceParentId !== null) {
@@ -132,7 +134,7 @@
         >{user?.username ?? "Anonymous"}</span
       >
     </div>
-    <form action="?/logout" method="POST">
+    <form {...logout}>
       <button
         type="submit"
         class="text-xs text-base-content/40 transition-colors hover:text-base-content/60"

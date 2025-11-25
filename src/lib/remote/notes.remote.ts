@@ -1,4 +1,4 @@
-import { query, getRequestEvent, command } from "$app/server";
+import { query, command } from "$app/server";
 import type { NoteOrFolder } from "$lib/schema.ts";
 import { db } from "$lib/server/db/index.ts";
 import { notes } from "$lib/server/db/schema.ts";
@@ -10,12 +10,10 @@ import {
   updateNoteSchema,
   reorderNotesSchema,
 } from "./notes.schemas.ts";
+import { requireLogin } from "$lib/server/auth.ts";
 
 export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
-  const { locals } = getRequestEvent();
-  const user = locals.user;
-
-  if (!user) error(401, "Unauthorized");
+  const { user } = requireLogin();
 
   const userNotes = await db.query.notes.findMany({
     where: (notes) => eq(notes.ownerId, user.id),
@@ -42,10 +40,7 @@ export const createNote = command(
     parentId,
     isFolder,
   }): Promise<Omit<NoteOrFolder, "content">> => {
-    const { locals } = getRequestEvent();
-    const user = locals.user;
-
-    if (!user) error(401, "Unauthorized");
+    const { user } = requireLogin();
 
     try {
       if (!title || !encryptedKey) {
@@ -84,10 +79,7 @@ export const createNote = command(
 export const deleteNote = command(
   deleteNoteSchema,
   async (noteId): Promise<void> => {
-    const { locals } = getRequestEvent();
-    const user = locals.user;
-
-    if (!user) error(401, "Unauthorized");
+    const { user } = requireLogin();
 
     try {
       // Verify ownership
@@ -113,10 +105,7 @@ export const updateNote = command(
     loroSnapshot,
     parentId,
   }): Promise<Omit<NoteOrFolder, "content">> => {
-    const { locals } = getRequestEvent();
-    const user = locals.user;
-
-    if (!user) error(401, "Unauthorized");
+    const { user } = requireLogin();
 
     try {
       // Verify ownership
@@ -160,17 +149,14 @@ function isTuple<T>(array: T[]): array is [T, ...T[]] {
 export const reorderNotes = command(
   reorderNotesSchema,
   async (updates): Promise<void> => {
-    const { locals } = getRequestEvent();
-    const user = locals.user;
-
-    if (!user) error(401, "Unauthorized");
+    const { user } = requireLogin();
 
     try {
       const updateStatements = updates.map(({ id, order: newOrder }) =>
         db
           .update(notes)
           .set({ order: newOrder, updatedAt: new Date() })
-          .where(and(eq(notes.id, id))),
+          .where(and(eq(notes.id, id), eq(notes.ownerId, user.id))),
       );
 
       // If no notes exist, do nothing.

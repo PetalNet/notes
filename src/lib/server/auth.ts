@@ -1,10 +1,11 @@
-import type { RequestEvent } from "@sveltejs/kit";
+import { error, redirect, type Cookies } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { sha256 } from "@oslojs/crypto/sha2";
 import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
 import type { User } from "$lib/schema.ts";
+import { getRequestEvent } from "$app/server";
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -36,15 +37,17 @@ export interface Session {
   expiresAt: Date;
 }
 
-export type AuthData =
-  | {
-      session: undefined;
-      user: undefined;
-    }
-  | {
-      session: Session;
-      user: User;
-    };
+interface NoAuthData {
+  session: undefined;
+  user: undefined;
+}
+
+interface SomeAuthData {
+  session: Session;
+  user: User;
+}
+
+export type AuthData = NoAuthData | SomeAuthData;
 
 export async function validateSessionToken(token: string): Promise<AuthData> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
@@ -63,9 +66,10 @@ export async function validateSessionToken(token: string): Promise<AuthData> {
     .innerJoin(table.users, eq(table.sessions.userId, table.users.id))
     .where(eq(table.sessions.token, sessionId));
 
-  if (!result) {
+  if (result === undefined) {
     return { session: undefined, user: undefined };
   }
+
   const { session, user } = result;
 
   const sessionExpired = Date.now() >= session.expiresAt.getTime();
@@ -94,18 +98,40 @@ export async function invalidateSession(sessionId: string) {
 }
 
 export function setSessionTokenCookie(
-  event: RequestEvent,
+  cookies: Cookies,
   token: string,
   expiresAt: Date,
 ) {
-  event.cookies.set(sessionCookieName, token, {
+  cookies.set(sessionCookieName, token, {
     expires: expiresAt,
     path: "/",
   });
 }
 
-export function deleteSessionTokenCookie(event: RequestEvent) {
-  event.cookies.delete(sessionCookieName, {
+export function deleteSessionTokenCookie(cookies: Cookies) {
+  cookies.delete(sessionCookieName, {
     path: "/",
   });
+}
+
+export function guardLogin(): SomeAuthData {
+  const {
+    locals: { user, session },
+  } = getRequestEvent();
+
+  if (!user || !session) {
+    redirect(302, "/login");
+  }
+
+  return { user, session };
+}
+
+export function requireLogin(): SomeAuthData {
+  const {
+    locals: { user, session },
+  } = getRequestEvent();
+
+  if (!user || !session) error(401, "Unauthorized");
+
+  return { user, session };
 }

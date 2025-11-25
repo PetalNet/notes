@@ -1,16 +1,39 @@
 {
   "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
+    // Environment Settings
+    // See also https://aka.ms/tsconfig/module
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "types": [],
     "allowImportingTsExtensions": true,
+
+    // Other Outputs
+    "sourceMap": true,
+
+    // Stricter Typechecking Options
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+
+    // Style Options
+    "noImplicitReturns": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    // Recommended Options
+    "strict": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "erasableSyntaxOnly": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+
     "allowJs": true,
     "checkJs": true,
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "sourceMap": true,
-    "strict": true,
-    "moduleResolution": "bundler",
+
     "plugins": [
       {
         "name": "typescript-svelte-plugin",

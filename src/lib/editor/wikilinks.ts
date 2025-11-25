@@ -38,7 +38,7 @@ class WikilinkWidget extends WidgetType {
     return a;
   }
 
-  ignoreEvent() {
+  override ignoreEvent() {
     return false;
   }
 }
@@ -47,7 +47,10 @@ const wikilinkMatcher = new MatchDecorator({
   regexp: /\[\[([^\]]+)\]\]/g,
   decoration: (match) =>
     Decoration.replace({
-      widget: new WikilinkWidget(match[1]),
+      widget: new WikilinkWidget(
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- There is a capture group in the regex.
+        match[1]!,
+      ),
     }),
 });
 

@@ -104,8 +104,8 @@
         isDropTarget = false;
       },
       onDrop: async ({ source }) => {
-        const sourceId = source.data.id as string;
-        const sourceParentId = source.data.parentId as string | null;
+        const sourceId = source.data["id"] as string;
+        const sourceParentId = source.data["parentId"] as string | null;
 
         // 1. Drop INTO folder
         if (isDropTarget && item.isFolder) {

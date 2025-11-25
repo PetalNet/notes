@@ -319,9 +319,7 @@ export async function getLoroManager(
 
     // Create Loro manager with auto-save
     const manager = new LoroNoteManager(noteId, noteKey, async (snapshot) => {
-      // Auto-save on changes
-      const encryptedSnapshot = await manager.getEncryptedSnapshot();
-      await notes.updateNote(noteId, encryptedSnapshot);
+      await notes.updateNote(noteId, snapshot);
     });
 
     // Initialize with encrypted snapshot

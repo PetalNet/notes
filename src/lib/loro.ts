@@ -187,11 +187,11 @@ export class LoroNoteManager {
       this.#eventSource = null;
     }
     if (this.#incomingFiber) {
-      Effect.runSync(Fiber.interrupt(this.#incomingFiber));
+      Effect.runFork(Fiber.interrupt(this.#incomingFiber));
       this.#incomingFiber = null;
     }
     if (this.#outgoingFiber) {
-      Effect.runSync(Fiber.interrupt(this.#outgoingFiber));
+      Effect.runFork(Fiber.interrupt(this.#outgoingFiber));
       this.#outgoingFiber = null;
     }
     this.#isSyncing = false;

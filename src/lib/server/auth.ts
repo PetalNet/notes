@@ -63,6 +63,9 @@ export async function validateSessionToken(token: string): Promise<AuthData> {
     .innerJoin(table.users, eq(table.sessions.userId, table.users.id))
     .where(eq(table.sessions.token, sessionId));
 
+  if (!result) {
+    return { session: undefined, user: undefined };
+  }
   const { session, user } = result;
 
   const sessionExpired = Date.now() >= session.expiresAt.getTime();

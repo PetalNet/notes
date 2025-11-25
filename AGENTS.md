@@ -268,8 +268,7 @@ src/
 │   │       └── schema.ts   # Drizzle schema definitions
 │   ├── crypto.ts           # Cryptography utilities
 │   ├── loro.ts             # Loro CRDT for collaboration
-│   ├── schema.ts           # Shared Effect Schema definitions
-│   └── store.svelte.ts     # Svelte 5 state
+│   └── schema.ts           # Shared Effect Schema definitions
 ├── routes/
 │   ├── (auth)/             # Auth routes (login, signup)
 │   ├── (editor)/           # Editor routes
@@ -408,6 +407,159 @@ This project uses **DaisyUI**, which provides semantic component classes. Never 
 - **Colors:** `bg-base-100`, `bg-base-200`, `bg-base-300`, `text-base-content`
 
 Refer to [DaisyUI documentation](https://daisyui.com/components/) for more components.
+
+## Svelte 5 & SvelteKit Patterns
+
+### Component Script Ordering
+
+Follow this ordering convention in `<script>` tags:
+
+1. **Imports**
+2. **Props** (`$props()`)
+3. **Function Calls / Promises** (e.g. initiating remote queries)
+4. **Effects & State** (`$effect`, `$state`, etc.)
+5. **Derived Async Data** (`$derived(await query)`)
+
+### Context Management (`createContext`)
+
+Use the new `createContext` function from `svelte` for type-safe context management. This replaces the manual `Symbol` key pattern and provides a cleaner API.
+
+```typescript
+import { createContext } from "svelte";
+
+// Define the context with a type - returns a getter and setter pair
+export const [getLinkContext, setLinkContext] = createContext<LinkContext>();
+
+// In parent component
+setLinkContext({ ... });
+
+// In child component
+const ctx = getLinkContext();
+```
+
+### Remote Functions
+
+When using SvelteKit remote functions, always wrap the call in `$derived` when using it in a component, especially if it depends on reactive props or state. This ensures the promise is re-evaluated when dependencies change.
+
+```svelte
+<script>
+  import { getNote } from "$lib/remote/notes.remote";
+
+  let { noteId } = $props();
+
+  let noteQuery = $derived(getNote(noteId));
+
+  // ✅ Correct: Reactive to noteId changes
+  let note = $derived(await noteQuery);
+</script>
+```
+
+### Shared State & SSR
+
+> [!WARNING]
+> **NEVER** use global shared stores (e.g., exported `writable` stores or `$state` in module scope) for user-specific data.
+
+In SvelteKit SSR, module-level state is shared across **all** requests. This means one user could see another user's data if you store it in a global variable or exported store.
+
+**Instead:**
+
+- Use `createContext` to scope state to the component tree (which is request-scoped during SSR).
+- Pass data via `props`.
+- Use `page.data` for route-specific data.
+
+### Optimistic UI
+
+Svelte 5 and SvelteKit provide several ways to implement optimistic UI, where you update the interface immediately while waiting for a server response.
+
+#### 1. Writable `$derived` (Local Overrides)
+
+Since Svelte 5.25, you can reassign `$derived` values to temporarily override them. This is perfect for optimistic updates where a value is derived from server data but you want to show immediate feedback.
+
+```svelte
+<script>
+  let { post, like } = $props();
+
+  // Derived from props (server data)
+  let likes = $derived(post.likes);
+
+  async function onclick() {
+    // Optimistically update the derived value
+    likes += 1;
+
+    try {
+      // Call the server action
+      await like();
+    } catch {
+      // Rollback on failure
+      likes -= 1;
+    }
+  }
+</script>
+
+<button {onclick}>🧡 {likes}</button>
+```
+
+#### 2. Remote Functions with `updates` and `withOverride`
+
+When using SvelteKit remote functions, you can use `.updates()` with `.withOverride()` to optimistically update the cache of a query.
+
+```typescript
+import { getPosts, createPost } from '$lib/remote/posts.remote';
+
+async function handleSubmit() {
+  const newPost = { id: 'temp', title: 'New Post' };
+
+  // Optimistically update the getPosts query cache
+  await createPost(newPost).updates(
+    getPosts().withOverride((posts) => [newPost, ...posts])
+  );
+}
+```
+
+#### 3. `$state.eager`
+
+Use `$state.eager` when you need to update the UI immediately in response to a state change, bypassing Svelte's default synchronized updates (which might wait for async work).
+
+```svelte
+<nav>
+  <!-- Update active class immediately on click, before navigation completes -->
+  <a
+    href="/about"
+    aria-current={$state.eager(page.url.pathname) === "/about" ? "page" : null}
+  >
+    About
+  </a>
+</nav>
+```
+
+### Legacy Patterns to Avoid
+
+> [!IMPORTANT]
+> The following patterns are considered **legacy** in this codebase and should be avoided in favor of modern Svelte 5 and SvelteKit features.
+
+#### ❌ Load Functions (`load`)
+
+Avoid using `load` functions in `+page.ts` or `+page.server.ts` for data fetching.
+**Instead:** Use **Remote Functions** (`.remote.ts`) imported directly into your components.
+
+#### ❌ `{#await}` Blocks
+
+Avoid using `{#await}` blocks in templates.
+**Instead:** Use top-level `await` in your component's `<script>` tag (supported in Svelte 5). This allows the component to suspend execution until the promise resolves, simplifying the template.
+
+```svelte
+<script>
+  import { getNote } from "$lib/remote/notes.remote";
+  let { noteId } = $props();
+
+  // Component suspends here until data is ready
+  let note = $derived(await getNote(noteId));
+</script>
+
+<!-- No need for {#await} --><h1>{note.title}</h1>
+```
+
+Be aware that `<svelte:boundary>` exists for handling errors and pending states in async components. It is particularly useful for wrapping components that use top-level `await` when you want to provide a fallback UI or error handling.
 
 ## Workflow Example
 

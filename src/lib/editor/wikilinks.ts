@@ -6,18 +6,20 @@ import {
   WidgetType,
   type ViewUpdate,
 } from "@codemirror/view";
-import { notes } from "$lib/store.svelte.ts";
 import type { RangeSet } from "@codemirror/state";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
+import type { NoteOrFolder } from "$lib/schema.ts";
 
 class WikilinkWidget extends WidgetType {
   title: string;
+  notesList: NoteOrFolder[];
 
-  constructor(title: string) {
+  constructor(title: string, notesList: NoteOrFolder[]) {
     super();
 
     this.title = title;
+    this.notesList = notesList;
   }
 
   toDOM() {
@@ -26,8 +28,7 @@ class WikilinkWidget extends WidgetType {
     a.textContent = `[[${this.title}]]`;
     a.onclick = (e) => {
       e.preventDefault();
-      const allNotes = notes;
-      const targetNote = allNotes.notesList.find((n) => n.title === this.title);
+      const targetNote = this.notesList.find((n) => n.title === this.title);
       if (targetNote) {
         goto(resolve("/notes/[id]", { id: targetNote.id }));
       } else {
@@ -43,32 +44,35 @@ class WikilinkWidget extends WidgetType {
   }
 }
 
-const wikilinkMatcher = new MatchDecorator({
-  regexp: /\[\[([^\]]+)\]\]/g,
-  decoration: (match) =>
-    Decoration.replace({
-      widget: new WikilinkWidget(
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- There is a capture group in the regex.
-        match[1]!,
-      ),
-    }),
-});
-
-export const wikilinks = ViewPlugin.fromClass(
-  class {
-    bookmarks: RangeSet<Decoration>;
-    constructor(view: EditorView) {
-      this.bookmarks = wikilinkMatcher.createDeco(view);
-    }
-    update(update: ViewUpdate) {
-      this.bookmarks = wikilinkMatcher.updateDeco(update, this.bookmarks);
-    }
-  },
-  {
-    decorations: (instance) => instance.bookmarks,
-    provide: (plugin) =>
-      EditorView.atomicRanges.of((view) => {
-        return view.plugin(plugin)?.bookmarks ?? Decoration.none;
+export function wikilinksExtension(notesList: NoteOrFolder[]) {
+  const wikilinkMatcher = new MatchDecorator({
+    regexp: /\[\[([^\]]+)\]\]/g,
+    decoration: (match) =>
+      Decoration.replace({
+        widget: new WikilinkWidget(
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- There is a capture group in the regex.
+          match[1]!,
+          notesList,
+        ),
       }),
-  },
-);
+  });
+
+  return ViewPlugin.fromClass(
+    class {
+      bookmarks: RangeSet<Decoration>;
+      constructor(view: EditorView) {
+        this.bookmarks = wikilinkMatcher.createDeco(view);
+      }
+      update(update: ViewUpdate) {
+        this.bookmarks = wikilinkMatcher.updateDeco(update, this.bookmarks);
+      }
+    },
+    {
+      decorations: (instance) => instance.bookmarks,
+      provide: (plugin) =>
+        EditorView.atomicRanges.of((view) => {
+          return view.plugin(plugin)?.bookmarks ?? Decoration.none;
+        }),
+    },
+  );
+}

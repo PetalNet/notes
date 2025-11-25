@@ -1,72 +1,104 @@
 <script lang="ts">
   import { dev } from "$app/environment";
+  import { page } from "$app/state";
   import Editor from "$lib/components/codemirror/Editor.svelte";
-  import type { LoroNoteManager } from "$lib/loro.js";
-  import { notes } from "$lib/store.svelte.js";
+  import { LoroNoteManager } from "$lib/loro.js";
+  import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
+  import { getUserPrivateKey } from "$lib/context";
+  import { decryptKey } from "$lib/crypto";
 
-  // TODO: SSR
-  await notes.load();
-
-  let selectedNote = $derived(
-    notes.notesList.find((n) => n.id === notes.selectedNoteId),
-  );
+  let selectedId = $derived(page.params.id);
   let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
+
   let unsubscribeContent: (() => void) | undefined;
 
+  const userPrivateKey = getUserPrivateKey();
+
   // Load Loro manager when note is selected
-  $effect.pre(() => {
-    const selectedId = notes.selectedNoteId;
-    console.log("[Page] Effect triggered. SelectedNoteId:", selectedId);
+  $effect(() => {
+    const id = selectedId;
+    console.log("[Page] Effect triggered. SelectedNoteId:", id);
 
-    // Cleanup previous subscription
-    if (unsubscribeContent) {
-      console.log("[Page] Cleaning up previous subscription");
-      unsubscribeContent();
-      unsubscribeContent = undefined;
-    }
+    untrack(() => {
+      // Cleanup previous subscription
+      if (unsubscribeContent) {
+        console.log("[Page] Cleaning up previous subscription");
+        unsubscribeContent();
+        unsubscribeContent = undefined;
+      }
 
-    if (selectedId && selectedNote && !selectedNote.isFolder) {
+      if (loroManager) {
+        loroManager.destroy();
+        loroManager = undefined;
+      }
+    });
+
+    if (id) {
       unawaited(
         (async () => {
-          await notes.syncSelectedNote(selectedId);
+          const notesList = await getNotes();
+          const selectedNote = notesList.find((n) => n.id === id);
 
-          console.log("[Page] Loading Loro manager for note:", selectedId);
+          if (selectedNote && !selectedNote.isFolder) {
+            console.log("[Page] Loading Loro manager for note:", id);
 
-          const manager = await notes.getLoroManager(selectedId);
+            if (!userPrivateKey) {
+              console.error("No private key available");
+              return;
+            }
 
-          console.log(
-            "[Page] Loro manager loaded:",
-            manager ? "Success" : "Failed",
-          );
-
-          loroManager = manager;
-
-          if (manager) {
-            // Set initial content
-            const initialContent = manager.getContent();
-            console.log("[Page] Initial content:", initialContent);
-            editorContent = initialContent;
-
-            // Subscribe to content changes
-            unsubscribeContent = manager.subscribeToContent((content) => {
-              console.log(
-                "[Page] Content update received. Preview:",
-                content.slice(0, 20),
+            try {
+              const noteKey = await decryptKey(
+                selectedNote.encryptedKey,
+                userPrivateKey,
               );
-              editorContent = content;
-            });
+
+              const manager = new LoroNoteManager(
+                id,
+                noteKey,
+                async (snapshot) => {
+                  await updateNote({ noteId: id, loroSnapshot: snapshot });
+                },
+              );
+
+              if (selectedNote.loroSnapshot) {
+                await manager.init(selectedNote.loroSnapshot);
+              }
+
+              manager.startSync();
+              loroManager = manager;
+
+              // Set initial content
+              const initialContent = manager.getContent();
+              console.log("[Page] Initial content:", initialContent);
+              editorContent = initialContent;
+
+              // Subscribe to content changes
+              unsubscribeContent = manager.subscribeToContent((content) => {
+                console.log(
+                  "[Page] Content update received. Preview:",
+                  content.slice(0, 20),
+                );
+                editorContent = content;
+              });
+            } catch (error) {
+              console.error("Failed to load note:", error);
+            }
+          } else {
+            console.log("[Page] No valid note selected or is folder");
+            editorContent = "";
           }
         })(),
       );
     } else {
-      console.log("[Page] No valid note selected or is folder");
-      loroManager = undefined;
       editorContent = "";
     }
+
+    return () => loroManager?.destroy();
   });
 
   // Cleanup on destroy
@@ -75,12 +107,16 @@
       unsubscribeContent();
     }
   });
+
+  const notesList = $derived(await getNotes());
+  const selectedNote = $derived(notesList.find((n) => n.id === selectedId));
 </script>
 
 <div class="relative h-full flex-1 overflow-hidden">
   {#if selectedNote && loroManager}
     <Editor
       content={editorContent}
+      {notesList}
       onchange={(newContent: string) => {
         // Update local state immediately to avoid jitter
         editorContent = newContent;
@@ -120,7 +156,7 @@
   <div
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
-    <p>Selected Note: {notes.selectedNoteId}</p>
+    <p>Selected Note: {selectedId}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>

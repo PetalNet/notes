@@ -15,8 +15,19 @@
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
   import { logout } from "$lib/remote/accounts.remote.ts";
-  import type { Notes } from "$lib/store.svelte.ts";
   import { unawaited } from "$lib/unawaited.ts";
+  import {
+    createNote,
+    deleteNote,
+    updateNote,
+    reorderNotes,
+    getNotes,
+  } from "$lib/remote/notes.remote.ts";
+  import { buildNotesTree } from "$lib/utils/tree.ts";
+  import { generateNoteKey, encryptKeyForUser } from "$lib/crypto";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
+  import type { NoteOrFolder } from "$lib/schema.ts";
 
   interface ContextState {
     x: number;
@@ -27,14 +38,16 @@
 
   interface Props {
     user: User | undefined;
-    notes: Notes;
+    notesList: NoteOrFolder[];
   }
 
-  let { user, notes }: Props = $props();
+  let { user, notesList }: Props = $props();
   let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<ContextState>();
+
+  let notesTree = $derived(buildNotesTree(notesList));
 
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
@@ -57,7 +70,12 @@
 
         // Move to root if it's not already there
         if (sourceParentId !== null) {
-          unawaited(notes.moveNoteToFolder(sourceId, null));
+          unawaited(
+            (async () => {
+              await updateNote({ noteId: sourceId, parentId: null });
+              await getNotes().refresh();
+            })(),
+          );
         }
       },
     });
@@ -84,7 +102,8 @@
 
   async function handleRename() {
     if (!renamingId) return;
-    await notes.updateNoteTitle(renamingId, renameTitle);
+    await updateNote({ noteId: renamingId, title: renameTitle });
+    await getNotes().refresh();
     renamingId = null;
     closeContextMenu();
   }
@@ -97,7 +116,11 @@
 
   async function handleDelete(noteId: string) {
     if (confirm("Are you sure you want to delete this note?")) {
-      await notes.deleteNote(noteId);
+      await deleteNote(noteId);
+      await getNotes().refresh();
+      // If deleted note was selected, navigate away?
+      // This logic was in store, but now Sidebar doesn't know about selection state easily.
+      // We can leave it for now or check $page.params.id
     }
     closeContextMenu();
   }
@@ -109,8 +132,8 @@
 
   // Handle reordering at root level
   async function handleRootReorder(sourceId: string, targetIndex: number) {
-    const rootItems = notes.notesTree;
-    const itemToMove = notes.notesList.find((n) => n.id === sourceId);
+    const rootItems = notesTree;
+    const itemToMove = notesList.find((n) => n.id === sourceId);
 
     if (!itemToMove) return;
 
@@ -119,7 +142,34 @@
       .toSpliced(targetIndex, 0, { ...itemToMove, children: [] })
       .map((item, i) => ({ id: item.id, order: i }));
 
-    await notes.reorderNotes(updates);
+    await reorderNotes(updates);
+    await getNotes().refresh();
+  }
+
+  async function handleCreateNote(
+    title: string,
+    parentId: string | null,
+    isFolder: boolean,
+    publicKey: string,
+  ) {
+    // Generate AES key for the note
+    const noteKey = await generateNoteKey();
+
+    // Encrypt note key with user's public key
+    const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
+
+    const newNote = await createNote({
+      title,
+      encryptedKey,
+      parentId,
+      isFolder,
+    });
+
+    await getNotes().refresh();
+
+    if (!isFolder) {
+      goto(resolve("/notes/[id]", { id: newNote.id }));
+    }
   }
 </script>
 
@@ -154,7 +204,7 @@
           throw new Error("Cannot create note whilst logged out.");
         }
 
-        await notes.createNote("Untitled Note", null, false, user.publicKey);
+        await handleCreateNote("Untitled Note", null, false, user.publicKey);
       }}
       class="btn"><FilePlus /> Note</button
     >
@@ -164,7 +214,7 @@
           throw new Error("Cannot create folder whilst logged out.");
         }
 
-        await notes.createFolder("New Folder", null, user.publicKey);
+        await handleCreateNote("New Folder", null, true, user.publicKey);
       }}
       class="btn"><FolderPlus /> Folder</button
     >
@@ -178,7 +228,7 @@
       isRootDropTarget && "bg-indigo-50 ring-2 ring-indigo-400 ring-inset",
     ]}
   >
-    {#each notes.notesTree as item, idx (item.id)}
+    {#each notesTree as item, idx (item.id)}
       <TreeItem
         {item}
         {expandedFolders}
@@ -186,11 +236,13 @@
         {handleContextMenu}
         index={idx}
         onReorder={handleRootReorder}
+        {notesList}
+        {notesTree}
       />
     {/each}
 
     <!-- Empty state -->
-    {#if notes.notesTree.length === 0}
+    {#if notesTree.length === 0}
       <div class="flex flex-col items-center justify-center py-12 text-center">
         <File />
         <p class="text-sm text-slate-400">No notes yet</p>
@@ -218,7 +270,7 @@
           }
 
           unawaited(
-            notes.createNote(
+            handleCreateNote(
               "An Untitled Note",
               clickedId,
               false,
@@ -233,7 +285,7 @@
     <button
       class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
       onclick={() => {
-        const noteToRename = notes.notesList.find((n) => n.id === clickedId);
+        const noteToRename = notesList.find((n) => n.id === clickedId);
         if (noteToRename) {
           startRename(noteToRename.id, noteToRename.title);
         }

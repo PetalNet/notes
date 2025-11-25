@@ -2,7 +2,7 @@
   import "./layout.css";
 
   import favicon from "$lib/assets/favicon.svg";
-  import { notes } from "$lib/store.svelte.js";
+  import { setUserPrivateKey } from "$lib/context";
 
   let { children, data } = $props();
 
@@ -11,7 +11,7 @@
   if (data.user?.privateKeyEncrypted) {
     // In production, this should decrypt with user's password
     // The crypto functions expect base64-encoded strings, so pass as-is
-    notes.userPrivateKey = data.user.privateKeyEncrypted;
+    setUserPrivateKey(data.user.privateKeyEncrypted);
   }
 </script>
 

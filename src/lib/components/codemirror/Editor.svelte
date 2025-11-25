@@ -29,13 +29,16 @@
     orderedListCommand,
   } from "./Editor.ts";
   import Toolbar from "./Toolbar.svelte";
+  import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
+  import type { NoteOrFolder } from "$lib/schema.ts";
 
   interface Props {
     content: string;
     onchange: (newContent: string) => void;
+    notesList?: NoteOrFolder[];
   }
 
-  let { content, onchange }: Props = $props();
+  let { content, onchange, notesList = [] }: Props = $props();
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
@@ -97,6 +100,7 @@
 
   const extensions = [
     coreExtensions,
+    wikilinksExtension(notesList),
     // Update listener
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {

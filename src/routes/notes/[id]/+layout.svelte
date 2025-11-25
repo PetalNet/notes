@@ -1,13 +1,15 @@
 <script>
   import Sidebar from "$lib/components/Sidebar.svelte";
-  import { notes } from "$lib/store.svelte.js";
+  import { getNotes } from "$lib/remote/notes.remote.ts";
 
   let { children, data } = $props();
+
+  const notesList = $derived(await getNotes());
 </script>
 
 <div class="flex h-screen overflow-hidden">
   {#if data.user}
-    <Sidebar user={data.user} {notes} />
+    <Sidebar user={data.user} {notesList} />
   {/if}
 
   {@render children()}

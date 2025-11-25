@@ -10,12 +10,19 @@
   } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
   import { onMount } from "svelte";
   import { slide } from "svelte/transition";
-  import { notes, type TreeNode } from "$lib/store.svelte.ts";
+  import { type TreeNode, findNode } from "$lib/utils/tree.ts";
+  import type { NoteOrFolder } from "$lib/schema.ts";
+  import {
+    updateNote,
+    reorderNotes,
+    getNotes,
+  } from "$lib/remote/notes.remote.ts";
   import Self from "./TreeItem.svelte";
   import { ChevronRight, Folder, FileText } from "@lucide/svelte";
   import { clsx } from "clsx";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
+  import { page } from "$app/state";
 
   interface Props {
     item: TreeNode;
@@ -29,6 +36,8 @@
       targetIndex: number,
       parentId: string | null,
     ) => Promise<void>;
+    notesList: NoteOrFolder[];
+    notesTree: TreeNode[];
   }
 
   let {
@@ -39,6 +48,8 @@
     index = 0,
     parentId = null,
     onReorder,
+    notesList,
+    notesTree,
   }: Props = $props();
 
   let element: HTMLElement;
@@ -111,7 +122,8 @@
           isDropTarget = false;
           closestEdge = null;
           if (sourceId !== item.id && sourceParentId !== item.id) {
-            await notes.moveNoteToFolder(sourceId, item.id);
+            await updateNote({ noteId: sourceId, parentId: item.id });
+            await getNotes().refresh();
             // Expand folder to show dropped item
             if (!expandedFolders.has(item.id)) {
               toggleFolder(item.id);
@@ -142,9 +154,9 @@
         if (sourceParentId === parentId) {
           const currentList =
             parentId === null
-              ? notes.notesList
+              ? notesTree
               : (() => {
-                  let note = notes.notesTree.find((f) => f.id === parentId);
+                  let note = findNode(notesTree, parentId);
                   return note?.isFolder ? note.children : [];
                 })();
           const sourceIndex = currentList.findIndex((n) => n.id === sourceId);
@@ -222,11 +234,11 @@
               {handleContextMenu}
               index={idx}
               parentId={item.id}
+              {notesList}
+              {notesTree}
               onReorder={async (sourceId, targetIndex) => {
                 const children = item.children;
-                const itemToMove = notes.notesList.find(
-                  (n) => n.id === sourceId,
-                );
+                const itemToMove = notesList.find((n) => n.id === sourceId);
 
                 if (!itemToMove) return;
 
@@ -234,7 +246,8 @@
                   .filter((c) => c.id !== sourceId)
                   .toSpliced(targetIndex, 0, { ...itemToMove, children: [] })
                   .map((c, i) => ({ id: c.id, order: i }));
-                await notes.reorderNotes(updates);
+                await reorderNotes(updates);
+                await getNotes().refresh();
               }}
             />
           {/each}
@@ -254,7 +267,7 @@
       }}
       class={[
         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-primary-content hover:text-primary hover:shadow-sm",
-        notes.selectedNoteId === item.id
+        page.params.id === item.id
           ? "bg-primary-content text-primary shadow-sm"
           : "text-base-content",
       ]}

@@ -20,7 +20,6 @@
   import Self from "./TreeItem.svelte";
   import { ChevronRight, Folder, FileText } from "@lucide/svelte";
   import { clsx } from "clsx";
-  import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
 
@@ -261,10 +260,8 @@
     </div>
   {:else}
     <!-- Note Item -->
-    <button
-      onclick={() => {
-        goto(resolve("/notes/[id]", { id: item.id }));
-      }}
+    <a
+      href={resolve("/notes/[id]", { id: item.id })}
       class={[
         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-primary-content hover:text-primary hover:shadow-sm",
         page.params.id === item.id
@@ -277,6 +274,6 @@
     >
       <FileText />
       <span class="truncate">{item.title || "Untitled"}</span>
-    </button>
+    </a>
   {/if}
 </div>

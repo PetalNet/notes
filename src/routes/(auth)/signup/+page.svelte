@@ -68,7 +68,10 @@
                 publicKeyInput.value = publicKey;
                 privateKeyInput.value = privateKey;
 
-                await signup.validate({ preflightOnly: true });
+                await signup.validate({
+                  includeUntouched: true,
+                  preflightOnly: true,
+                });
                 console.debug(signup.fields.allIssues());
 
                 if ((signup.fields.allIssues()?.length ?? 0) !== 0) return;

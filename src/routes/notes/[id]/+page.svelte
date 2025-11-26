@@ -19,64 +19,76 @@
 
   const notesList = $derived(await notesListQuery);
   const note = $derived(notesList.find((n) => n.id === id));
-  const keyPromise = $derived(
-    note && !note.isFolder && userPrivateKey
-      ? decryptKey(note.encryptedKey, userPrivateKey).catch((e: unknown) => {
-          console.error("Failed to decrypt key:", e);
-          return undefined;
-        })
-      : undefined,
-  );
-  const key = $derived(await keyPromise);
 
   // Load Loro manager when note is selected
   $effect.pre(() => {
     console.debug("[Page] Effect triggered. SelectedNoteId:", id);
 
     let unsubscribeContent: (() => void) | undefined;
+    const abortController = new AbortController();
+    const signal = abortController.signal;
 
-    if (id && note && !note.isFolder && key) {
-      console.debug("[Page] Loading Loro manager for note:", id);
-
-      unawaited(
-        (async () => {
-          try {
-            const manager = new LoroNoteManager(id, key, async (snapshot) => {
-              await updateNote({ noteId: id, loroSnapshot: snapshot });
-            });
-
-            if (note.loroSnapshot) {
-              await manager.init(note.loroSnapshot);
+    unawaited(
+      (async (signal) => {
+        if (id && note && !note.isFolder) {
+          let key: string | undefined;
+          if (userPrivateKey) {
+            try {
+              key = await decryptKey(note.encryptedKey, userPrivateKey);
+            } catch (e) {
+              console.error("Failed to decrypt key:", e);
             }
-
-            manager.startSync();
-            loroManager = manager;
-
-            // Sync content from server
-            editorContent = manager.getContent();
-
-            // Subscribe to content changes
-            unsubscribeContent = manager.subscribeToContent((content) => {
-              console.debug(
-                "[Page] Content update received. Preview:",
-                content.slice(0, 20),
-              );
-              editorContent = content;
-            });
-          } catch (error) {
-            console.error("Failed to load note:", error);
           }
-        })(),
-      );
-    } else {
-      if (!note || note.isFolder) {
-        console.debug("[Page] No valid note selected or is folder");
-      }
-      editorContent = "";
-    }
+
+          if (signal.aborted) return;
+
+          if (key) {
+            console.debug("[Page] Loading Loro manager for note:", id);
+            try {
+              const manager = new LoroNoteManager(id, key, async (snapshot) => {
+                await updateNote({ noteId: id, loroSnapshot: snapshot });
+              });
+
+              if (note.loroSnapshot) {
+                await manager.init(note.loroSnapshot);
+              }
+
+              if (signal.aborted as boolean) {
+                manager.destroy();
+                return;
+              }
+
+              manager.startSync();
+              loroManager = manager;
+
+              // Sync content from server
+              editorContent = manager.getContent();
+
+              // Subscribe to content changes
+              unsubscribeContent = manager.subscribeToContent((content) => {
+                console.debug(
+                  "[Page] Content update received. Preview:",
+                  content.slice(0, 20),
+                );
+                editorContent = content;
+              });
+              return;
+            } catch (error) {
+              console.error("Failed to load note:", error);
+            }
+          }
+        }
+
+        if (!note || note.isFolder) {
+          console.debug("[Page] No valid note selected or is folder");
+        }
+        editorContent = "";
+      })(signal),
+    );
 
     return () => {
       console.debug("[Page] Cleaning up previous subscription");
+      abortController.abort();
       loroManager?.destroy();
       loroManager = undefined;
       unsubscribeContent?.();

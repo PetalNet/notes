@@ -144,9 +144,7 @@ export class LoroNoteManager {
             const data = Schema.decodeSync(syncSchemaJson)(event.data);
 
             for (const update of data.updates) {
-              const updateBytes = Encoding.decodeBase64(update).pipe(
-                Either.getOrThrow,
-              ) as Uint8Array<ArrayBuffer>;
+              const updateBytes = Uint8Array.fromBase64(update);
               void emit(Effect.succeed(Chunk.make(updateBytes)));
             }
           } catch (error) {
@@ -208,7 +206,7 @@ export class LoroNoteManager {
     try {
       await sync({
         noteId: this.#noteId,
-        updates: updates.map((u) => Encoding.encodeBase64(u)),
+        updates: updates.map((u) => u.toBase64()),
       });
     } catch (error) {
       console.error("Failed to send update:", error);
@@ -269,7 +267,7 @@ export class LoroNoteManager {
       mode: "snapshot",
     }) as Uint8Array<ArrayBuffer>;
     const encrypted = await encryptData(snapshot, this.#noteKey);
-    return Encoding.encodeBase64(encrypted);
+    return encrypted.toBase64();
   }
 
   /**
@@ -277,9 +275,7 @@ export class LoroNoteManager {
    */
   async loadEncryptedSnapshot(encryptedSnapshot: string) {
     try {
-      const encryptedBytes = Encoding.decodeBase64(encryptedSnapshot).pipe(
-        Either.getOrThrow,
-      ) as Uint8Array<ArrayBuffer>;
+      const encryptedBytes = Uint8Array.fromBase64(encryptedSnapshot);
       const decrypted = await decryptData(encryptedBytes, this.#noteKey);
       this.#doc.import(decrypted);
     } catch (error) {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { browser } from "$app/environment";
   import type { Extension, Text } from "@codemirror/state";
   import { EditorView } from "@codemirror/view";
   import { onMount, onDestroy } from "svelte";
@@ -30,7 +31,7 @@
   });
 
   onDestroy(() => {
-    editorView.destroy();
+    if (browser) editorView.destroy();
   });
 </script>
 

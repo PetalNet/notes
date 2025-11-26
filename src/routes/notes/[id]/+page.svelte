@@ -6,130 +6,101 @@
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
-  import { onDestroy, untrack } from "svelte";
   import { getUserPrivateKey } from "$lib/context";
   import { decryptKey } from "$lib/crypto";
 
-  let selectedId = $derived(page.params.id);
+  const notesListQuery = $derived(getNotes());
+  let id = $derived(page.params.id);
+  const userPrivateKey = getUserPrivateKey();
+
   let loroManager = $state<LoroNoteManager>();
   let editorContent = $state("");
 
-  let unsubscribeContent: (() => void) | undefined;
-
-  const userPrivateKey = getUserPrivateKey();
+  const notesList = $derived(await notesListQuery);
+  const note = $derived(notesList.find((n) => n.id === id));
+  const keyPromise = $derived(
+    note && !note.isFolder && userPrivateKey
+      ? decryptKey(note.encryptedKey, userPrivateKey).catch((e: unknown) => {
+          console.error("Failed to decrypt key:", e);
+          return undefined;
+        })
+      : undefined,
+  );
+  const key = $derived(await keyPromise);
 
   // Load Loro manager when note is selected
-  $effect(() => {
-    const id = selectedId;
+  $effect.pre(() => {
     console.log("[Page] Effect triggered. SelectedNoteId:", id);
 
-    untrack(() => {
-      // Cleanup previous subscription
-      if (unsubscribeContent) {
-        console.log("[Page] Cleaning up previous subscription");
-        unsubscribeContent();
-        unsubscribeContent = undefined;
-      }
+    let unsubscribeContent: (() => void) | undefined;
 
-      if (loroManager) {
-        loroManager.destroy();
-        loroManager = undefined;
-      }
-    });
+    if (id && note && !note.isFolder && key) {
+      console.log("[Page] Loading Loro manager for note:", id);
 
-    if (id) {
       unawaited(
         (async () => {
-          const notesList = await getNotes();
-          const selectedNote = notesList.find((n) => n.id === id);
+          try {
+            const manager = new LoroNoteManager(id, key, async (snapshot) => {
+              await updateNote({ noteId: id, loroSnapshot: snapshot });
+            });
 
-          if (selectedNote && !selectedNote.isFolder) {
-            console.log("[Page] Loading Loro manager for note:", id);
-
-            if (!userPrivateKey) {
-              console.error("No private key available");
-              return;
+            if (note.loroSnapshot) {
+              await manager.init(note.loroSnapshot);
             }
 
-            try {
-              const noteKey = await decryptKey(
-                selectedNote.encryptedKey,
-                userPrivateKey,
+            manager.startSync();
+            loroManager = manager;
+
+            // Set initial content
+            const initialContent = manager.getContent();
+            console.log("[Page] Initial content:", initialContent);
+            editorContent = initialContent;
+
+            // Subscribe to content changes
+            unsubscribeContent = manager.subscribeToContent((content) => {
+              console.log(
+                "[Page] Content update received. Preview:",
+                content.slice(0, 20),
               );
-
-              const manager = new LoroNoteManager(
-                id,
-                noteKey,
-                async (snapshot) => {
-                  await updateNote({ noteId: id, loroSnapshot: snapshot });
-                },
-              );
-
-              if (selectedNote.loroSnapshot) {
-                await manager.init(selectedNote.loroSnapshot);
-              }
-
-              manager.startSync();
-              loroManager = manager;
-
-              // Set initial content
-              const initialContent = manager.getContent();
-              console.log("[Page] Initial content:", initialContent);
-              editorContent = initialContent;
-
-              // Subscribe to content changes
-              unsubscribeContent = manager.subscribeToContent((content) => {
-                console.log(
-                  "[Page] Content update received. Preview:",
-                  content.slice(0, 20),
-                );
-                editorContent = content;
-              });
-            } catch (error) {
-              console.error("Failed to load note:", error);
-            }
-          } else {
-            console.log("[Page] No valid note selected or is folder");
-            editorContent = "";
+              editorContent = content;
+            });
+          } catch (error) {
+            console.error("Failed to load note:", error);
           }
         })(),
       );
     } else {
+      if (!note || note.isFolder) {
+        console.log("[Page] No valid note selected or is folder");
+      }
       editorContent = "";
     }
 
-    return () => loroManager?.destroy();
+    return () => {
+      console.log("[Page] Cleaning up previous subscription");
+      loroManager?.destroy();
+      loroManager = undefined;
+      unsubscribeContent?.();
+    };
   });
-
-  // Cleanup on destroy
-  onDestroy(() => {
-    if (unsubscribeContent) {
-      unsubscribeContent();
-    }
-  });
-
-  const notesList = $derived(await getNotes());
-  const selectedNote = $derived(notesList.find((n) => n.id === selectedId));
 </script>
 
 <div class="relative h-full flex-1 overflow-hidden">
-  {#if selectedNote && loroManager}
+  {#if !note?.isFolder}
     <Editor
       content={editorContent}
       {notesList}
       onchange={(newContent: string) => {
-        // Update local state immediately to avoid jitter
-        editorContent = newContent;
-        // Update Loro
+        // Hook in Loro
         loroManager?.updateContent(newContent);
       }}
     />
-  {:else if selectedNote?.isFolder}
+  {:else if note?.isFolder}
     <div class="flex h-full items-center justify-center text-slate-400">
       <div class="text-center">
         <p class="mb-2 text-xl font-medium">
           <Folder class="inline-block" />
-          {selectedNote.title}
+          {note.title}
         </p>
         <p class="text-sm">Select a note inside to start editing.</p>
       </div>
@@ -156,7 +127,7 @@
   <div
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
-    <p>Selected Note: {selectedId}</p>
+    <p>Selected Note: {id}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>

@@ -30,7 +30,7 @@ export const reorderNotesSchema = ReorderNotesSchema.pipe(
 
 export const SyncSchema = Schema.Struct({
   noteId: Schema.String,
-  updates: Schema.Array(Schema.String),
+  update: Schema.String,
 });
 export const syncSchemaJson = Schema.parseJson(SyncSchema);
 export const syncSchema = SyncSchema.pipe(Schema.standardSchemaV1);

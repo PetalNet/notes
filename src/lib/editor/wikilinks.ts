@@ -32,7 +32,7 @@ class WikilinkWidget extends WidgetType {
       if (targetNote) {
         goto(resolve("/notes/[id]", { id: targetNote.id }));
       } else {
-        console.log("Note not found:", this.title);
+        console.debug("Note not found:", this.title);
         // Optional: Create note if not found?
       }
     };

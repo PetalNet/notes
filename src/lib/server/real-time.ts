@@ -11,7 +11,7 @@ export function addClient(
   }
   clients.get(noteId)!.add(controller);
 
-  console.log(
+  console.debug(
     `Client added to note ${noteId}. Total clients: ${clients.get(noteId)?.size}`,
   );
 }
@@ -26,7 +26,7 @@ export function removeClient(
     if (set.size === 0) {
       clients.delete(noteId);
     }
-    console.log(`Client removed from note ${noteId}. Remaining: ${set.size}`);
+    console.debug(`Client removed from note ${noteId}. Remaining: ${set.size}`);
   }
 }
 

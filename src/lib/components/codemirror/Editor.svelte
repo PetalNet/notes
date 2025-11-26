@@ -105,7 +105,7 @@
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
         const newContent = update.state.doc.toString();
-        console.log(
+        console.debug(
           "[Prosemark] Content updated. Preview:",
           newContent.slice(0, 50),
         );
@@ -118,7 +118,7 @@
   // Update content if it changes externally (from Loro)
   $effect(() => {
     if (content !== editorView.state.doc.toString()) {
-      console.log("[Prosemark] External content update");
+      console.debug("[Prosemark] External content update");
       editorView.dispatch({
         changes: {
           from: 0,

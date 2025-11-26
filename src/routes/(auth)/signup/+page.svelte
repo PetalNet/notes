@@ -69,7 +69,7 @@
                 privateKeyInput.value = privateKey;
 
                 await signup.validate({ preflightOnly: true });
-                console.log(signup.fields.allIssues());
+                console.debug(signup.fields.allIssues());
 
                 if ((signup.fields.allIssues()?.length ?? 0) !== 0) return;
                 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- It is indeed a child of a form.

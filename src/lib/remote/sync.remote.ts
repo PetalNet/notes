@@ -21,7 +21,7 @@ export const sync = command(syncSchema, async ({ noteId, updates }) => {
 
     if (!note || note.ownerId !== user.id) error(404, "Not found");
 
-    console.log("Syncing", noteId);
+    console.debug("Syncing", noteId);
 
     // Broadcast update to all connected clients
     // The update is expected to be a base64 string of the binary update

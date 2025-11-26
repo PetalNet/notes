@@ -226,7 +226,7 @@ export class LoroNoteManager {
     const currentContent = this.#text.toString();
     if (currentContent === newContent) return;
 
-    console.log("[Loro] Updating content with diff...");
+    console.debug("[Loro] Updating content with diff...");
 
     // Calculate diff
     const diffs = diff(currentContent, newContent);

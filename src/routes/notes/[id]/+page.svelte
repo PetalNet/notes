@@ -30,12 +30,12 @@
 
   // Load Loro manager when note is selected
   $effect.pre(() => {
-    console.log("[Page] Effect triggered. SelectedNoteId:", id);
+    console.debug("[Page] Effect triggered. SelectedNoteId:", id);
 
     let unsubscribeContent: (() => void) | undefined;
 
     if (id && note && !note.isFolder && key) {
-      console.log("[Page] Loading Loro manager for note:", id);
+      console.debug("[Page] Loading Loro manager for note:", id);
 
       unawaited(
         (async () => {
@@ -53,12 +53,12 @@
 
             // Set initial content
             const initialContent = manager.getContent();
-            console.log("[Page] Initial content:", initialContent);
+            console.debug("[Page] Initial content:", initialContent);
             editorContent = initialContent;
 
             // Subscribe to content changes
             unsubscribeContent = manager.subscribeToContent((content) => {
-              console.log(
+              console.debug(
                 "[Page] Content update received. Preview:",
                 content.slice(0, 20),
               );
@@ -71,13 +71,13 @@
       );
     } else {
       if (!note || note.isFolder) {
-        console.log("[Page] No valid note selected or is folder");
+        console.debug("[Page] No valid note selected or is folder");
       }
       editorContent = "";
     }
 
     return () => {
-      console.log("[Page] Cleaning up previous subscription");
+      console.debug("[Page] Cleaning up previous subscription");
       loroManager?.destroy();
       loroManager = undefined;
       unsubscribeContent?.();

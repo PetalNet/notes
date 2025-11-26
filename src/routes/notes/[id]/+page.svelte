@@ -117,10 +117,10 @@
       </div>
     </div>
   {:else}
-    <div class="flex h-full items-center justify-center text-slate-400">
+    <div class="flex h-full items-center justify-center text-base-content">
       <div class="text-center">
         <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100"
+          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-base-content/25"
         >
           <FilePlus />
         </div>

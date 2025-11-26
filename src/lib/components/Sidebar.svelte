@@ -1,6 +1,5 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fade } from "svelte/transition";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -46,6 +45,7 @@
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<ContextState>();
+  let renameModal: HTMLDialogElement;
 
   let notesTree = $derived(buildNotesTree(notesList));
 
@@ -115,7 +115,10 @@
   }
 
   async function handleDelete(noteId: string) {
-    if (confirm("Are you sure you want to delete this note?")) {
+    if (
+      // TODO: confirm sucks, use a <dialog>
+      confirm("Are you sure you want to delete this note?")
+    ) {
       await deleteNote(noteId);
       await getNotes().refresh();
       // If deleted note was selected, navigate away?
@@ -171,6 +174,14 @@
       goto(resolve("/notes/[id]", { id: newNote.id }));
     }
   }
+
+  $effect(() => {
+    if (renamingId && !renameModal.open) {
+      renameModal.showModal();
+    } else if (!renamingId && renameModal.open) {
+      renameModal.close();
+    }
+  });
 </script>
 
 <svelte:window onclick={onWindowClick} />
@@ -182,7 +193,7 @@
   >
     <div class="flex items-center gap-2">
       <ProfilePicture name={user?.username ?? "A"} />
-      <span class="max-w-[100px] truncate text-sm font-medium"
+      <span class="max-w-28 truncate text-sm font-medium"
         >{user?.username ?? "Anonymous"}</span
       >
     </div>
@@ -245,8 +256,8 @@
     {#if notesTree.length === 0}
       <div class="flex flex-col items-center justify-center py-12 text-center">
         <File />
-        <p class="text-sm text-slate-400">No notes yet</p>
-        <p class="mt-1 text-xs text-slate-300">
+        <p class="text-sm text-base-content">No notes yet</p>
+        <p class="mt-1 text-xs text-base-content/75">
           Create your first note to get started
         </p>
       </div>
@@ -258,12 +269,12 @@
 {#if contextMenu}
   {@const clickedId = contextMenu.noteId}
   <div
-    class="animate-in fade-in zoom-in-95 fixed z-50 w-48 rounded-lg border border-slate-200 bg-white py-1 shadow-lg duration-100"
+    class="animate-in fade-in zoom-in-95 fixed z-50 w-48 rounded-lg border bg-base-300 py-1 duration-100"
     style="top: {contextMenu.y}px; left: {contextMenu.x}px;"
   >
     {#if contextMenu.isFolder}
       <button
-        class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
+        class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-base-content hover:bg-primary hover:text-primary-content"
         onclick={() => {
           if (user === undefined) {
             throw new Error("Cannot create note whilst logged out.");
@@ -283,7 +294,7 @@
     {/if}
 
     <button
-      class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 hover:text-indigo-600"
+      class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-base-content hover:bg-primary hover:text-primary-content"
       onclick={() => {
         const noteToRename = notesList.find((n) => n.id === clickedId);
         if (noteToRename) {
@@ -296,7 +307,7 @@
     </button>
 
     <button
-      class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+      class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-error hover:bg-error hover:text-error-content"
       onclick={() => handleDelete(clickedId)}
     >
       <Trash2 />
@@ -306,43 +317,32 @@
 {/if}
 
 <!-- Rename Modal -->
-{#if renamingId}
-  <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-    transition:fade={{ duration: 150 }}
-  >
-    <div
-      class="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
-      transition:fade={{ duration: 200 }}
-    >
-      <h3 class="mb-4 text-lg font-semibold text-slate-800">Rename</h3>
-      <input
-        type="text"
-        bind:value={renameTitle}
-        class="w-full rounded-lg border border-slate-200 px-4 py-2 text-sm transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 focus:outline-none"
-        placeholder="Enter new name..."
-        onkeydown={async (e) => {
-          if (e.key === "Enter") {
-            await handleRename();
-          } else if (e.key === "Escape") {
-            renamingId = null;
-          }
-        }}
-      />
-      <div class="mt-6 flex justify-end gap-2">
-        <button
-          onclick={() => (renamingId = null)}
-          class="cursor-pointer rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
-        >
-          Cancel
-        </button>
-        <button
-          onclick={handleRename}
-          class="cursor-pointer rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
-        >
-          Save Changes
-        </button>
-      </div>
+<dialog
+  class="modal"
+  bind:this={renameModal}
+  onclose={() => (renamingId = null)}
+>
+  <div class="modal-box">
+    <h3 class="mb-4 text-lg font-semibold text-primary">Rename</h3>
+    <input
+      type="text"
+      bind:value={renameTitle}
+      class="input w-full focus:outline-none"
+      placeholder="Enter new name..."
+      onkeydown={async (e) => {
+        if (e.key === "Enter") {
+          await handleRename();
+        }
+      }}
+    />
+    <div class="modal-action">
+      <button onclick={() => (renamingId = null)} class="btn"> Cancel </button>
+      <button onclick={handleRename} class="btn btn-primary">
+        Save Changes
+      </button>
     </div>
   </div>
-{/if}
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>

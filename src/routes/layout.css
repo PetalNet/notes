@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@plugin "@tailwindcss/forms";
 @plugin "@tailwindcss/typography";
 @plugin "daisyui";
 
@@ -16,8 +15,8 @@
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-slate-300;
+  @apply rounded-full bg-current/25;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-400;
+  @apply bg-current/50;
 }

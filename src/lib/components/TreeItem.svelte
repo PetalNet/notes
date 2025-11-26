@@ -222,7 +222,7 @@
       <!-- Nested Items -->
       {#if expandedFolders.has(item.id)}
         <div
-          class="mt-0.5 ml-4 min-h-2.5 space-y-0.5 border-l border-slate-200 pl-2"
+          class="mt-0.5 ml-4 min-h-2.5 space-y-0.5 border-l border-base-200 pl-2"
           transition:slide|local={{ duration: 200 }}
         >
           {#each item.children as child, idx (child.id)}
@@ -261,12 +261,13 @@
   {:else}
     <!-- Note Item -->
     <a
+      aria-current={$state.eager(page.params.id) === item.id ? "page" : false}
       href={resolve("/notes/[id]", { id: item.id })}
       class={[
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all hover:bg-primary-content hover:text-primary hover:shadow-sm",
-        page.params.id === item.id
-          ? "bg-primary-content text-primary shadow-sm"
-          : "text-base-content",
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-500",
+        // TODO: Make it secondary, but without flickering when clicked.
+        "hover:bg-primary-content hover:text-primary hover:shadow-sm",
+        "aria-[current=page]:shadow-sm aria-[current=page]:not-hover:bg-primary aria-[current=page]:not-hover:text-primary-content",
       ]}
       oncontextmenu={(e) => {
         handleContextMenu(e, item.id, false);

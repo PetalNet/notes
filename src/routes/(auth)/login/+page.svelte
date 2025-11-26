@@ -10,6 +10,7 @@
       <h2 class="card-title">Log In</h2>
 
       {#each login.fields.allIssues() as issue (issue.path)}
+        <!-- TODO: make per field, use daisyui's validator-hint.  -->
         <div class="alert alert-error">
           <p>{issue.message}</p>
         </div>

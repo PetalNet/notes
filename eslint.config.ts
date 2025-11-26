@@ -47,6 +47,8 @@ export default defineConfig(
           ],
         },
       ],
+      // Too many false positives, due for a rework. See: typescript-eslint/typescript-eslint#8113.
+      "@typescript-eslint/no-invalid-void-type": "off",
     },
   },
   {

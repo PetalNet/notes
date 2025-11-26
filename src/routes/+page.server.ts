@@ -2,7 +2,20 @@ import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { count, sql } from "drizzle-orm";
 
-export const load = async ({ locals }) => {
+// TODO: Make this a remote function instead.
+interface Data {
+  totalNotes: number;
+  randomNote:
+    | {
+        id: string;
+        title: string;
+        updatedAt: Date;
+      }
+    | null
+    | undefined;
+}
+
+export const load = async ({ locals }): Promise<Data> => {
   const user = locals.user;
 
   if (!user) {

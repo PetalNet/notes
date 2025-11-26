@@ -14,6 +14,7 @@
   const userPrivateKey = getUserPrivateKey();
 
   let loroManager = $state<LoroNoteManager>();
+  // TODO: Use codemirror-server-render to SSR the editor
   let editorContent = $state("");
 
   const notesList = $derived(await notesListQuery);
@@ -51,10 +52,8 @@
             manager.startSync();
             loroManager = manager;
 
-            // Set initial content
-            const initialContent = manager.getContent();
-            console.debug("[Page] Initial content:", initialContent);
-            editorContent = initialContent;
+            // Sync content from server
+            editorContent = manager.getContent();
 
             // Subscribe to content changes
             unsubscribeContent = manager.subscribeToContent((content) => {

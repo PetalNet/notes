@@ -14,12 +14,15 @@ import {
 } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
-import { unawaited } from "./unawaited.ts";
+
+export type Doc = LoroDoc<{
+  content: LoroText;
+}>;
 
 export class LoroNoteManager {
   #noteId: string;
   #noteKey: string;
-  #doc: LoroDoc;
+  #doc: Doc;
   #text: LoroText;
   #onUpdate: (snapshot: string) => void | Promise<void>;
   #eventSource: EventSource | null = null;
@@ -65,7 +68,7 @@ export class LoroNoteManager {
     // Subscribe to changes
     this.#doc.subscribe((event) => {
       // Notify content listeners
-      const content = this.#text.toString();
+      const content = this.getContent();
       this.#contentListeners.forEach((listener) => {
         listener(content);
       });
@@ -127,7 +130,7 @@ export class LoroNoteManager {
   /**
    * Start real-time sync
    */
-  startSync() {
+  startSync(): void {
     if (this.#isSyncing) return;
     this.#isSyncing = true;
 
@@ -144,7 +147,7 @@ export class LoroNoteManager {
               const updateBytes = Encoding.decodeBase64(update).pipe(
                 Either.getOrThrow,
               ) as Uint8Array<ArrayBuffer>;
-              unawaited(emit(Effect.succeed(Chunk.make(updateBytes))));
+              void emit(Effect.succeed(Chunk.make(updateBytes)));
             }
           } catch (error) {
             console.error("Failed to process sync message:", error);

@@ -97,7 +97,7 @@
 </script>
 
 <div class="relative h-full flex-1 overflow-hidden">
-  {#if !note?.isFolder}
+  {#if !(note?.isFolder ?? true)}
     <Editor
       content={editorContent}
       {notesList}

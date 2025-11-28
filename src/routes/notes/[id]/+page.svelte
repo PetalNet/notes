@@ -5,13 +5,14 @@
   import { LoroNoteManager } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { getUserPrivateKey } from "$lib/context";
   import { decryptKey } from "$lib/crypto";
   import { FilePlus, Folder } from "@lucide/svelte";
 
+  const { data } = $props();
+
   const notesListQuery = $derived(getNotes());
   let id = $derived(page.params.id);
-  const userPrivateKey = getUserPrivateKey();
+  const userPrivateKey = data.user?.privateKeyEncrypted;
 
   let loroManager = $state<LoroNoteManager>();
   // TODO: Use codemirror-server-render to SSR the editor

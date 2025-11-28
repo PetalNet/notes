@@ -16,7 +16,17 @@
 }
 ::-webkit-scrollbar-thumb {
   @apply rounded-full bg-current/25;
+
+  &:hover {
+    @apply bg-current/50;
+  }
 }
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-current/50;
+
+/* Respect users' accessibility preferences by disabling view transitions. */
+@media (prefers-reduced-motion) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

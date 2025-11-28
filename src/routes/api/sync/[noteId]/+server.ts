@@ -1,4 +1,4 @@
-import { syncSchemaJson } from "$lib/remote/notes.schemas.js";
+import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { addClient, removeClient } from "$lib/server/real-time";

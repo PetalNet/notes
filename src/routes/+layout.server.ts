@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import type { User } from "$lib/schema.ts";
 import { db } from "$lib/server/db";
-import type { User } from "$lib/schema.js";
+import { eq } from "drizzle-orm";
 
 export interface Data {
   user: User | undefined;

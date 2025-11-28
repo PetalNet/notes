@@ -2,7 +2,7 @@
   import { dev } from "$app/environment";
   import { page } from "$app/state";
   import Editor from "$lib/components/codemirror/Editor.svelte";
-  import { LoroNoteManager } from "$lib/loro.js";
+  import { LoroNoteManager } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
   import { FilePlus, Folder } from "@lucide/svelte";

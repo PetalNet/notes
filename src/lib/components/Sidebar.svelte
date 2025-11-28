@@ -27,6 +27,7 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import type { NoteOrFolder } from "$lib/schema.ts";
+  import { page } from "$app/state";
 
   interface ContextState {
     x: number;
@@ -72,8 +73,13 @@
         if (sourceParentId !== null) {
           unawaited(
             (async () => {
-              await updateNote({ noteId: sourceId, parentId: null });
-              await getNotes().refresh();
+              await updateNote({ noteId: sourceId, parentId: null }).updates(
+                getNotes().withOverride((notes) =>
+                  notes.map((note) =>
+                    note.id === sourceId ? { ...note, parentId: null } : note,
+                  ),
+                ),
+              );
             })(),
           );
         }
@@ -102,8 +108,13 @@
 
   async function handleRename() {
     if (!renamingId) return;
-    await updateNote({ noteId: renamingId, title: renameTitle });
-    await getNotes().refresh();
+    await updateNote({ noteId: renamingId, title: renameTitle }).updates(
+      getNotes().withOverride((notes) =>
+        notes.map((note) =>
+          note.id === renamingId ? { ...note, title: renameTitle } : note,
+        ),
+      ),
+    );
     renamingId = null;
     closeContextMenu();
   }
@@ -119,11 +130,15 @@
       // TODO: confirm sucks, use a <dialog>
       confirm("Are you sure you want to delete this note?")
     ) {
-      await deleteNote(noteId);
-      await getNotes().refresh();
-      // If deleted note was selected, navigate away?
-      // This logic was in store, but now Sidebar doesn't know about selection state easily.
-      // We can leave it for now or check $page.params.id
+      await deleteNote(noteId).updates(
+        getNotes().withOverride((notes) =>
+          notes.filter((note) => note.id !== noteId),
+        ),
+      );
+
+      if (page.params.id === noteId) {
+        goto(resolve("/"));
+      }
     }
     closeContextMenu();
   }
@@ -145,8 +160,10 @@
       .toSpliced(targetIndex, 0, { ...itemToMove, children: [] })
       .map((item, i) => ({ id: item.id, order: i }));
 
-    await reorderNotes(updates);
-    await getNotes().refresh();
+    await reorderNotes(updates).updates(
+      // TODO: add optimistic update.
+      getNotes(),
+    );
   }
 
   async function handleCreateNote(
@@ -166,9 +183,10 @@
       encryptedKey,
       parentId,
       isFolder,
-    });
-
-    await getNotes().refresh();
+    }).updates(
+      // TODO: add optimistic update.
+      getNotes(),
+    );
 
     if (!isFolder) {
       goto(resolve("/notes/[id]", { id: newNote.id }));

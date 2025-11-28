@@ -121,8 +121,10 @@
           isDropTarget = false;
           closestEdge = null;
           if (sourceId !== item.id && sourceParentId !== item.id) {
-            await updateNote({ noteId: sourceId, parentId: item.id });
-            await getNotes().refresh();
+            await updateNote({ noteId: sourceId, parentId: item.id }).updates(
+              // TODO: add optimistic update.
+              getNotes(),
+            );
             // Expand folder to show dropped item
             if (!expandedFolders.has(item.id)) {
               toggleFolder(item.id);
@@ -245,8 +247,10 @@
                   .filter((c) => c.id !== sourceId)
                   .toSpliced(targetIndex, 0, { ...itemToMove, children: [] })
                   .map((c, i) => ({ id: c.id, order: i }));
-                await reorderNotes(updates);
-                await getNotes().refresh();
+                await reorderNotes(updates).updates(
+                  // TODO: add optimistic update.
+                  getNotes(),
+                );
               }}
             />
           {/each}

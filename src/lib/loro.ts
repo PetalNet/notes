@@ -1,17 +1,7 @@
 import { decryptData, encryptData } from "$lib/crypto";
 import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { sync } from "$lib/remote/sync.remote.ts";
-import {
-  Chunk,
-  Effect,
-  Either,
-  Encoding,
-  Fiber,
-  Function,
-  PubSub,
-  Schema,
-  Stream,
-} from "effect";
+import { Chunk, Effect, Fiber, Function, PubSub, Schema, Stream } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
 
@@ -256,7 +246,7 @@ export class LoroNoteManager {
       }
     }
 
-    this.commit();
+    this.#doc.commit();
   }
 
   /**
@@ -282,19 +272,5 @@ export class LoroNoteManager {
       console.error("Failed to load encrypted snapshot:", error);
       throw error;
     }
-  }
-
-  /**
-   * Apply update from another peer
-   */
-  applyUpdate(update: Uint8Array) {
-    this.#doc.import(update);
-  }
-
-  /**
-   * Commit current changes
-   */
-  commit() {
-    this.#doc.commit();
   }
 }

@@ -45,6 +45,7 @@
           if (key) {
             console.debug("[Page] Loading Loro manager for note:", id);
             try {
+              // TODO: Cache again?
               const manager = new LoroNoteManager(id, key, async (snapshot) => {
                 await updateNote({ noteId: id, loroSnapshot: snapshot });
               });

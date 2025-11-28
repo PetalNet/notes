@@ -5,9 +5,9 @@
   import { LoroNoteManager } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { FilePlus, Folder } from "@lucide/svelte";
   import { getUserPrivateKey } from "$lib/context";
   import { decryptKey } from "$lib/crypto";
+  import { FilePlus, Folder } from "@lucide/svelte";
 
   const notesListQuery = $derived(getNotes());
   let id = $derived(page.params.id);
@@ -143,5 +143,6 @@
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>
+    <p>~Word Count: {editorContent.split(/\s+/).length}</p>
   </div>
 {/if}

@@ -286,6 +286,7 @@
       oncontextmenu={(e) => {
         handleContextMenu(e, item.id, false);
       }}
+      draggable="false"
     >
       <FileText />
       <span class="truncate">{item.title || "Untitled"}</span>

@@ -18,7 +18,12 @@
     getNotes,
   } from "$lib/remote/notes.remote.ts";
   import Self from "./TreeItem.svelte";
-  import { ChevronRight, Folder, FileText } from "@lucide/svelte";
+  import {
+    ChevronRight,
+    FileText,
+    FolderOpen,
+    FolderClosed,
+  } from "@lucide/svelte";
   import { clsx } from "clsx";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
@@ -181,29 +186,34 @@
   <!-- Drop Indicators -->
   {#if closestEdge === "top"}
     <div
-      class="pointer-events-none absolute top-0 right-0 left-0 z-10 h-0.5 rounded-full bg-indigo-500"
+      class="pointer-events-none absolute top-0 right-0 left-0 z-10 h-0.5 rounded-full bg-primary"
     ></div>
   {/if}
   {#if closestEdge === "bottom"}
     <div
-      class="pointer-events-none absolute right-0 bottom-0 left-0 z-10 h-0.5 rounded-full bg-indigo-500"
+      class="pointer-events-none absolute right-0 bottom-0 left-0 z-10 h-0.5 rounded-full bg-primary"
     ></div>
   {/if}
 
   <!-- Drop Into Highlight -->
   <div
     class={[
-      "pointer-events-none absolute inset-0 rounded-md bg-indigo-100/50 transition-opacity duration-200",
+      "pointer-events-none absolute inset-0 rounded-md bg-primary/10 transition-opacity duration-200",
       isDropTarget ? "opacity-100" : "opacity-0",
     ]}
   ></div>
 
   {#if item.isFolder}
+    {@const isExpanded = expandedFolders.has(item.id)}
     <!-- Folder Item -->
     <div class="group relative">
       <button
         tabindex="0"
-        class="flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-1.5 text-left text-sm font-medium text-base-content transition-all select-none hover:bg-primary-content hover:text-primary hover:shadow-sm"
+        class={[
+          "flex w-full cursor-pointer items-center gap-2 rounded-md px-2  py-1.5 text-left text-sm font-medium text-base-content transition-all duration-500 select-none [view-transition-name:match-element] hover:bg-primary-content hover:text-primary hover:shadow-sm",
+          "hover:bg-secondary-content hover:text-secondary hover:shadow-sm",
+          "aria-[current=page]:bg-primary aria-[current=page]:text-primary-content aria-[current=page]:shadow-sm",
+        ]}
         onclick={() => toggleFolder(item.id)}
         oncontextmenu={(e) => handleContextMenu(e, item.id, true)}
         onkeydown={(e) => e.key === "Enter" && toggleFolder(item.id)}
@@ -211,20 +221,21 @@
         <ChevronRight
           class={clsx(
             // lucid-svelte doesn’t automatically wrap classes with clsx.
-            [
-              "transition-transform duration-200",
-              expandedFolders.has(item.id) && "rotate-90",
-            ],
+            ["transition-transform duration-200", isExpanded && "rotate-90"],
           )}
         />
-        <Folder class="text-indigo-400" />
+        {#if isExpanded}
+          <FolderOpen class="text-primary transition-all" />
+        {:else}
+          <FolderClosed class="text-primary transition-all" />
+        {/if}
         <span class="flex-1 truncate text-start">{item.title}</span>
       </button>
 
       <!-- Nested Items -->
-      {#if expandedFolders.has(item.id)}
+      {#if isExpanded}
         <div
-          class="mt-0.5 ml-4 min-h-2.5 space-y-0.5 border-l border-base-200 pl-2"
+          class="mt-0.5 ml-4 min-h-2.5 space-y-0.5 border-l border-base-300 pl-2"
           transition:slide|local={{ duration: 200 }}
         >
           {#each item.children as child, idx (child.id)}
@@ -268,10 +279,9 @@
       aria-current={$state.eager(page.params.id) === item.id ? "page" : false}
       href={resolve("/notes/[id]", { id: item.id })}
       class={[
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-500",
-        // TODO: Make it secondary, but without flickering when clicked.
-        "hover:bg-primary-content hover:text-primary hover:shadow-sm",
-        "aria-[current=page]:shadow-sm aria-[current=page]:not-hover:bg-primary aria-[current=page]:not-hover:text-primary-content",
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-500 [view-transition-name:match-element]",
+        "hover:bg-secondary-content hover:text-secondary hover:shadow-sm",
+        "aria-[current=page]:bg-primary aria-[current=page]:text-primary-content aria-[current=page]:shadow-sm",
       ]}
       oncontextmenu={(e) => {
         handleContextMenu(e, item.id, false);

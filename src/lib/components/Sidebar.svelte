@@ -204,7 +204,9 @@
 
 <svelte:window onclick={onWindowClick} />
 
-<div class="flex h-full w-64 flex-col border-r border-base-content/10">
+<div
+  class="sidebar flex h-full w-64 flex-col border-r border-base-content/10 [view-transition-name:sidebar]"
+>
   <!-- User Header -->
   <div
     class="flex items-center justify-between border-b border-base-content/10 p-4"
@@ -253,8 +255,8 @@
   <div
     bind:this={rootContainer}
     class={[
-      "flex-1 space-y-0.5 overflow-y-auto px-2 py-2 transition-all",
-      isRootDropTarget && "bg-indigo-50 ring-2 ring-indigo-400 ring-inset",
+      "flex-1 space-y-1 overflow-y-auto px-2 py-2 transition-all",
+      isRootDropTarget && "bg-indigo-50 ring-2 ring-primary ring-inset",
     ]}
   >
     {#each notesTree as item, idx (item.id)}

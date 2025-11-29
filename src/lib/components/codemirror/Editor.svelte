@@ -14,6 +14,7 @@
     ListOrdered,
     Strikethrough,
   } from "@lucide/svelte";
+  import { LoroExtensions } from "loro-codemirror";
   import Codemirror from "./Codemirror.svelte";
   import {
     coreExtensions,
@@ -30,15 +31,19 @@
   } from "./Editor.ts";
   import Toolbar from "./Toolbar.svelte";
   import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
-  import type { NoteOrFolder } from "$lib/schema.ts";
+  import type { NoteOrFolder, User } from "$lib/schema.ts";
+  import { LoroNoteManager } from "$lib/loro.ts";
+  import { EphemeralStore, UndoManager } from "loro-crdt";
+  import type { Extension } from "@codemirror/state";
+  import { onDestroy } from "svelte";
 
   interface Props {
-    content: string;
-    onchange: (newContent: string) => void;
+    manager: LoroNoteManager | undefined;
     notesList?: NoteOrFolder[];
+    user: User | undefined;
   }
 
-  let { content, onchange, notesList = [] }: Props = $props();
+  let { manager, notesList = [], user }: Props = $props();
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
@@ -98,36 +103,34 @@
     },
   });
 
-  const extensions = [
+  let loroExtensions: Extension;
+  if (manager !== undefined && user !== undefined) {
+    const ephemeral = new EphemeralStore();
+    const undoManager = new UndoManager(manager.doc, {});
+
+    onDestroy(() => {
+      ephemeral.destroy();
+    });
+
+    loroExtensions = LoroExtensions(
+      manager.doc,
+      {
+        ephemeral,
+        user: { name: user.username, colorClassName: "bg-primary" },
+      },
+      undoManager,
+      LoroNoteManager.getTextFromDoc,
+    );
+  } else {
+    loroExtensions = [];
+  }
+
+  const extensions: Extension[] = [
     coreExtensions,
     wikilinksExtension(notesList),
-    // Update listener
-    EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        const newContent = update.state.doc.toString();
-        console.debug(
-          "[Prosemark] Content updated. Preview:",
-          newContent.slice(0, 50),
-        );
-        onchange(newContent);
-      }
-    }),
+    loroExtensions,
     editorTheme,
   ];
-
-  // Update content if it changes externally (from Loro)
-  $effect(() => {
-    if (content !== editorView.state.doc.toString()) {
-      console.debug("[Prosemark] External content update");
-      editorView.dispatch({
-        changes: {
-          from: 0,
-          to: editorView.state.doc.length,
-          insert: content,
-        },
-      });
-    }
-  });
 
   const tools = [
     [
@@ -196,10 +199,5 @@
 <div class="flex h-full flex-col">
   <Toolbar {tools} />
 
-  <Codemirror
-    bind:editorView
-    doc={content}
-    {extensions}
-    class="flex-1 overflow-y-auto"
-  />
+  <Codemirror bind:editorView {extensions} class="flex-1 overflow-y-auto" />
 </div>

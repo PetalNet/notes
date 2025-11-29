@@ -110,22 +110,28 @@ export async function decryptKey(
   return new Uint8Array(decrypted).toBase64();
 }
 
-export async function encryptData(
-  data: Uint8Array<ArrayBuffer>,
-  noteKey: string,
-): Promise<Uint8Array> {
-  const keyBuffer = Uint8Array.fromBase64(noteKey);
-  const key = await crypto.subtle.importKey(
+async function getCryptoKeyFromBase64(base64Key: string): Promise<CryptoKey> {
+  const keyBuffer = Uint8Array.fromBase64(base64Key);
+  return crypto.subtle.importKey(
     "raw",
     keyBuffer,
     {
       name: "AES-GCM",
     },
     false,
-    ["encrypt"],
+    ["encrypt", "decrypt"],
   );
+}
 
-  const iv = crypto.getRandomValues(new Uint8Array(12));
+const IV_LENGTH = 12; // AES-GCM standard IV length
+
+export async function encryptData(
+  data: Uint8Array<ArrayBuffer>,
+  noteKey: string,
+): Promise<Uint8Array> {
+  const key = await getCryptoKeyFromBase64(noteKey);
+
+  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const encrypted = await crypto.subtle.encrypt(
     {
       name: "AES-GCM",
@@ -147,20 +153,11 @@ export async function decryptData(
   encrypted: Uint8Array,
   noteKey: string,
 ): Promise<Uint8Array> {
-  const keyBuffer = Uint8Array.fromBase64(noteKey);
-  const key = await crypto.subtle.importKey(
-    "raw",
-    keyBuffer,
-    {
-      name: "AES-GCM",
-    },
-    false,
-    ["decrypt"],
-  );
+  const key = await getCryptoKeyFromBase64(noteKey);
 
   // Extract IV from first 12 bytes
-  const iv = encrypted.slice(0, 12);
-  const data = encrypted.slice(12);
+  const iv = encrypted.slice(0, IV_LENGTH);
+  const data = encrypted.slice(IV_LENGTH);
 
   const decrypted = await crypto.subtle.decrypt(
     {

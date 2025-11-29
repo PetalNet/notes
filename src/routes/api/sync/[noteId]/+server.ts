@@ -1,12 +1,12 @@
-import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { addClient, removeClient } from "$lib/server/real-time";
 import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
-import { Schema } from "effect";
 
 export const GET = async ({ params, locals }) => {
+  console.log("SSE connection request for note:", params.noteId);
+
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -34,11 +34,7 @@ export const GET = async ({ params, locals }) => {
       addClient(noteId, controller);
       // Send initial connection message
       const encoder = new TextEncoder();
-      c.enqueue(
-        encoder.encode(
-          `event: connected\ndata: ${Schema.encodeSync(syncSchemaJson)({ noteId, updates: [] })}\n\n`,
-        ),
-      );
+      c.enqueue(encoder.encode(`event: connected\n`));
     },
     cancel() {
       removeClient(noteId, controller);

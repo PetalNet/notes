@@ -35,7 +35,7 @@ export default defineConfig(
         "error",
         {
           selector:
-            ':matches(PropertyDefinition, MethodDefinition)[accessibility="private"]',
+            ':matches(PropertyDefinition, MethodDefinition)[accessibility="private"]:not([kind="constructor"])',
           message: "Use #private instead",
         },
       ],

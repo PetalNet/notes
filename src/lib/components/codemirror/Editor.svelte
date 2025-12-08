@@ -13,9 +13,11 @@
     List,
     ListOrdered,
     Strikethrough,
+    Clock,
   } from "@lucide/svelte";
   import { LoroExtensions } from "loro-codemirror";
   import Codemirror from "./Codemirror.svelte";
+  import HistoryPanel from "$lib/components/HistoryPanel.svelte";
   import {
     coreExtensions,
     boldCommand,
@@ -47,6 +49,7 @@
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
+  let isHistoryOpen = $state(false);
 
   /** Custom theme */
   const editorTheme = EditorView.theme({
@@ -193,11 +196,24 @@
         icon: ListOrdered,
       },
     ],
+    [
+      {
+        onclick: () => (isHistoryOpen = !isHistoryOpen),
+        title: "Version History",
+        icon: Clock,
+      },
+    ],
   ];
 </script>
 
-<div class="flex h-full flex-col">
+<div class="relative flex h-full flex-col">
   <Toolbar {tools} />
 
   <Codemirror bind:editorView {extensions} class="flex-1 overflow-y-auto" />
+
+  <HistoryPanel
+    {manager}
+    isOpen={isHistoryOpen}
+    onClose={() => (isHistoryOpen = false)}
+  />
 </div>

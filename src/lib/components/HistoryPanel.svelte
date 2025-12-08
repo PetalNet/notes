@@ -1,0 +1,176 @@
+<script lang="ts">
+  import { Clock, RotateCcw, User } from "@lucide/svelte";
+  import type { LoroNoteManager } from "$lib/loro.ts";
+  import { onMount } from "svelte";
+
+  interface Props {
+    manager: LoroNoteManager | undefined;
+    isOpen: boolean;
+    onClose: () => void;
+  }
+
+  let { manager, isOpen, onClose }: Props = $props();
+
+  interface HistoryEntry {
+    version: number;
+    timestamp: Date;
+    author?: string;
+    preview: string;
+  }
+
+  let history = $state<HistoryEntry[]>([]);
+  let selectedVersion = $state<number | null>(null);
+
+  // Get history from Loro document
+  function loadHistory() {
+    if (!manager) return;
+
+    const frontiers = manager.doc.frontiers();
+    const versions: HistoryEntry[] = [];
+
+    // Get all versions by traversing the version graph
+    // For now, we'll create a simple version list
+    // In a real implementation, you'd traverse the Loro version graph
+    const currentVersion = manager.doc.version();
+
+    // Create a simple history based on the current state
+    // This is a simplified version - Loro's actual history is more complex
+    versions.push({
+      version: 0,
+      timestamp: new Date(),
+      preview: manager.doc.getText("content").toString().slice(0, 100),
+    });
+
+    history = versions;
+  }
+
+  onMount(() => {
+    loadHistory();
+  });
+
+  function restoreVersion(version: number) {
+    // TODO: Implement version restoration using Loro's checkout functionality
+    console.log("Restoring version:", version);
+  }
+
+  function formatTime(date: Date): string {
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return "Just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  }
+</script>
+
+{#if isOpen}
+  <div
+    class="fixed inset-y-0 right-0 z-50 flex w-80 flex-col border-l border-base-content/10 bg-base-100 shadow-xl"
+  >
+    <!-- Header -->
+    <div
+      class="flex items-center justify-between border-b border-base-content/10 p-4"
+    >
+      <div class="flex items-center gap-2">
+        <Clock class="h-5 w-5 text-primary" />
+        <h2 class="text-lg font-semibold">Version History</h2>
+      </div>
+      <button
+        onclick={onClose}
+        class="btn btn-circle btn-ghost btn-sm"
+        aria-label="Close history"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- History List -->
+    <div class="flex-1 overflow-y-auto p-4">
+      {#if history.length === 0}
+        <div class="flex h-full items-center justify-center text-center">
+          <div>
+            <Clock class="mx-auto mb-2 h-12 w-12 text-base-content/30" />
+            <p class="text-sm text-base-content/60">No history available</p>
+          </div>
+        </div>
+      {:else}
+        <div class="space-y-2">
+          {#each history as entry, i (entry.version)}
+            <button
+              onclick={() => (selectedVersion = entry.version)}
+              class={[
+                "w-full rounded-lg border p-3 text-left transition-all",
+                selectedVersion === entry.version
+                  ? "border-primary bg-primary/10"
+                  : "border-base-content/10 hover:border-primary/50 hover:bg-base-200",
+              ].join(" ")}
+            >
+              <!-- Version Header -->
+              <div class="mb-2 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  {#if entry.author}
+                    <div
+                      class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-content"
+                    >
+                      {entry.author[0].toUpperCase()}
+                    </div>
+                    <span class="text-sm font-medium">{entry.author}</span>
+                  {:else}
+                    <User class="h-4 w-4 text-base-content/50" />
+                    <span class="text-sm text-base-content/60">Unknown</span>
+                  {/if}
+                </div>
+                <span class="text-xs text-base-content/50">
+                  {formatTime(entry.timestamp)}
+                </span>
+              </div>
+
+              <!-- Preview -->
+              <p class="line-clamp-2 text-xs text-base-content/70">
+                {entry.preview || "Empty document"}
+              </p>
+
+              <!-- Version Number -->
+              <div class="mt-2 flex items-center justify-between">
+                <span class="font-mono text-xs text-base-content/50">
+                  v{entry.version}
+                </span>
+                {#if i === 0}
+                  <span
+                    class="rounded-full bg-success/20 px-2 py-0.5 text-xs font-medium text-success"
+                  >
+                    Current
+                  </span>
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Actions -->
+    {#if selectedVersion !== null && selectedVersion !== history[0]?.version}
+      <div class="border-t border-base-content/10 p-4">
+        <button
+          onclick={() => restoreVersion(selectedVersion)}
+          class="btn w-full btn-primary"
+        >
+          <RotateCcw class="h-4 w-4" />
+          Restore This Version
+        </button>
+      </div>
+    {/if}
+  </div>
+
+  <!-- Backdrop -->
+  <button
+    onclick={onClose}
+    class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+    aria-label="Close history panel"
+  ></button>
+{/if}

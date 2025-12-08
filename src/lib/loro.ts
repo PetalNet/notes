@@ -139,4 +139,25 @@ export class LoroNoteManager {
     const encrypted = await encryptData(snapshot, this.#noteKey);
     return encrypted.toBase64();
   }
+
+  /**
+   * Get the current version/frontiers of the document
+   */
+  getVersion() {
+    return this.doc.version();
+  }
+
+  /**
+   * Get frontiers (latest version points) of the document
+   */
+  getFrontiers() {
+    return this.doc.frontiers();
+  }
+
+  /**
+   * Get the text content
+   */
+  getText(): string {
+    return this.#text.toString();
+  }
 }

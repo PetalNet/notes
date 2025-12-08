@@ -192,7 +192,7 @@ export class LoroNoteManager {
     // For now, just return the current version
     // In a full implementation, you'd traverse the oplog
     history.push({
-      version: currentVersion.get(this.doc.peerId) || 0,
+      version: currentVersion.get(this.doc.peerId) ?? 0,
       timestamp: new Date(),
       preview: currentText.slice(0, 100),
     });

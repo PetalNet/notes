@@ -4,7 +4,7 @@
   let { data } = $props();
 </script>
 
-<div class="min-h-screen bg-base-100 p-8">
+<div class="h-full bg-base-100 p-8">
   <div class="mx-auto max-w-6xl">
     <h1 class="mb-8 text-4xl font-bold">Dashboard</h1>
 
@@ -57,9 +57,9 @@
               </p>
             </div>
             <div class="card-actions justify-end">
-              <a href={resolve("/notes")} class="btn btn-accent"
-                >Create New Note</a
-              >
+              <p class="text-sm text-base-content/60">
+                Use the sidebar to create your first note
+              </p>
             </div>
           </div>
         </div>

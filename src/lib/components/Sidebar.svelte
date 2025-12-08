@@ -251,7 +251,7 @@
 
       <button
         onclick={toggleSidebar}
-        class="btn-sq btn btn-ghost btn-sm"
+        class="btn btn-square btn-ghost btn-sm"
         title="Collapse sidebar (Ctrl+B)"
       >
         <PanelLeftClose size={20} />

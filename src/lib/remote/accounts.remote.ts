@@ -41,7 +41,7 @@ export const login = form(
     const session = await auth.createSession(sessionToken, existingUser.id);
     auth.setSessionTokenCookie(cookies, sessionToken, session.expiresAt);
 
-    return redirect(302, "/");
+    throw redirect(302, "/");
   },
 );
 
@@ -75,7 +75,7 @@ export const signup = form(
     } catch {
       return fail(500, { message: "An error has occurred" });
     }
-    redirect(302, "/");
+    throw redirect(302, "/");
   },
 );
 

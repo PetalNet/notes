@@ -4,8 +4,13 @@
     ChevronRight,
     ChevronDown,
     MoreHorizontal,
+    PanelLeftOpen,
   } from "@lucide/svelte";
-  import { onMount } from "svelte";
+  import { onMount, getContext } from "svelte";
+  import {
+    SIDEBAR_CONTEXT_KEY,
+    type SidebarContext,
+  } from "$lib/components/sidebar-context";
 
   interface Tool {
     title: string;
@@ -21,11 +26,11 @@
 
   interface Props {
     toolGroups: ToolGroup[];
-    toggleSidebar?: () => void;
-    isCollapsed?: boolean;
   }
 
-  const { toolGroups, toggleSidebar, isCollapsed = false }: Props = $props();
+  const { toolGroups }: Props = $props();
+
+  const sidebarCtx = getContext<SidebarContext>(SIDEBAR_CONTEXT_KEY);
 
   let toolbarElement: HTMLDivElement;
   // Initialize with all groups visible by default
@@ -56,7 +61,7 @@
 
     let availableWidth =
       containerWidth -
-      (toggleSidebar && isCollapsed ? buttonWidth + groupSpacing : 0);
+      (sidebarCtx?.isCollapsed ? buttonWidth + groupSpacing : 0);
     let currentVisibleGroups: number[] = [];
 
     // Try to fit groups by priority
@@ -102,14 +107,14 @@
   class="flex items-center gap-1 border-b border-base-content/10 px-2 py-1.5 sm:gap-2 sm:px-4"
 >
   <!-- Sidebar toggle (when collapsed) -->
-  {#if toggleSidebar && isCollapsed}
+  {#if sidebarCtx?.isCollapsed}
     <button
-      onclick={toggleSidebar}
+      onclick={sidebarCtx.toggleSidebar}
       class="btn h-8 min-h-8 w-8 p-0 btn-ghost btn-sm hover:bg-base-200"
       title="Open sidebar (Ctrl+\)"
       aria-label="Open sidebar"
     >
-      <ChevronRight size={16} class="sm:h-[18px] sm:w-[18px]" />
+      <PanelLeftOpen size={16} class="sm:h-[18px] sm:w-[18px]" />
     </button>
     <div class="mx-0.5 h-5 w-px bg-base-300 sm:mx-1"></div>
   {/if}

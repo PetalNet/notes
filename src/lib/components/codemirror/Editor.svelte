@@ -136,78 +136,95 @@
   ];
 
   const tools = [
-    [
-      {
-        title: "Bold (⌘+B)",
-        onclick: () => boldCommand(editorView),
-        icon: Bold,
-      },
-      {
-        title: "Italic (⌘+I)",
-        onclick: () => italicCommand(editorView),
-        icon: Italic,
-      },
-      {
-        title: "Strikethrough (⌘+Shift+X)",
-        onclick: () => strikethroughCommand(editorView),
-        icon: Strikethrough,
-      },
-      {
-        title: "Code (⌘+E)",
-        onclick: () => codeCommand(editorView),
-        icon: Code,
-      },
-    ],
-    [
-      {
-        title: "Link (⌘+K)",
-        onclick: () => linkCommand(editorView),
-        icon: Link,
-      },
-    ],
-    [
-      {
-        title: "Heading 1",
-        onclick: () => heading1Command(editorView),
-        icon: Heading1,
-      },
-      {
-        title: "Heading 2",
-        onclick: () => heading2Command(editorView),
-        icon: Heading2,
-      },
-      {
-        title: "Heading 3",
-        onclick: () => heading3Command(editorView),
-        icon: Heading3,
-      },
-    ],
-    [
-      {
-        onclick: () => bulletListCommand(editorView),
-        title: "Bullet List",
+    {
+      priority: 1,
+      tools: [
+        {
+          title: "Bold (⌘+B)",
+          onclick: () => boldCommand(editorView),
+          icon: Bold,
+        },
+        {
+          title: "Italic (⌘+I)",
+          onclick: () => italicCommand(editorView),
+          icon: Italic,
+        },
+        {
+          title: "Strikethrough (⌘+Shift+X)",
+          onclick: () => strikethroughCommand(editorView),
+          icon: Strikethrough,
+        },
+        {
+          title: "Code (⌘+E)",
+          onclick: () => codeCommand(editorView),
+          icon: Code,
+        },
+      ],
+    },
+    {
+      priority: 2,
+      tools: [
+        {
+          title: "Link (⌘+K)",
+          onclick: () => linkCommand(editorView),
+          icon: Link,
+        },
+      ],
+    },
+    {
+      priority: 10,
+      label: "Headings",
+      tools: [
+        {
+          title: "Heading 1",
+          onclick: () => heading1Command(editorView),
+          icon: Heading1,
+        },
+        {
+          title: "Heading 2",
+          onclick: () => heading2Command(editorView),
+          icon: Heading2,
+        },
+        {
+          title: "Heading 3",
+          onclick: () => heading3Command(editorView),
+          icon: Heading3,
+        },
+      ],
+    },
+    {
+      priority: 5,
+      label: "Lists",
+      tools: [
+        {
+          onclick: () => bulletListCommand(editorView),
+          title: "Bullet List",
 
-        icon: List,
-      },
-      {
-        onclick: () => orderedListCommand(editorView),
-        title: "Numbered List",
+          icon: List,
+        },
+        {
+          onclick: () => orderedListCommand(editorView),
+          title: "Numbered List",
 
-        icon: ListOrdered,
-      },
-    ],
-    [
-      {
-        onclick: () => (isHistoryOpen = !isHistoryOpen),
-        title: "Version History",
-        icon: Clock,
-      },
-    ],
+          icon: ListOrdered,
+        },
+      ],
+    },
+    {
+      priority: 100,
+      tools: [
+        {
+          onclick: () => (isHistoryOpen = !isHistoryOpen),
+          title: "Version History",
+          icon: Clock,
+        },
+      ],
+    },
   ];
 </script>
 
 <div class="relative flex h-full flex-col">
-  <Toolbar {tools} />
+  <Toolbar toolGroups={tools} />
 
   <Codemirror bind:editorView {extensions} class="flex-1 overflow-y-auto" />
 

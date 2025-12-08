@@ -12,6 +12,8 @@
     Pencil,
     ChevronLeft,
     ChevronRight,
+    PanelLeftClose,
+    LogOut,
   } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
@@ -54,11 +56,14 @@
 
   let notesTree = $derived(buildNotesTree(notesList));
 
-  let rootContainer: HTMLElement;
+  let rootContainer = $state<HTMLElement>();
   let isRootDropTarget = $state(false);
 
   // Set up root drop target
-  onMount(() => {
+  // Set up root drop target
+  $effect(() => {
+    if (!rootContainer) return;
+
     const cleanup = dropTargetForElements({
       element: rootContainer,
       onDragEnter: () => {
@@ -210,46 +215,47 @@
 
 <div
   class="sidebar flex h-full flex-col border-r border-base-content/10 transition-all duration-300 [view-transition-name:sidebar]"
-  style="width: {isCollapsed ? '4rem' : '16rem'}"
+  style="width: {isCollapsed ? '0' : '16rem'}"
 >
-  <!-- Toggle Button -->
-  <div
-    class="flex items-center justify-between border-b border-base-content/10 p-4"
-  >
-    <button
-      onclick={toggleSidebar}
-      class="btn btn-ghost btn-sm"
-      title={isCollapsed
-        ? "Expand sidebar (Ctrl+B)"
-        : "Collapse sidebar (Ctrl+B)"}
-    >
-      {#if isCollapsed}
-        <ChevronRight size={20} />
-      {:else}
-        <ChevronLeft size={20} />
-      {/if}
-    </button>
-  </div>
-
   {#if !isCollapsed}
     <!-- User Header -->
     <div
       class="flex items-center justify-between border-b border-base-content/10 p-4"
     >
-      <div class="flex items-center gap-2">
-        <ProfilePicture name={user?.username ?? "A"} />
-        <span class="max-w-28 truncate text-sm font-medium"
-          >{user?.username ?? "Anonymous"}</span
+      <div class="dropdown dropdown-bottom">
+        <div
+          tabindex="0"
+          role="button"
+          class="btn flex items-center gap-2 px-1 font-normal btn-ghost btn-sm"
         >
+          <ProfilePicture name={user?.username ?? "A"} />
+          <span class="max-w-[120px] truncate text-sm font-medium">
+            {user?.username ?? "Anonymous"}
+          </span>
+        </div>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <ul
+          tabindex="0"
+          class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
+        >
+          <li>
+            <form {...logout} class="w-full">
+              <button type="submit" class="flex w-full items-center gap-2">
+                <LogOut size={16} />
+                Log out
+              </button>
+            </form>
+          </li>
+        </ul>
       </div>
-      <form {...logout}>
-        <button
-          type="submit"
-          class="text-xs text-base-content/40 transition-colors hover:text-base-content/60"
-        >
-          Log out
-        </button>
-      </form>
+
+      <button
+        onclick={toggleSidebar}
+        class="btn-sq btn btn-ghost btn-sm"
+        title="Collapse sidebar (Ctrl+B)"
+      >
+        <PanelLeftClose size={20} />
+      </button>
     </div>
 
     <!-- Actions -->

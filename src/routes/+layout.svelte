@@ -6,13 +6,26 @@
   import favicon from "$lib/assets/favicon.svg";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { getNotes } from "$lib/remote/notes.remote.ts";
+  import { setContext } from "svelte";
+  import { SIDEBAR_CONTEXT_KEY } from "$lib/components/sidebar-context";
 
   let { children, data } = $props();
 
-  const notesList = $derived(data.user ? await getNotes() : []);
-
   // Sidebar collapse state
   let isCollapsed = $state(false);
+
+  function toggleSidebar() {
+    isCollapsed = !isCollapsed;
+  }
+
+  setContext(SIDEBAR_CONTEXT_KEY, {
+    get isCollapsed() {
+      return isCollapsed;
+    },
+    toggleSidebar,
+  });
+
+  const notesList = $derived(data.user ? await getNotes() : []);
 
   // Initialize from localStorage and handle responsive behavior
   onMount(() => {
@@ -54,10 +67,6 @@
   $effect(() => {
     localStorage.setItem("sidebarCollapsed", String(isCollapsed));
   });
-
-  function toggleSidebar() {
-    isCollapsed = !isCollapsed;
-  }
 
   onNavigate((navigation) => {
     const { promise, resolve } = Promise.withResolvers<void>();

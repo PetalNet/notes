@@ -28,15 +28,28 @@ export const GET = async ({ params, locals }) => {
 
   // Create a stream for SSE
   let controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+  let keepAliveInterval: NodeJS.Timeout;
+
   const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
     start(c) {
       controller = c;
       addClient(noteId, controller);
+
       // Send initial connection message
       const encoder = new TextEncoder();
       c.enqueue(encoder.encode(`event: connected\n`));
+
+      // Send keep-alive comment every 15 seconds to prevent timeout
+      keepAliveInterval = setInterval(() => {
+        try {
+          c.enqueue(encoder.encode(`: keep-alive\n\n`));
+        } catch (e) {
+          clearInterval(keepAliveInterval);
+        }
+      }, 15000);
     },
     cancel() {
+      clearInterval(keepAliveInterval);
       removeClient(noteId, controller);
     },
   });

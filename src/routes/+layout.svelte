@@ -3,8 +3,13 @@
 
   import { onNavigate } from "$app/navigation";
   import favicon from "$lib/assets/favicon.svg";
+  import Sidebar from "$lib/components/Sidebar.svelte";
+  import { getNotes } from "$lib/remote/notes.remote.ts";
 
-  let { children } = $props();
+  let { children, data } = $props();
+
+  const notesList = $derived(data.user ? await getNotes() : []);
+
   onNavigate((navigation) => {
     const { promise, resolve } = Promise.withResolvers<void>();
 
@@ -21,4 +26,13 @@
   <link rel="icon" href={favicon} />
 </svelte:head>
 
-{@render children()}
+{#if data.user}
+  <div class="flex h-screen overflow-hidden">
+    <Sidebar user={data.user} {notesList} />
+    <div class="flex-1 overflow-auto">
+      {@render children()}
+    </div>
+  </div>
+{:else}
+  {@render children()}
+{/if}

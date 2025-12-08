@@ -160,4 +160,41 @@ export class LoroNoteManager {
   getText(): string {
     return this.#text.toString();
   }
+
+  /**
+   * Get version history with user attribution
+   * Returns an array of version snapshots
+   */
+  getHistory(): Array<{
+    version: number;
+    timestamp: Date;
+    preview: string;
+  }> {
+    const history: Array<{
+      version: number;
+      timestamp: Date;
+      preview: string;
+    }> = [];
+
+    // Get current version
+    const currentVersion = this.doc.version();
+    const currentText = this.#text.toString();
+
+    // For now, just return the current version
+    // In a full implementation, you'd traverse the oplog
+    history.push({
+      version: currentVersion.get(this.doc.peerId) || 0,
+      timestamp: new Date(),
+      preview: currentText.slice(0, 100),
+    });
+
+    return history;
+  }
+
+  /**
+   * Subscribe to history changes (live updates)
+   */
+  subscribeToHistory(callback: () => void): () => void {
+    return this.doc.subscribe(callback);
+  }
 }

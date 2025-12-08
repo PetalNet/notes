@@ -14,38 +14,40 @@
   interface HistoryEntry {
     version: number;
     timestamp: Date;
-    author?: string;
     preview: string;
   }
 
   let history = $state<HistoryEntry[]>([]);
   let selectedVersion = $state<number | null>(null);
+  let unsubscribe: (() => void) | null = null;
 
-  // Get history from Loro document
+  // Load history from Loro document
   function loadHistory() {
-    if (!manager) return;
+    if (!manager) {
+      history = [];
+      return;
+    }
 
-    const frontiers = manager.doc.frontiers();
-    const versions: HistoryEntry[] = [];
-
-    // Get all versions by traversing the version graph
-    // For now, we'll create a simple version list
-    // In a real implementation, you'd traverse the Loro version graph
-    const currentVersion = manager.doc.version();
-
-    // Create a simple history based on the current state
-    // This is a simplified version - Loro's actual history is more complex
-    versions.push({
-      version: 0,
-      timestamp: new Date(),
-      preview: manager.doc.getText("content").toString().slice(0, 100),
-    });
-
-    history = versions;
+    history = manager.getHistory();
   }
 
-  onMount(() => {
-    loadHistory();
+  // Subscribe to live updates
+  $effect(() => {
+    if (manager && isOpen) {
+      loadHistory();
+
+      // Subscribe to document changes for live updates
+      unsubscribe = manager.subscribeToHistory(() => {
+        loadHistory();
+      });
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
+      }
+    };
   });
 
   function restoreVersion(version: number) {

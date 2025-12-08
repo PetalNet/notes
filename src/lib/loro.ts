@@ -39,8 +39,10 @@ export class LoroNoteManager {
     // Subscribe to changes
     this.doc.subscribeLocalUpdates((update) => {
       console.debug(
-        "Loro document changed. Preview:",
+        "[Loro] Local update detected. Preview:",
         this.#text.toString().slice(0, 20),
+        "Update size:",
+        update.length,
       );
 
       // Persist changes
@@ -48,6 +50,7 @@ export class LoroNoteManager {
 
       // Send local changes immediately
       if (this.#isSyncing) {
+        console.debug("[Loro] Sending local update to server");
         unawaited(this.#sendUpdate(update));
       }
     });
@@ -99,10 +102,16 @@ export class LoroNoteManager {
     this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
 
     this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
+      console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
       try {
         const data = Schema.decodeSync(syncSchemaJson)(event.data);
         const updateBytes = Uint8Array.fromBase64(data.update);
+        console.debug(
+          "[Loro] Applying remote update, size:",
+          updateBytes.length,
+        );
         this.doc.import(updateBytes);
+        console.debug("[Loro] Remote update applied successfully");
       } catch (error) {
         console.error("Failed to process sync message:", error);
       }

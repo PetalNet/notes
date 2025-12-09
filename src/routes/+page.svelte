@@ -1,7 +1,14 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { getContext } from "svelte";
+  import {
+    SIDEBAR_CONTEXT_KEY,
+    type SidebarContext,
+  } from "$lib/components/sidebar-context";
+  import { PanelLeftOpen } from "@lucide/svelte";
 
   let { data } = $props();
+  const sidebar = getContext<SidebarContext>(SIDEBAR_CONTEXT_KEY);
 </script>
 
 <div class="h-full bg-base-100 p-8">
@@ -57,9 +64,19 @@
               </p>
             </div>
             <div class="card-actions justify-end">
-              <p class="text-sm text-base-content/60">
-                Use the sidebar to create your first note
-              </p>
+              {#if sidebar.isCollapsed}
+                <button
+                  class="btn btn-sm btn-primary"
+                  onclick={sidebar.toggleSidebar}
+                >
+                  <PanelLeftOpen size={16} />
+                  Open Sidebar
+                </button>
+              {:else}
+                <p class="text-sm text-base-content/60">
+                  Use the sidebar to create your first note
+                </p>
+              {/if}
             </div>
           </div>
         </div>

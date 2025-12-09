@@ -3,6 +3,7 @@
 
   import { EditorView } from "@codemirror/view";
   import {
+    type Icon as IconType,
     Bold,
     Code,
     Heading1,
@@ -14,7 +15,31 @@
     ListOrdered,
     Strikethrough,
     Clock,
+    Globe,
+    Share as ShareIcon,
   } from "@lucide/svelte";
+  // ... existing imports ...
+
+  interface Props {
+    manager: LoroNoteManager | undefined;
+    notesList?: NoteOrFolder[];
+    user: User | undefined;
+    handleOpenInHomeserver: (input: string | null) => void;
+    noteId: string;
+    noteTitle: string;
+  }
+
+  let {
+    manager,
+    notesList = [],
+    user,
+    handleOpenInHomeserver,
+    noteId,
+    noteTitle,
+  }: Props = $props();
+
+  // ... (existing code) ...
+
   import { LoroExtensions } from "loro-codemirror";
   import Codemirror from "./Codemirror.svelte";
   import HistoryPanel from "$lib/components/HistoryPanel.svelte";
@@ -32,24 +57,17 @@
     orderedListCommand,
   } from "./Editor.ts";
   import Toolbar from "./Toolbar.svelte";
+  import ShareModal from "$lib/components/ShareModal.svelte";
   import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
   import type { NoteOrFolder, User } from "$lib/schema.ts";
   import { LoroNoteManager } from "$lib/loro.ts";
   import { EphemeralStore, UndoManager } from "loro-crdt";
   import type { Extension } from "@codemirror/state";
-  import { onDestroy } from "svelte";
-
-  interface Props {
-    manager: LoroNoteManager | undefined;
-    notesList?: NoteOrFolder[];
-    user: User | undefined;
-  }
-
-  let { manager, notesList = [], user }: Props = $props();
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
   let isHistoryOpen = $state(false);
+  let isShareOpen = $state(false);
 
   /** Custom theme */
   const editorTheme = EditorView.theme({
@@ -106,34 +124,31 @@
     },
   });
 
-  let loroExtensions: Extension;
-  if (manager !== undefined && user !== undefined) {
-    const ephemeral = new EphemeralStore();
-    const undoManager = new UndoManager(manager.doc, {});
+  let loroExtensions = $state<Extension>([]);
 
-    onDestroy(() => {
-      ephemeral.destroy();
-    });
+  $effect(() => {
+    if (manager !== undefined && user !== undefined) {
+      const ephemeral = new EphemeralStore();
+      const undoManager = new UndoManager(manager.doc, {});
 
-    loroExtensions = LoroExtensions(
-      manager.doc,
-      {
-        ephemeral,
-        user: { name: user.username, colorClassName: "bg-primary" },
-      },
-      undoManager,
-      LoroNoteManager.getTextFromDoc,
-    );
-  } else {
-    loroExtensions = [];
-  }
+      loroExtensions = LoroExtensions(
+        manager.doc,
+        {
+          ephemeral,
+          user: { name: user.username, colorClassName: "bg-primary" },
+        },
+        undoManager,
+        LoroNoteManager.getTextFromDoc,
+      );
 
-  const extensions: Extension[] = [
-    coreExtensions,
-    wikilinksExtension(notesList),
-    loroExtensions,
-    editorTheme,
-  ];
+      return () => {
+        ephemeral.destroy();
+      };
+    } else {
+      loroExtensions = [];
+      return;
+    }
+  });
 
   const tools = [
     {
@@ -199,13 +214,11 @@
         {
           onclick: () => bulletListCommand(editorView),
           title: "Bullet List",
-
           icon: List,
         },
         {
           onclick: () => orderedListCommand(editorView),
           title: "Numbered List",
-
           icon: ListOrdered,
         },
       ],
@@ -218,9 +231,26 @@
           title: "Version History",
           icon: Clock,
         },
+        {
+          onclick: () => handleOpenInHomeserver(null),
+          title: "Open in Homeserver",
+          icon: Globe,
+        },
+        {
+          onclick: () => (isShareOpen = true),
+          title: "Share",
+          icon: ShareIcon,
+        },
       ],
     },
   ];
+
+  let extensions = $derived([
+    coreExtensions,
+    wikilinksExtension(notesList),
+    loroExtensions,
+    editorTheme,
+  ]);
 </script>
 
 <div class="relative flex h-full flex-col">
@@ -232,5 +262,12 @@
     {manager}
     isOpen={isHistoryOpen}
     onClose={() => (isHistoryOpen = false)}
+  />
+
+  <ShareModal
+    {noteId}
+    {noteTitle}
+    isOpen={isShareOpen}
+    onClose={() => (isShareOpen = false)}
   />
 </div>

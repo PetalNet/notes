@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
+    "dev:federation": "./scripts/start_federation.sh",
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
@@ -76,6 +77,9 @@
     "@milkdown/theme-nord": "^7.17.1",
     "@milkdown/utils": "^7.17.1",
     "@modelcontextprotocol/sdk": "^1.22.0",
+    "@noble/ciphers": "^2.1.1",
+    "@noble/curves": "^2.0.1",
+    "@noble/hashes": "^2.0.1",
     "@node-rs/argon2": "^2.0.2",
     "@prosemark/core": "^0.0.4",
     "@prosemark/paste-rich-text": "^0.0.2",

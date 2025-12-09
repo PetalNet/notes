@@ -1,13 +1,19 @@
-import { getNotes } from "$lib/remote/notes.remote.ts";
-import { guardLogin } from "$lib/server/auth.ts";
-import { error } from "@sveltejs/kit";
+import type { PageServerLoad } from "./$types.js";
+import { parseNoteId } from "$lib/noteId.ts";
+import { env } from "$env/dynamic/private";
 
-export const load = async ({ params }): Promise<void> => {
-  guardLogin();
+export const load: PageServerLoad = async ({ params, locals }) => {
+  const { id } = params;
+  const currentDomain = env.SERVER_DOMAIN || "localhost:5173";
 
-  const notesList = await getNotes();
-  const note = notesList.find((n) => n.id === params.id);
-  if (note === undefined) {
-    error(404, "Note not found");
-  }
+  // Parse note ID to check origin
+  const { origin, uuid } = parseNoteId(id);
+
+  // Pass origin info to client for federation handling
+  return {
+    noteId: id,
+    noteUuid: uuid,
+    originServer: origin || currentDomain,
+    isLocal: !origin || origin === currentDomain,
+  };
 };

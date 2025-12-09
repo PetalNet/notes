@@ -25,7 +25,7 @@
     FolderClosed,
   } from "@lucide/svelte";
   import { clsx } from "clsx";
-  import { resolve } from "$app/paths";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
 
   interface Props {
@@ -276,8 +276,8 @@
   {:else}
     <!-- Note Item -->
     <a
-      aria-current={$state.eager(page.params.id) === item.id ? "page" : false}
-      href={resolve("/notes/[id]", { id: item.id })}
+      aria-current={page.params.id === item.id ? "page" : undefined}
+      href={`${base}/notes/${item.id}`}
       class={[
         "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-500 [view-transition-name:match-element]",
         "hover:bg-secondary-content hover:text-secondary hover:shadow-sm",

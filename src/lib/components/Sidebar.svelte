@@ -14,6 +14,8 @@
     ChevronRight,
     PanelLeftClose,
     LogOut,
+    Globe,
+    Users,
   } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
@@ -25,11 +27,12 @@
     updateNote,
     reorderNotes,
     getNotes,
+    type SharedNote,
   } from "$lib/remote/notes.remote.ts";
   import { buildNotesTree } from "$lib/utils/tree.ts";
   import { generateNoteKey, encryptKeyForUser } from "$lib/crypto";
   import { goto } from "$app/navigation";
-  import { resolve } from "$app/paths";
+  import { base } from "$app/paths";
   import type { NoteOrFolder } from "$lib/schema.ts";
   import { page } from "$app/state";
 
@@ -40,21 +43,34 @@
     isFolder: boolean;
   }
 
+  import ConfirmationModal from "./ConfirmationModal.svelte";
+
   interface Props {
     user: User | undefined;
     notesList: NoteOrFolder[];
+    sharedNotes?: SharedNote[];
     isCollapsed: boolean;
     toggleSidebar: () => void;
   }
 
-  let { user, notesList, isCollapsed, toggleSidebar }: Props = $props();
+  let {
+    user,
+    notesList,
+    sharedNotes = [],
+    isCollapsed,
+    toggleSidebar,
+  }: Props = $props();
   let expandedFolders = new SvelteSet<string>();
+  let showSharedNotes = $state(true);
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<ContextState>();
   let renameModal: HTMLDialogElement;
+  let noteToDeleteId = $state<string | null>(null);
 
-  let notesTree = $derived(buildNotesTree(notesList));
+  let notesTree = $derived(
+    buildNotesTree(notesList.filter((n) => n.ownerId === user?.id)),
+  );
 
   let rootContainer = $state<HTMLElement>();
   let isRootDropTarget = $state(false);
@@ -134,22 +150,26 @@
     closeContextMenu();
   }
 
-  async function handleDelete(noteId: string) {
-    if (
-      // TODO: confirm sucks, use a <dialog>
-      confirm("Are you sure you want to delete this note?")
-    ) {
-      await deleteNote(noteId).updates(
-        getNotes().withOverride((notes) =>
-          notes.filter((note) => note.id !== noteId),
-        ),
-      );
-
-      if (page.params.id === noteId) {
-        goto(resolve("/"));
-      }
-    }
+  function handleDelete(noteId: string) {
+    noteToDeleteId = noteId;
     closeContextMenu();
+  }
+
+  async function confirmDelete() {
+    if (!noteToDeleteId) return;
+
+    const id = noteToDeleteId;
+    noteToDeleteId = null; // Close modal immediately
+
+    await deleteNote(id).updates(
+      getNotes().withOverride((notes) =>
+        notes.filter((note) => note.id !== id),
+      ),
+    );
+
+    if (page.params.id === id) {
+      goto(`${base}/`);
+    }
   }
 
   // Close context menu on click outside
@@ -198,7 +218,7 @@
     );
 
     if (!isFolder) {
-      goto(resolve("/notes/[id]", { id: newNote.id }));
+      goto(`${base}/notes/${newNote.id}`);
     }
   }
 
@@ -282,24 +302,64 @@
       >
     </div>
 
+    <!-- Shared with me -->
+    {#if sharedNotes.length > 0}
+      <div class="px-2 pb-2">
+        <button
+          class="flex w-full items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-base-content/70 hover:bg-base-content/5 hover:text-base-content"
+          onclick={() => (showSharedNotes = !showSharedNotes)}
+        >
+          {#if showSharedNotes}
+            <ChevronRight class="rotate-90 transition-transform" size={16} />
+          {:else}
+            <ChevronRight class="transition-transform" size={16} />
+          {/if}
+          <Globe size={16} />
+          <span>Shared with me</span>
+        </button>
+
+        {#if showSharedNotes}
+          <div class="mt-1 space-y-0.5 pl-4">
+            {#each sharedNotes as note (note.id)}
+              <a
+                href={`${base}/notes/${note.id}`}
+                class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-base-content/70 hover:bg-base-content/5 hover:text-base-content {page
+                  .params.id === note.id
+                  ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
+                  : ''}"
+              >
+                <div class=" text-primary"><File size={16} /></div>
+                <div class="flex flex-1 flex-col overflow-hidden">
+                  <span class="truncate">{note.title || "Untitled"}</span>
+                  <span class="truncate text-[10px] opacity-60"
+                    >from {note.hostServer}</span
+                  >
+                </div>
+              </a>
+            {/each}
+          </div>
+        {/if}
+      </div>
+      <div class="mx-2 my-1 border-t border-base-content/10"></div>
+    {/if}
+
     <!-- Note Tree -->
     <div
       bind:this={rootContainer}
-      class={[
-        "flex-1 space-y-1 overflow-y-auto px-2 py-2 transition-all",
-        isRootDropTarget && "bg-indigo-50 ring-2 ring-primary ring-inset",
-      ]}
+      class="flex-1 overflow-y-auto px-2 pb-2"
+      role="tree"
+      itemscope
     >
-      {#each notesTree as item, idx (item.id)}
+      {#each notesTree as note, idx (note.id)}
         <TreeItem
-          {item}
+          item={note}
           {expandedFolders}
           {toggleFolder}
           {handleContextMenu}
-          index={idx}
-          onReorder={handleRootReorder}
           {notesList}
           {notesTree}
+          index={idx}
+          onReorder={handleRootReorder}
         />
       {/each}
 
@@ -400,3 +460,14 @@
     <button>close</button>
   </form>
 </dialog>
+
+<!-- Delete Confirmation Modal -->
+<ConfirmationModal
+  isOpen={!!noteToDeleteId}
+  title="Delete Note"
+  message="Are you sure you want to delete this note? This action cannot be undone."
+  type="danger"
+  confirmText="Delete"
+  onConfirm={confirmDelete}
+  onCancel={() => (noteToDeleteId = null)}
+/>

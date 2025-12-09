@@ -4,6 +4,13 @@ import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
 import { LoroDoc, LoroText } from "loro-crdt";
 import { unawaited } from "./unawaited.ts";
+import { writable, type Writable } from "svelte/store";
+
+export type ConnectionState =
+  | "connected"
+  | "connecting"
+  | "disconnected"
+  | "reconnecting";
 
 export type Doc = LoroDoc<{
   content: LoroText;
@@ -17,6 +24,8 @@ export class LoroNoteManager {
   #onUpdate: (snapshot: string) => void | Promise<void>;
   #eventSource: EventSource | null = null;
   #isSyncing = false;
+  connectionState: Writable<ConnectionState> = writable("disconnected");
+  #retryTimeout: NodeJS.Timeout | null = null;
 
   static getTextFromDoc(this: void, doc: LoroDoc): LoroText {
     return doc.getText("content");
@@ -38,7 +47,7 @@ export class LoroNoteManager {
 
     // Subscribe to changes
     this.doc.subscribeLocalUpdates((update) => {
-      console.debug(
+      console.log(
         "[Loro] Local update detected. Preview:",
         this.#text.toString().slice(0, 20),
         "Update size:",
@@ -50,7 +59,7 @@ export class LoroNoteManager {
 
       // Send local changes immediately
       if (this.#isSyncing) {
-        console.debug("[Loro] Sending local update to server");
+        console.log("[Loro] Sending local update to server");
         unawaited(this.#sendUpdate(update));
       }
     });
@@ -89,29 +98,60 @@ export class LoroNoteManager {
       this.#eventSource.close();
       this.#eventSource = null;
     }
+    if (this.#retryTimeout) {
+      clearTimeout(this.#retryTimeout);
+      this.#retryTimeout = null;
+    }
     this.#isSyncing = false;
+    this.connectionState.set("disconnected");
   }
 
+  /**
+   * Start real-time sync
+   */
   /**
    * Start real-time sync
    */
   startSync(): void {
     if (this.#isSyncing) return;
     this.#isSyncing = true;
+    this.connectionState.set("connecting");
 
-    this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
+    // Use SSE endpoint
+    this.#eventSource = new EventSource(`/client/doc/${this.#noteId}/events`);
+
+    this.#eventSource.onopen = () => {
+      console.log("[Loro] SSE Connected");
+      this.connectionState.set("connected");
+      // Clear any retry loop if we succeeded
+      if (this.#retryTimeout) {
+        clearTimeout(this.#retryTimeout);
+        this.#retryTimeout = null;
+      }
+    };
 
     this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
-      console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
+      // console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
       try {
-        const data = Schema.decodeSync(syncSchemaJson)(event.data);
-        const updateBytes = Uint8Array.fromBase64(data.update);
-        console.debug(
-          "[Loro] Applying remote update, size:",
-          updateBytes.length,
-        );
-        this.doc.import(updateBytes);
-        console.debug("[Loro] Remote update applied successfully");
+        const ops = JSON.parse(event.data);
+        if (!Array.isArray(ops)) return;
+
+        for (const op of ops) {
+          // op.payload is encrypted blob (base64)
+          // Loro import expects Uint8Array?
+          // Wait, op.payload is base64 string provided by server.
+          // Loro import expects Uint8Array.
+          // Loro import expects Uint8Array.
+          // Support both 'payload' (DB/PubSub normalized) and 'encrypted_payload' (Raw API)
+          const base64 = op.payload || op.encrypted_payload;
+          if (!base64) {
+            console.warn("[Loro] Received op without payload:", op);
+            continue;
+          }
+          const updateBytes = Uint8Array.fromBase64(base64);
+          this.doc.import(updateBytes);
+        }
+        // console.debug(`[Loro] Applied ${ops.length} ops`);
       } catch (error) {
         console.error("Failed to process sync message:", error);
       }
@@ -119,9 +159,27 @@ export class LoroNoteManager {
 
     this.#eventSource.onerror = (error) => {
       console.error("SSE connection error:", error);
-      this.#eventSource?.close();
-      this.#isSyncing = false;
+      // Browser will auto-reconnect usually, but let's be explicit about state
+      if (this.#eventSource?.readyState === EventSource.CLOSED) {
+        this.connectionState.set("disconnected");
+        this.#isSyncing = false;
+        // Try to reconnect?
+        this.#scheduleReconnect();
+      } else if (this.#eventSource?.readyState === EventSource.CONNECTING) {
+        this.connectionState.set("reconnecting");
+      }
     };
+  }
+
+  #scheduleReconnect() {
+    if (this.#retryTimeout) return;
+    this.connectionState.set("reconnecting");
+    console.log("[Loro] Scheduling reconnect in 3s...");
+    this.#retryTimeout = setTimeout(() => {
+      this.#retryTimeout = null;
+      this.#isSyncing = false; // reset flag to allow startSync
+      this.startSync();
+    }, 3000);
   }
 
   /**
@@ -129,9 +187,34 @@ export class LoroNoteManager {
    */
   async #sendUpdate(update: Uint8Array) {
     try {
-      await sync({
-        noteId: this.#noteId,
-        update: update.toBase64(),
+      const opId = this.doc.peerId; // Wait, op ID needs to be unique?
+      // Loro update is a blob. We wrap it in an Op structure?
+      // Server expects: { op: { op_id, actor_id, lamport_ts, encrypted_payload, signature } }
+      // Client generates these?
+      // Loro `update` is a patch. We treat it as one "Op"?
+      // We need `actor_id` (peerId).
+      // `lamport_ts`: does Loro expose generic lamport? `doc.oplog.vv`?
+      // Or we just use client timestamp/counter?
+      // Loro updates are CRDT blobs.
+      // For federation Op Log, we wrap the blob.
+
+      const payload = update.toBase64();
+      const actorId = this.doc.peerIdStr; // string?
+      // Loro API check: `doc.peerIdStr` exists.
+
+      // Mock Op structure
+      const op = {
+        op_id: crypto.randomUUID(),
+        actor_id: actorId,
+        lamport_ts: Date.now(), // Approximate ordering
+        encrypted_payload: payload,
+        signature: "TODO", // Client signature!
+      };
+
+      await fetch(`/client/doc/${this.#noteId}/push`, {
+        method: "POST",
+        body: JSON.stringify({ op }),
+        headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
       console.error("Failed to send update:", error);

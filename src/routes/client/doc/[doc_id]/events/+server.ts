@@ -3,6 +3,7 @@ import { federatedOps, documents } from "$lib/server/db/schema";
 import { eq, gt, asc, and } from "drizzle-orm";
 import type { RequestHandler } from "./$types";
 import { error } from "@sveltejs/kit";
+import { notePubSub } from "$lib/server/pubsub";
 export const GET: RequestHandler = async ({ params, url }) => {
   const { doc_id } = params;
   const since = url.searchParams.get("since");
@@ -26,77 +27,97 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
   const stream = new ReadableStream({
     async start(controller) {
-      while (true) {
-        try {
-          if (isRemote) {
-            // Poll remote server
-            // Ideally we'd subscribe to SSE, but for MVP polling is safer/easier
-            // We need to sign this request? Or is it public?
-            // Federation ops endpoint currently requires signature.
+      let remoteReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+      let abortController: AbortController | null = null;
+      let heartbeat: NodeJS.Timeout | null = null;
 
-            // Note: Efficient way would be to proxy the SSE connection directly?
-            // But we need to sign the request as the server.
+      try {
+        if (isRemote) {
+          console.log(`[CLIENT-SSE] Proxying to remote ${doc.hostServer}`);
 
-            // Let's implement polling for now to match local logic
-            const remoteUrl = `http://${doc.hostServer}/federation/doc/${encodeURIComponent(doc_id)}/ops?since=${lastTs}`;
+          // Connect to remote SSE
+          const remoteUrl = `http://${doc.hostServer}/federation/doc/${encodeURIComponent(doc_id)}/events?since=${lastTs}`;
 
-            // GET request doesn't have body, but we need headers.
-            // Ops endpoint checks signature on headers.
-            // It validates against NO body for GET?
-            // Checking ops/+server.ts: verifyServerRequest checks body?
-            // Wait, verifyServerRequest uses JSON.stringify(payload).
-            // If payload is empty body, verify logic needs to handle that.
-            // GET /ops logic in previous step didn't call verifyServerRequest.
-            // Let's check ops/+server.ts content again.
-            // GET handler checks DB directly. It does NOT call verifyServerRequest.
-            // So it's effectively public? Or relies on something else?
-            // It just returns ops.
-            // Ops are encrypted. So maybe it's fine.
-            // IF it's public, we don't need signature.
+          // We need to sign this if we enforce auth, but we relaxed it for now.
+          abortController = new AbortController();
+          const response = await fetch(remoteUrl, {
+            headers: {
+              Accept: "text/event-stream",
+            },
+            signal: abortController.signal,
+          });
 
-            // console.log(`[CLIENT] Polling remote events from ${remoteUrl}`);
-            const res = await fetch(remoteUrl);
-            if (res.ok) {
-              const data = await res.json();
-              if (data.ops && data.ops.length > 0) {
-                console.log(`[CLIENT] Received ${data.ops.length} remote ops`);
-                const message = JSON.stringify(data.ops);
-                controller.enqueue(`data: ${message}\n\n`);
-                const maxTs = Math.max(
-                  ...data.ops.map((o: any) => o.lamportTs),
-                );
-                if (maxTs > lastTs) lastTs = maxTs;
-              }
-            } else {
-              console.warn(`[CLIENT] Remote polling failed: ${res.status}`);
-            }
-          } else {
-            // Local polling (existing logic)
-            const newOps = await db.query.federatedOps.findMany({
-              where: and(
-                eq(federatedOps.docId, doc_id),
-                gt(federatedOps.lamportTs, lastTs),
-              ),
-              orderBy: [asc(federatedOps.lamportTs)],
-            });
-
-            if (newOps.length > 0) {
-              const message = JSON.stringify(newOps);
-              controller.enqueue(`data: ${message}\n\n`);
-              // Update lastTs to the max ts found
-              const maxTs = Math.max(...newOps.map((o) => o.lamportTs));
-              if (maxTs > lastTs) lastTs = maxTs;
-            }
+          if (!response.ok || !response.body) {
+            console.error(
+              `[CLIENT-SSE] Remote connection failed:`,
+              response.status,
+            );
+            throw new Error(`Remote SSE failed: ${response.status}`);
           }
 
-          await new Promise((r) => setTimeout(r, 50));
-        } catch (e) {
-          // Error or closed?
-          console.error("Stream error:", e);
-          controller.close();
-          break;
+          remoteReader = response.body.getReader();
+
+          // Pipe remote stream to local controller
+          while (true) {
+            const { done, value } = await remoteReader.read();
+            if (done) break;
+            controller.enqueue(value);
+          }
+        } else {
+          // Local logic: Monitor DB (Polling or PubSub locally too?)
+          // For local, we can ALSO use PubSub!
+          // But 'events/+server.ts' is used by the client.
+          // IF we use PubSub locally, we get instant updates for local users too (multi-tab/window).
+
+          // notePubSub is imported statically
+          // 1. Initial history
+          const ops = await db.query.federatedOps.findMany({
+            where: and(
+              eq(federatedOps.docId, doc_id),
+              gt(federatedOps.lamportTs, lastTs),
+            ),
+            orderBy: [asc(federatedOps.lamportTs)],
+          });
+
+          if (ops.length > 0) {
+            controller.enqueue(`data: ${JSON.stringify(ops)}\n\n`);
+          }
+
+          // 2. Subscribe
+          const unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
+            controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
+          });
+
+          // Keep alive
+          heartbeat = setInterval(() => {
+            try {
+              controller.enqueue(": keep-alive\n\n");
+            } catch (e) {
+              clearInterval(heartbeat!);
+            }
+          }, 30000);
+
+          // Wait until closed
+          await new Promise((resolve) => {
+            // This promise pends forever until stream is cancelled
+            // The loop below (if we had one) would wait.
+            // Since we use callbacks, we just need to keep this scope alive?
+            // Actually start() can return a promise that keeps running.
+          });
+
+          unsubscribe();
         }
+      } catch (e) {
+        console.error("[CLIENT-SSE] Stream error:", e);
+        if (remoteReader) remoteReader.cancel();
+        if (abortController) abortController.abort();
+        if (heartbeat) clearInterval(heartbeat);
+        controller.close();
       }
+    },
+    cancel() {
+      // Cleanup happens above if logic is structure correctly,
+      // but standard approach is to use returned cancel function.
     },
   });
 

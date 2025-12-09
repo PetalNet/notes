@@ -3,6 +3,7 @@ import { db } from "$lib/server/db";
 import { federatedOps, documents } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
 import { signServerRequest } from "$lib/server/identity";
+import { notePubSub } from "$lib/server/pubsub";
 
 export async function POST({ params, request, locals }) {
   const { doc_id } = params;
@@ -72,19 +73,23 @@ export async function POST({ params, request, locals }) {
     console.log(
       `[CLIENT] Inserting op ${op.op_id} into federatedOps (docId: ${doc_id})`,
     );
-    await db
-      .insert(federatedOps)
-      .values({
-        id: op.op_id,
-        docId: doc_id,
-        opId: op.op_id,
-        actorId: op.actor_id,
-        lamportTs: op.lamport_ts,
-        payload: op.encrypted_payload, // or 'payload' in DB
-        signature: op.signature,
-      })
-      .onConflictDoNothing();
+    // Construct normalized Op matching DB schema
+    const normalizedOp = {
+      id: op.op_id,
+      docId: doc_id,
+      opId: op.op_id,
+      actorId: op.actor_id,
+      lamportTs: op.lamport_ts,
+      payload: op.encrypted_payload, // Normalize to 'payload'
+      signature: op.signature,
+      createdAt: new Date(),
+    };
+
+    await db.insert(federatedOps).values(normalizedOp).onConflictDoNothing();
     console.log(`[CLIENT] Local insertion successful for ${op.op_id}`);
+
+    // Publish to PubSub for real-time subscribers (Federation SSE & Local SSE)
+    notePubSub.publish(doc_id, [normalizedOp]);
   } catch (err) {
     console.error(`[CLIENT] Local insertion failed for ${op.op_id}:`, err);
     throw error(500, "Failed to store operation locally");

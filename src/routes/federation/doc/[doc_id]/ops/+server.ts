@@ -4,6 +4,7 @@ import { db } from "$lib/server/db";
 import { federatedOps } from "$lib/server/db/schema";
 import { eq, gt, asc, and } from "drizzle-orm";
 import { signServerRequest } from "$lib/server/identity";
+import { notePubSub } from "$lib/server/pubsub";
 
 // Helper for verification (reuse from Join or export it? Duplicate for now to avoid logic split)
 async function verifyServerRequest(request: Request, payload: any) {
@@ -91,5 +92,9 @@ export async function POST({ params, request }) {
   }
 
   console.log(`[FED] Ops inserted successfully`);
+
+  // Publish to PubSub for real-time subscribers
+  notePubSub.publish(doc_id, ops);
+
   return json({ success: true });
 }

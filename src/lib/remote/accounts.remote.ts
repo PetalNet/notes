@@ -84,7 +84,7 @@ export const login = form(
     auth.setSessionTokenCookie(cookies, sessionToken, session.expiresAt);
 
     // Redirect to the original destination if provided, otherwise go home
-    const redirectTo = url.searchParams.get("redirectTo") || "/";
+    const redirectTo = url.searchParams.get("redirectTo") ?? "/";
     // Validate redirectTo to prevent open redirect attacks
     const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
     throw redirect(302, safeRedirect);
@@ -121,7 +121,7 @@ export const signup = form(
     } catch {
       error(500, "An error has occurred");
     }
-    throw redirect(302, "/");
+    redirect(302, "/");
   },
 );
 

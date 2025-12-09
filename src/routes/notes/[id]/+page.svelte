@@ -1,27 +1,32 @@
 <script lang="ts" module>
+  /* eslint-disable svelte/no-navigation-without-resolve */
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
+
   const loroManagers = new SvelteMap<string, LoroNoteManager>();
   // Track joined notes in module scope to persist across component rerenders
-  const joinedNotes = new Set<string>();
+  const joinedNotes = new SvelteSet<string>();
 </script>
 
 <script lang="ts">
-  import type { NoteOrFolder } from "$lib/schema";
   import { dev } from "$app/environment";
   import { page } from "$app/state";
-  import { invalidateAll } from "$app/navigation";
   import Editor from "$lib/components/codemirror/Editor.svelte";
-  import { LoroNoteManager } from "$lib/loro.ts";
+  import { LoroNoteManager, type ConnectionState } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { joinFederatedNote } from "$lib/remote/federation.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { decryptKey } from "$lib/crypto";
+  import {
+    decryptKey,
+    decryptWithPassword,
+    encryptKeyForUser,
+  } from "$lib/crypto";
   import { FilePlus, Folder } from "@lucide/svelte";
-  import { SvelteMap } from "svelte/reactivity";
 
   const { data } = $props();
 
-  let notesList = $state<NoteOrFolder[]>([]);
-  let isLoadingNotes = $state(true);
+  const notesListQuery = $derived(data.user ? getNotes() : Promise.resolve([]));
+  const notesList = $derived(await notesListQuery);
+
   let id = $derived(page.params.id);
 
   let loroManager = $derived(
@@ -31,30 +36,10 @@
   // TODO: Use codemirror-server-render to SSR the editor
   let editorContent = $state("");
 
-  $effect(() => {
-    if (data.user) {
-      isLoadingNotes = true;
-      getNotes()
-        .then((res) => {
-          notesList = res;
-        })
-        .catch((e) => {
-          console.error("Failed to load notes:", e);
-        })
-        .finally(() => {
-          isLoadingNotes = false;
-        });
-    } else {
-      notesList = [];
-      isLoadingNotes = false;
-    }
-  });
-
   const note = $derived(notesList.find((n) => n.id === id));
 
   import ConfirmationModal from "$lib/components/ConfirmationModal.svelte";
-
-  // ...
+  import { resolve } from "$app/paths";
 
   // Track join state
   let isJoining = $state(false);
@@ -80,19 +65,22 @@
       !showPasswordPrompt // Don't auto-join if we are prompting for password
     ) {
       // This is a foreign note we haven't joined yet
-      console.log(`Auto-joining foreign note from ${data.originServer}`);
+      console.log(
+        `Auto-joining foreign note from ${data.originServer as string}`,
+      );
       joinedNotes.add(id);
       isJoining = true;
       joinError = null;
 
       unawaited(
-        joinFederatedNote({ noteId: id, originServer: data.originServer })
-          .then(async (res) => {
-            if (
-              res &&
-              res.status === "needs_password" &&
-              res.passwordEncryptedKey
-            ) {
+        (async () => {
+          try {
+            const res = await joinFederatedNote({
+              noteId: id,
+              originServer: data.originServer,
+            });
+
+            if (res.status === "needs_password" && res.passwordEncryptedKey) {
               console.log("Note requires password.");
               passwordEncryptedBlob = res.passwordEncryptedKey;
               showPasswordPrompt = true;
@@ -106,49 +94,15 @@
             isJoining = false;
 
             // Force refresh notes list to include the new note
-            try {
-              if (data.user) {
-                const updatedNotes = await getNotes();
-                notesList = updatedNotes;
-              } else {
-                throw new Error("Anonymous user cannot fetch notes");
-              }
-            } catch (e) {
-              // Anonymous or failure: Construct ephemeral note
-              console.log("Using ephemeral note for anonymous/failed fetch");
-              if (res && res.rawKey) {
-                notesList = [
-                  {
-                    id: res.doc_id || id,
-                    title: res.title || "Shared Note",
-                    ownerId: res.ownerId || "",
-                    encryptedKey: res.rawKey, // Use raw key directly
-                    isFolder: false,
-                    order: 0,
-                    parentId: null,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    content: "",
-                    accessLevel: res.accessLevel || "public",
-                    loroSnapshot: res.snapshot || null,
-                    serverEncryptedKey: null,
-                  },
-                ];
-              }
-            }
-
-            // Invalidate data to reload everything else (only if logged in)
-            if (data.user) {
-              await invalidateAll();
-            }
-          })
-          .catch((err) => {
+            await getNotes().refresh();
+          } catch (err) {
             console.error("Federation join failed:", err);
             isJoining = false;
-            joinError = err?.body?.message || "Failed to join note";
+            joinError = (err as App.Error).message || "Failed to join note";
             // Remove from joined notes on failure so user can retry
             joinedNotes.delete(id);
-          }),
+          }
+        })(),
       );
     }
   });
@@ -157,8 +111,7 @@
     if (
       !passwordInput ||
       !passwordEncryptedBlob ||
-      !data.user ||
-      !data.user.publicKey ||
+      !data.user?.publicKey ||
       !data.originServer
     )
       return;
@@ -168,8 +121,6 @@
 
     try {
       // 1. Decrypt the blob using the password
-      const { decryptWithPassword, encryptKeyForUser } =
-        await import("$lib/crypto");
       let rawKey = "";
       try {
         rawKey = await decryptWithPassword(
@@ -184,10 +135,7 @@
       }
 
       // 2. Encrypt for myself
-      const preComputedKey = await encryptKeyForUser(
-        rawKey,
-        data.user.publicKey,
-      );
+      const preComputedKey = encryptKeyForUser(rawKey, data.user.publicKey);
 
       // 3. Complete Join
       await joinFederatedNote({
@@ -198,9 +146,7 @@
 
       // Success!
       showPasswordPrompt = false;
-      const updatedNotes = await getNotes();
-      notesList = updatedNotes;
-      invalidateAll();
+      await getNotes().refresh();
     } catch (e) {
       console.error("Failed to complete password join:", e);
       passwordError = "Failed to unlock note. Please try again.";
@@ -231,7 +177,7 @@
                 );
                 return;
               }
-              noteKey = await decryptKey(note.encryptedKey, rawPrivKey);
+              noteKey = decryptKey(note.encryptedKey, rawPrivKey);
             }
 
             // Create manager
@@ -271,23 +217,12 @@
     }
   });
 
-  import type { ConnectionState } from "$lib/loro";
-  let connectionStatus = $state<ConnectionState>("disconnected");
-
-  $effect(() => {
-    if (loroManager) {
-      const unsubscribe = loroManager.connectionState.subscribe((val) => {
-        connectionStatus = val;
-      });
-      return unsubscribe;
-    } else {
-      connectionStatus = "disconnected";
-      return;
-    }
-  });
+  let connectionStatus = $derived<ConnectionState>(
+    loroManager?.connectionState ?? "disconnected",
+  );
 
   function handleOpenInHomeserver(inputHandle: string | null) {
-    const saved = localStorage.getItem("notes_homeserver_handle") || "";
+    const saved = localStorage.getItem("notes_homeserver_handle") ?? "";
     const input =
       inputHandle ??
       prompt(
@@ -326,10 +261,10 @@
 
 <div class="relative h-full flex-1 overflow-hidden">
   {#if note}
-    {#if note && !note.isFolder}
+    {#if !note.isFolder}
       <Editor
         noteId={id ?? ""}
-        noteTitle={(note.title || "Untitled") as string}
+        noteTitle={note.title || "Untitled"}
         manager={loroManager}
         {notesList}
         user={data.user}
@@ -468,8 +403,9 @@
 
           <div class="divider">OR</div>
 
+          <!-- prettier-ignore -->
           <a
-            href="/login?redirectTo={encodeURIComponent(`/notes/${id}`)}"
+            href="/login?redirectTo={resolve(`/notes/[id]`, { id: id! })}"
             class="btn btn-block btn-ghost"
           >
             Log in on this server
@@ -510,7 +446,7 @@
 <ConfirmationModal
   isOpen={!!redirectError}
   title="Invalid Handle"
-  message={redirectError || ""}
+  message={redirectError ?? ""}
   type="warning"
   confirmText="OK"
   isAlert={true}

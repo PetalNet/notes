@@ -1,14 +1,12 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-  import { getContext } from "svelte";
-  import {
-    SIDEBAR_CONTEXT_KEY,
-    type SidebarContext,
-  } from "$lib/components/sidebar-context";
+  import { getSidebarContext } from "$lib/components/sidebar-context.js";
+  import { formatRelativeTime } from "$lib/utils/time.js";
   import { PanelLeftOpen } from "@lucide/svelte";
+  import { Temporal } from "temporal-polyfill";
 
   let { data } = $props();
-  const sidebar = getContext<SidebarContext>(SIDEBAR_CONTEXT_KEY);
+  const sidebar = getSidebarContext();
 </script>
 
 <div class="h-full bg-base-100 p-8">
@@ -38,9 +36,11 @@
                 {data.randomNote.title}
               </h3>
               <p class="text-sm text-base-content/60">
-                Last updated: {new Date(
-                  data.randomNote.updatedAt,
-                ).toLocaleDateString()}
+                Last updated: {formatRelativeTime(
+                  Temporal.Instant.fromEpochMilliseconds(
+                    data.randomNote.updatedAt.getTime(),
+                  ),
+                )}
               </p>
             </div>
             <div class="card-actions justify-end">

@@ -25,12 +25,13 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
   const isRemote = doc && doc.hostServer !== "local";
 
+  let remoteReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  let abortController: AbortController | null = null;
+  let heartbeat: NodeJS.Timeout | null = null;
+  let unsubscribe: (() => void) | null = null;
+
   const stream = new ReadableStream({
     async start(controller) {
-      let remoteReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
-      let abortController: AbortController | null = null;
-      let heartbeat: NodeJS.Timeout | null = null;
-
       try {
         if (isRemote) {
           console.log(`[CLIENT-SSE] Proxying to remote ${doc.hostServer}`);
@@ -58,10 +59,32 @@ export const GET: RequestHandler = async ({ params, url }) => {
           remoteReader = response.body.getReader();
 
           // Pipe remote stream to local controller
-          while (true) {
-            const { done, value } = await remoteReader.read();
-            if (done) break;
-            controller.enqueue(value);
+          // Combine with local PubSub to get instant updates from other local users
+          unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
+            try {
+              controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
+            } catch (e) {
+              console.warn(
+                "[CLIENT-SSE] Failed to enqueue local op (stream closed?):",
+                e,
+              );
+            }
+          });
+
+          // Pipe remote stream to local controller
+          // This must be awaited to keep the stream open
+          try {
+            while (true) {
+              const { done, value } = await remoteReader.read();
+              if (done) break;
+              controller.enqueue(value);
+            }
+          } catch (e) {
+            console.error("[CLIENT-SSE] Remote stream error:", e);
+            controller.error(e);
+          } finally {
+            // Ensure we unsubscribe from local updates when remote stream ends or errors
+            if (unsubscribe) unsubscribe();
           }
         } else {
           // Local logic: Monitor DB (Polling or PubSub locally too?)
@@ -84,7 +107,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
           }
 
           // 2. Subscribe
-          const unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
+          unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
             try {
               controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
             } catch (e) {
@@ -103,31 +126,31 @@ export const GET: RequestHandler = async ({ params, url }) => {
             try {
               controller.enqueue(": keep-alive\n\n");
             } catch (e) {
-              clearInterval(heartbeat!);
+              if (heartbeat) clearInterval(heartbeat);
             }
           }, 30000);
 
-          // Wait until closed
-          await new Promise((resolve) => {
-            // This promise pends forever until stream is cancelled
-            // The loop below (if we had one) would wait.
-            // Since we use callbacks, we just need to keep this scope alive?
-            // Actually start() can return a promise that keeps running.
-          });
-
-          unsubscribe();
+          // Never resolve, keep stream open until cancelled
+          await new Promise(() => {});
         }
       } catch (e) {
         console.error("[CLIENT-SSE] Stream error:", e);
+        // If error occurs, we should cleanup and close
         if (remoteReader) remoteReader.cancel();
         if (abortController) abortController.abort();
         if (heartbeat) clearInterval(heartbeat);
-        controller.close();
+        if (unsubscribe) unsubscribe();
+        try {
+          controller.close();
+        } catch {} // ignore if already closed
       }
     },
     cancel() {
-      // Cleanup happens above if logic is structure correctly,
-      // but standard approach is to use returned cancel function.
+      console.log(`[CLIENT-SSE] Stream cancelled for ${doc_id}`);
+      if (remoteReader) remoteReader.cancel();
+      if (abortController) abortController.abort();
+      if (heartbeat) clearInterval(heartbeat);
+      if (unsubscribe) unsubscribe();
     },
   });
 

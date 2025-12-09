@@ -32,7 +32,7 @@
   import { buildNotesTree } from "$lib/utils/tree.ts";
   import { generateNoteKey, encryptKeyForUser } from "$lib/crypto";
   import { goto } from "$app/navigation";
-  import { resolve } from "$app/paths";
+  import { base } from "$app/paths";
   import type { NoteOrFolder } from "$lib/schema.ts";
   import { page } from "$app/state";
 
@@ -45,7 +45,13 @@
 
   import ConfirmationModal from "./ConfirmationModal.svelte";
 
-  // ... (Props definition)
+  interface Props {
+    user: User | undefined;
+    notesList: NoteOrFolder[];
+    sharedNotes?: SharedNote[];
+    isCollapsed: boolean;
+    toggleSidebar: () => void;
+  }
 
   let {
     user,
@@ -162,7 +168,7 @@
     );
 
     if (page.params.id === id) {
-      goto(resolve("/"));
+      goto(`${base}/`);
     }
   }
 
@@ -212,7 +218,7 @@
     );
 
     if (!isFolder) {
-      goto(resolve("/notes/[id]", { id: newNote.id }));
+      goto(`${base}/notes/${newNote.id}`);
     }
   }
 
@@ -316,7 +322,7 @@
           <div class="mt-1 space-y-0.5 pl-4">
             {#each sharedNotes as note (note.id)}
               <a
-                href={resolve(`/notes/${note.id}`)}
+                href={`${base}/notes/${note.id}`}
                 class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-base-content/70 hover:bg-base-content/5 hover:text-base-content {page
                   .params.id === note.id
                   ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
@@ -341,24 +347,20 @@
     <div
       bind:this={rootContainer}
       class="flex-1 overflow-y-auto px-2 pb-2"
-      ondragover={handleDragOverRoot}
-      ondragleave={handleDragLeaveRoot}
-      ondrop={handleDropOnRoot}
       role="tree"
       itemscope
     >
-      {#each notesList.filter((n) => n.ownerId === user?.id) as note (note.id)}
-        {#if !note.parentId}
-          <TreeItem
-            item={note}
-            {expandedFolders}
-            {toggleFolder}
-            {handleContextMenu}
-            allNotes={notesList}
-            depth={0}
-            onReorder={handleRootReorder}
-          />
-        {/if}
+      {#each notesTree as note, idx (note.id)}
+        <TreeItem
+          item={note}
+          {expandedFolders}
+          {toggleFolder}
+          {handleContextMenu}
+          {notesList}
+          {notesTree}
+          index={idx}
+          onReorder={handleRootReorder}
+        />
       {/each}
 
       <!-- Empty state -->

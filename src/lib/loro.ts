@@ -4,6 +4,13 @@ import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
 import { LoroDoc, LoroText } from "loro-crdt";
 import { unawaited } from "./unawaited.ts";
+import { writable, type Writable } from "svelte/store";
+
+export type ConnectionState =
+  | "connected"
+  | "connecting"
+  | "disconnected"
+  | "reconnecting";
 
 export type Doc = LoroDoc<{
   content: LoroText;
@@ -17,6 +24,8 @@ export class LoroNoteManager {
   #onUpdate: (snapshot: string) => void | Promise<void>;
   #eventSource: EventSource | null = null;
   #isSyncing = false;
+  connectionState: Writable<ConnectionState> = writable("disconnected");
+  #retryTimeout: NodeJS.Timeout | null = null;
 
   static getTextFromDoc(this: void, doc: LoroDoc): LoroText {
     return doc.getText("content");
@@ -89,7 +98,12 @@ export class LoroNoteManager {
       this.#eventSource.close();
       this.#eventSource = null;
     }
+    if (this.#retryTimeout) {
+      clearTimeout(this.#retryTimeout);
+      this.#retryTimeout = null;
+    }
     this.#isSyncing = false;
+    this.connectionState.set("disconnected");
   }
 
   /**
@@ -101,9 +115,20 @@ export class LoroNoteManager {
   startSync(): void {
     if (this.#isSyncing) return;
     this.#isSyncing = true;
+    this.connectionState.set("connecting");
 
     // Use SSE endpoint
     this.#eventSource = new EventSource(`/client/doc/${this.#noteId}/events`);
+
+    this.#eventSource.onopen = () => {
+      console.log("[Loro] SSE Connected");
+      this.connectionState.set("connected");
+      // Clear any retry loop if we succeeded
+      if (this.#retryTimeout) {
+        clearTimeout(this.#retryTimeout);
+        this.#retryTimeout = null;
+      }
+    };
 
     this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
       // console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
@@ -134,10 +159,27 @@ export class LoroNoteManager {
 
     this.#eventSource.onerror = (error) => {
       console.error("SSE connection error:", error);
-      this.#eventSource?.close();
-      this.#isSyncing = false;
-      // Reconnect logic? Browser EventSource handles reconnect automatically often.
+      // Browser will auto-reconnect usually, but let's be explicit about state
+      if (this.#eventSource?.readyState === EventSource.CLOSED) {
+        this.connectionState.set("disconnected");
+        this.#isSyncing = false;
+        // Try to reconnect?
+        this.#scheduleReconnect();
+      } else if (this.#eventSource?.readyState === EventSource.CONNECTING) {
+        this.connectionState.set("reconnecting");
+      }
     };
+  }
+
+  #scheduleReconnect() {
+    if (this.#retryTimeout) return;
+    this.connectionState.set("reconnecting");
+    console.log("[Loro] Scheduling reconnect in 3s...");
+    this.#retryTimeout = setTimeout(() => {
+      this.#retryTimeout = null;
+      this.#isSyncing = false; // reset flag to allow startSync
+      this.startSync();
+    }, 3000);
   }
 
   /**

@@ -149,6 +149,21 @@
     }
   });
 
+  import type { ConnectionState } from "$lib/loro";
+  let connectionStatus = $state<ConnectionState>("disconnected");
+
+  $effect(() => {
+    if (loroManager) {
+      const unsubscribe = loroManager.connectionState.subscribe((val) => {
+        connectionStatus = val;
+      });
+      return unsubscribe;
+    } else {
+      connectionStatus = "disconnected";
+      return;
+    }
+  });
+
   function handleOpenInHomeserver(inputHandle: string | null) {
     const saved = localStorage.getItem("notes_homeserver_handle") || "";
     const input =
@@ -198,6 +213,32 @@
         user={data.user}
         {handleOpenInHomeserver}
       />
+
+      <!-- Connection Status Banner -->
+      {#if loroManager && connectionStatus !== "connected"}
+        <div class="absolute bottom-4 left-1/2 z-50 -translate-x-1/2">
+          <div
+            class="alert px-4 py-2 text-sm font-medium shadow-lg
+                 {connectionStatus === 'disconnected'
+              ? 'alert-error'
+              : 'alert-warning'}"
+          >
+            <span>
+              {#if connectionStatus === "disconnected"}
+                Disconnected.
+                <button
+                  class="btn ml-2 btn-outline btn-xs"
+                  onclick={() => loroManager?.startSync()}>Reconnect</button
+                >
+              {:else if connectionStatus === "reconnecting"}
+                Reconnecting...
+              {:else}
+                Connecting...
+              {/if}
+            </span>
+          </div>
+        </div>
+      {/if}
     {:else}
       <div class="flex h-full items-center justify-center text-slate-400">
         <div class="text-center">
@@ -214,7 +255,21 @@
     <div
       class="relative flex h-full items-center justify-center text-base-content"
     >
-      {#if !data.user}
+      {#if isJoining}
+        <div class="text-center">
+          <span class="loading loading-lg loading-spinner text-primary"></span>
+          <p class="mt-4 text-lg">Joining remote note...</p>
+        </div>
+      {:else if joinError}
+        <div class="max-w-md p-8 text-center">
+          <h3 class="mb-4 text-xl font-bold text-error">Failed to Join Note</h3>
+          <p class="mb-6 text-base-content/70">{joinError}</p>
+          <button
+            class="btn btn-primary"
+            onclick={() => window.location.reload()}>Retry</button
+          >
+        </div>
+      {:else if !data.user}
         <div class="max-w-md p-8 text-center">
           <h3 class="mb-4 text-xl font-bold">
             You do not have access to this note

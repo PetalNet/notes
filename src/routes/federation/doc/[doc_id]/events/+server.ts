@@ -1,4 +1,3 @@
-import { produce } from "svelte/store";
 import { db } from "$lib/server/db";
 import { federatedOps } from "$lib/server/db/schema";
 import { eq, gt, asc, and } from "drizzle-orm";
@@ -45,6 +44,9 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
 
   // await verifyServerRequest(request);
 
+  let unsubscribe: (() => void) | undefined;
+  let interval: NodeJS.Timeout | undefined;
+
   const stream = new ReadableStream({
     async start(controller) {
       // 1. Send History
@@ -62,35 +64,38 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
       }
 
       // 2. Subscribe to real-time updates
-      const unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
+      unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
         try {
-          // console.log(`[FED-SSE] Sending ${newOps.length} live ops`);
           controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
         } catch (e) {
+          // If we can't write, the stream is likely dead
           console.warn("[FED-SSE] Failed to enqueue (stream closed?):", e);
+          if (unsubscribe) unsubscribe();
+          if (interval) clearInterval(interval);
         }
       });
 
       // Heartbeat to keep connection alive
-      const interval = setInterval(() => {
-        controller.enqueue(": keep-alive\n\n");
+      interval = setInterval(() => {
+        try {
+          controller.enqueue(": keep-alive\n\n");
+        } catch (e) {
+          console.warn("[FED-SSE] Heartbeat failed:", e);
+          if (interval) clearInterval(interval);
+          if (unsubscribe) unsubscribe();
+        }
       }, 30000);
 
-      controller.close = () => {
-        unsubscribe();
-        clearInterval(interval);
-      };
-
-      return () => {
-        unsubscribe();
-        clearInterval(interval);
-      };
+      // Keep stream open forever
+      try {
+        await new Promise(() => {});
+      } catch (e) {
+        // Ignored
+      }
     },
     cancel(controller) {
-      // Did we attach cleanup to controller?
-      // ReadableStream cancel doesn't auto-call custom close method on controller unless we structure it so.
-      // But the 'start' return function is called on cancel.
-      // The return function above handles unsub scription.
+      if (unsubscribe) unsubscribe();
+      if (interval) clearInterval(interval);
     },
   });
 

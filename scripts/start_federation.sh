@@ -12,11 +12,11 @@ trap cleanup SIGINT SIGTERM EXIT
 
 # Start Server A (Alice)
 echo "Starting Alice (Server A) on port 5173..."
-DATABASE_URL=file:local-a.db ORIGIN=http://localhost:5173 pnpm run dev --port 5173 &
+SERVER_DOMAIN=localhost:5173 DATABASE_URL=file:local-a.db ORIGIN=http://localhost:5173 pnpm run dev --port 5173 &
 
 # Start Server B (Bob)
 echo "Starting Bob (Server B) on port 5174..."
-DATABASE_URL=file:local-b.db ORIGIN=http://localhost:5174 pnpm run dev --port 5174 &
+SERVER_DOMAIN=localhost:5174 DATABASE_URL=file:local-b.db ORIGIN=http://localhost:5174 pnpm run dev --port 5174 &
 
 # Wait for both processes to keep the script running
 wait

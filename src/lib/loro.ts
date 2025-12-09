@@ -38,7 +38,7 @@ export class LoroNoteManager {
 
     // Subscribe to changes
     this.doc.subscribeLocalUpdates((update) => {
-      console.debug(
+      console.log(
         "[Loro] Local update detected. Preview:",
         this.#text.toString().slice(0, 20),
         "Update size:",
@@ -50,7 +50,7 @@ export class LoroNoteManager {
 
       // Send local changes immediately
       if (this.#isSyncing) {
-        console.debug("[Loro] Sending local update to server");
+        console.log("[Loro] Sending local update to server");
         unawaited(this.#sendUpdate(update));
       }
     });

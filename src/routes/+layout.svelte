@@ -86,7 +86,13 @@
 
 {#if data.user}
   <div class="flex h-screen overflow-hidden">
-    <Sidebar user={data.user} {notesList} {isCollapsed} {toggleSidebar} />
+    <Sidebar
+      user={data.user}
+      {notesList}
+      sharedNotes={data.sharedNotes}
+      {isCollapsed}
+      {toggleSidebar}
+    />
     <div class="flex-1 overflow-auto">
       {@render children()}
     </div>

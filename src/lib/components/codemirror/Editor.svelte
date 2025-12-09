@@ -63,7 +63,6 @@
   import { LoroNoteManager } from "$lib/loro.ts";
   import { EphemeralStore, UndoManager } from "loro-crdt";
   import type { Extension } from "@codemirror/state";
-  import { onDestroy } from "svelte";
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
@@ -125,27 +124,31 @@
     },
   });
 
-  let loroExtensions: Extension;
-  if (manager !== undefined && user !== undefined) {
-    const ephemeral = new EphemeralStore();
-    const undoManager = new UndoManager(manager.doc, {});
+  let loroExtensions = $state<Extension>([]);
 
-    onDestroy(() => {
-      ephemeral.destroy();
-    });
+  $effect(() => {
+    if (manager !== undefined && user !== undefined) {
+      const ephemeral = new EphemeralStore();
+      const undoManager = new UndoManager(manager.doc, {});
 
-    loroExtensions = LoroExtensions(
-      manager.doc,
-      {
-        ephemeral,
-        user: { name: user.username, colorClassName: "bg-primary" },
-      },
-      undoManager,
-      LoroNoteManager.getTextFromDoc,
-    );
-  } else {
-    loroExtensions = [];
-  }
+      loroExtensions = LoroExtensions(
+        manager.doc,
+        {
+          ephemeral,
+          user: { name: user.username, colorClassName: "bg-primary" },
+        },
+        undoManager,
+        LoroNoteManager.getTextFromDoc,
+      );
+
+      return () => {
+        ephemeral.destroy();
+      };
+    } else {
+      loroExtensions = [];
+      return;
+    }
+  });
 
   const tools = [
     {
@@ -242,12 +245,12 @@
     },
   ];
 
-  const extensions: Extension[] = [
+  let extensions = $derived([
     coreExtensions,
     wikilinksExtension(notesList),
     loroExtensions,
     editorTheme,
-  ];
+  ]);
 </script>
 
 <div class="relative flex h-full flex-col">

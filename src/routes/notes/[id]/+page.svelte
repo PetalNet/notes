@@ -1,10 +1,14 @@
 <script lang="ts" module>
   const loroManagers = new SvelteMap<string, LoroNoteManager>();
+  // Track joined notes in module scope to persist across component rerenders
+  const joinedNotes = new Set<string>();
 </script>
 
 <script lang="ts">
+  import type { NoteOrFolder } from "$lib/schema";
   import { dev } from "$app/environment";
   import { page } from "$app/state";
+  import { invalidateAll } from "$app/navigation";
   import Editor from "$lib/components/codemirror/Editor.svelte";
   import { LoroNoteManager } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
@@ -16,7 +20,8 @@
 
   const { data } = $props();
 
-  const notesListQuery = $derived(data.user ? getNotes() : Promise.resolve([]));
+  let notesList = $state<NoteOrFolder[]>([]);
+  let isLoadingNotes = $state(true);
   let id = $derived(page.params.id);
   const userPrivateKey = data.user?.privateKeyEncrypted;
 
@@ -26,11 +31,35 @@
   // TODO: Use codemirror-server-render to SSR the editor
   let editorContent = $state("");
 
-  const notesList = $derived(await notesListQuery);
+  $effect(() => {
+    if (data.user) {
+      isLoadingNotes = true;
+      getNotes()
+        .then((res) => {
+          notesList = res;
+        })
+        .catch((e) => {
+          console.error("Failed to load notes:", e);
+        })
+        .finally(() => {
+          isLoadingNotes = false;
+        });
+    } else {
+      notesList = [];
+      isLoadingNotes = false;
+    }
+  });
+
   const note = $derived(notesList.find((n) => n.id === id));
 
-  // Track which notes we've attempted to join to prevent infinite loops
-  let attemptedJoins = $state<Set<string>>(new Set());
+  import ConfirmationModal from "$lib/components/ConfirmationModal.svelte";
+
+  // ...
+
+  // Track join state
+  let isJoining = $state(false);
+  let joinError = $state<string | null>(null);
+  let redirectError = $state<string | null>(null);
 
   // Auto-join foreign notes when authenticated
   $effect(() => {
@@ -40,26 +69,83 @@
       id &&
       !note &&
       data.originServer &&
-      !attemptedJoins.has(id)
+      !joinedNotes.has(id) &&
+      !isJoining
     ) {
       // This is a foreign note we haven't joined yet
       console.log(`Auto-joining foreign note from ${data.originServer}`);
-      attemptedJoins.add(id);
+      joinedNotes.add(id);
+      isJoining = true;
+      joinError = null;
 
       unawaited(
         joinFederatedNote({ noteId: id, originServer: data.originServer })
           .then(async () => {
             console.log("Successfully joined federated note");
-            // Trigger notes list refresh by navigating to trigger load
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            window.location.href = `/notes/${id}`;
+            isJoining = false;
+            // Invalidate data to reload notes list without full page refresh
+            await invalidateAll();
           })
           .catch((err) => {
             console.error("Federation join failed:", err);
-            // Remove from attempted joins on failure so user can retry
-            attemptedJoins.delete(id);
+            isJoining = false;
+            joinError = err?.body?.message || "Failed to join note";
+            // Remove from joined notes on failure so user can retry
+            joinedNotes.delete(id);
           }),
       );
+    }
+  });
+
+  // Initialize Loro manager for the current note
+  $effect(() => {
+    if (!id || !note || !userPrivateKey || !data.user) return;
+
+    if (!loroManagers.has(id)) {
+      console.log(`Initializing Loro manager for ${id}`);
+      unawaited(
+        (async () => {
+          try {
+            // Decrypt the note key if it's an envelope (long)
+            // If it's short (raw key), use it directly.
+            let noteKey = note.encryptedKey;
+            if (note.encryptedKey.length > 60) {
+              noteKey = await decryptKey(note.encryptedKey, userPrivateKey);
+            }
+
+            // Create manager
+            const manager = await LoroNoteManager.create(
+              id,
+              noteKey,
+              async (snapshot) => {
+                // onUpdate: save snapshot (optional, mostly for backup since Ops are source of truth)
+                // But we do update 'updatedAt' and maybe 'loroSnapshot' column?
+                // The updateNote command handles updating the snapshot column.
+                if (note.ownerId === data.user.id) {
+                  await updateNote({ noteId: id, loroSnapshot: snapshot });
+                } else {
+                  // Federated/Shared notes: We don't save snapshots to 'notes' table (as we don't own it).
+                  // In the future, we might save to 'members' table or local storage,
+                  // but for now, rely on Replay from Ops.
+                  // console.debug("[Loro] Skipping snapshot save for non-owned note");
+                }
+              },
+              note.loroSnapshot,
+            );
+
+            // Start sync
+            manager.startSync();
+
+            loroManagers.set(id, manager);
+          } catch (e) {
+            console.error("Failed to init Loro manager:", e);
+          }
+        })(),
+      );
+    } else {
+      // Ensure sync is running if we switch back to it
+      const m = loroManagers.get(id);
+      m?.startSync();
     }
   });
 
@@ -95,7 +181,7 @@
         // Redirect to their homeserver with the same note ID
         window.location.href = `${window.location.protocol}//${domain.trim()}/notes/${id}`;
       } else {
-        alert("Could not determine server domain from handle.");
+        redirectError = "Could not determine server domain from handle.";
       }
     }
   }
@@ -103,7 +189,7 @@
 
 <div class="relative h-full flex-1 overflow-hidden">
   {#if note}
-    {#if !note.isFolder}
+    {#if !note?.isFolder}
       <Editor
         noteId={id}
         noteTitle={note.title}
@@ -196,9 +282,22 @@
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
     <p>Selected Note: {id}</p>
+    <p>Note Found: {!!note}</p>
+    <p>Note Title: {note?.title}</p>
     <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>
     <p>~Word Count: {editorContent.split(/\s+/).length}</p>
   </div>
 {/if}
+
+<ConfirmationModal
+  isOpen={!!redirectError}
+  title="Invalid Handle"
+  message={redirectError || ""}
+  type="warning"
+  confirmText="OK"
+  isAlert={true}
+  onConfirm={() => (redirectError = null)}
+  onCancel={() => (redirectError = null)}
+/>

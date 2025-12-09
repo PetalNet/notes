@@ -37,28 +37,13 @@ export async function load({ url, locals }) {
     throw redirect(302, `/notes/${doc_id}`);
   }
 
-  // Perform Join
-  // 1. Fetch user's devices to request keys for?
-  // Actually, Server A (Host) needs to know which users to generate envelopes for.
-  // If User B is joining, we send User B's ID (federated ID: @user:domain).
-  // But Server A might not know User B's device keys yet?
-  // "Join" implies we are asking for keys.
-  // Usually we exchange keys first.
-  // Spec: "Join... We expect them to be allowed...".
-
-  // Complex part: How does Server A know User B's device public key to encrypt the note key?
-  // Option A: User B published keys to Server A previously (via Join Request payload?).
-  // Option B: Server A queries Server B Identity endpoint `/.well-known/notes-identity/user`.
-
-  // Let's assume Option B: Host looks up Joiner's identity.
-  // So we just send `users: ["bob"]` (local username or full handle?) -> Federated Handle `@bob:server-b.com`.
-
-  const userHandle = `@${user.username}`; // Requesting for local user
+  // Construct the federated handle for the joining user
+  const userHandle = `@${user.username}:${identity.domain}`;
 
   // Sign request
   const payload = {
     requesting_server: identity.domain,
-    users: [userHandle], // List of users I am joining on behalf of
+    users: [userHandle], // Full federated handle
   };
 
   const { signature, timestamp, domain } = await signServerRequest(payload);
@@ -82,65 +67,69 @@ export async function load({ url, locals }) {
     if (!res.ok) {
       const text = await res.text();
       console.error("Join failed:", text);
-      throw error(res.status as any, "Failed to join document on host server");
+      throw error(res.status as any, `Failed to join document: ${text}`);
     }
 
     joinRes = await res.json();
-  } catch (e) {
+  } catch (e: any) {
     console.error("Join error:", e);
+    if (e.status) throw e; // Re-throw if it's already an error response
     throw error(502, "Failed to contact host server");
   }
 
   // Process Response
-  // { snapshot: ..., envelopes: [...] }
+  // { snapshot, envelopes: [{ user_id, device_id, encrypted_key }], title, accessLevel }
+
+  // Find the envelope for our user
+  const myEnvelope = joinRes.envelopes?.find(
+    (env: any) =>
+      env.user_id === userHandle ||
+      env.user_id === `@${user.username}` ||
+      env.user_id === user.username,
+  );
+
+  const encryptedKey = myEnvelope?.encrypted_key || "";
 
   // Save Document Metadata
   await db.insert(documents).values({
     id: doc_id,
     hostServer: host,
-    ownerId: "unknown", // or fetch from host
-    // ...
+    ownerId: joinRes.ownerId || "unknown",
+    title: joinRes.title || "Untitled",
+    accessLevel: joinRes.accessLevel || "authenticated",
   });
 
-  // Save Content (Snapshot)
-  if (joinRes.snapshot) {
-    await db
-      .insert(notes)
-      .values({
-        id: doc_id,
-        ownerId: user.id, // Local owner? Or proxy?
-        // If we are replica, ownerId might be irrelevant or we keep original owner ID string?
-        // Schema `notes.ownerId` is `text`.
-        loroSnapshot: joinRes.snapshot,
-      })
-      .onConflictDoUpdate({
-        target: notes.id,
-        set: { loroSnapshot: joinRes.snapshot },
-      });
-  }
+  // Save Content (Snapshot) - use empty snapshot if none provided
+  await db
+    .insert(notes)
+    .values({
+      id: doc_id,
+      ownerId: user.id, // Local user becomes local "owner" of this copy
+      title: joinRes.title || "Untitled",
+      encryptedKey, // The encrypted document key for this user
+      loroSnapshot: joinRes.snapshot || null,
+      accessLevel: joinRes.accessLevel || "authenticated",
+    })
+    .onConflictDoUpdate({
+      target: notes.id,
+      set: {
+        loroSnapshot: joinRes.snapshot || null,
+        encryptedKey,
+        updatedAt: new Date(),
+      },
+    });
 
-  // Save Envelopes
-  // joinRes.envelopes: [{ user_id, device_id, encrypted_key }]
-  // We need to map these to local `members` table.
-
-  for (const env of joinRes.envelopes) {
-    // user_id from host might be `@bob:server-b.com` or just `bob`?
-    // Hosted returns what we asked or canonical.
-
-    // We need to store it for OUR local user.
-    // `members` table links to `users`? Schema check: `userId` is text, not reference?
-    // Let's check schema.
-
+  // Save all envelopes to members table
+  for (const env of joinRes.envelopes || []) {
     await db
       .insert(members)
       .values({
         docId: doc_id,
-        userId: user.id, // Map back to local ID? Or store federated ID?
-        // If `members.userId` is used for auth checks, it better match `locals.user.id`.
-        // But if it receives envelopes for multiple devices?
-        deviceId: env.device_id,
-        role: "writer", // Assume writer if joined?
+        userId: user.id, // Map to local user ID
+        deviceId: env.device_id || "primary",
+        role: "writer",
         encryptedKeyEnvelope: env.encrypted_key,
+        createdAt: new Date(),
       })
       .onConflictDoNothing();
   }

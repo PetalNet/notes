@@ -11,6 +11,7 @@ const NoteBaseSchema = Schema.Struct({
   order: Schema.Number,
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
+  accessLevel: Schema.optional(Schema.String),
 });
 
 export const NoteSchema = Schema.extend(

@@ -11,16 +11,29 @@
     editorView: EditorView;
   }
 
+  import { Compartment } from "@codemirror/state";
+
+  // ...
+
   let { extensions = [], editorView = $bindable(), ...props }: Props = $props();
 
   let editorElement: HTMLElement;
+  let extensionCompartment = new Compartment();
 
   onMount(() => {
     // Initialize CodeMirror
     editorView = new EditorView({
       parent: editorElement,
-      extensions: extensions,
+      extensions: [extensionCompartment.of(extensions)],
     });
+  });
+
+  $effect(() => {
+    if (editorView) {
+      editorView.dispatch({
+        effects: extensionCompartment.reconfigure(extensions),
+      });
+    }
   });
 
   onDestroy(() => {

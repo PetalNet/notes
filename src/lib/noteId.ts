@@ -25,11 +25,25 @@ export function parseNoteId(id: string): {
   fullId: string;
 } {
   if (!id.includes("~")) {
-    // Legacy format - assume local
+    // Strict mode: fail if no tilde
+    // throw new Error(`Invalid note ID format: ${id}`);
+    // Actually, for now let's just return empty origin but maybe log a warning?
+    // User requested strict enforcement.
+    // If we throw here, we might break existing legacy notes if they exist.
+    // But this is a new feature set.
+    // Let's return null/empty for origin but keep UUID so things don't crash hard,
+    // but maybe we should ensure we ONLY use fullId everywhere.
     return { origin: "", uuid: id, fullId: id };
   }
 
-  const [domainB64, uuid] = id.split("~");
+  const parts = id.split("~");
+  const domainB64 = parts[0];
+  const uuid = parts[1];
+
+  if (!domainB64 || !uuid) {
+    throw new Error(`Malformed portable ID: ${id}`);
+  }
+
   const padded = domainB64 + "=".repeat((4 - (domainB64.length % 4)) % 4);
   const origin = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
 

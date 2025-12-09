@@ -1,5 +1,13 @@
 <script lang="ts">
-  import { X, Users, Lock, Globe, UserPlus } from "@lucide/svelte";
+  import {
+    X,
+    Users,
+    Lock,
+    Globe,
+    UserPlus,
+    Loader2,
+    Check,
+  } from "@lucide/svelte";
 
   interface Props {
     isOpen: boolean;
@@ -15,6 +23,39 @@
   let accessLevel = $state<AccessLevel>("private");
   let invitedUsers = $state<string[]>([]);
   let inviteInput = $state("");
+  let loading = $state(false);
+  let saving = $state(false);
+  let error = $state<string | null>(null);
+  let success = $state(false);
+  let copied = $state(false);
+
+  // Load existing settings when modal opens
+  $effect(() => {
+    if (isOpen && noteId) {
+      loadSettings();
+    }
+  });
+
+  async function loadSettings() {
+    loading = true;
+    error = null;
+    try {
+      const res = await fetch(`/api/notes/${noteId}/share`);
+      if (res.ok) {
+        const data = await res.json();
+        accessLevel = data.accessLevel || "private";
+        invitedUsers = data.invitedUsers || [];
+      } else if (res.status !== 404) {
+        // 404 is fine - just means no settings yet
+        const text = await res.text();
+        console.error("Failed to load share settings:", text);
+      }
+    } catch (err) {
+      console.error("Error loading share settings:", err);
+    } finally {
+      loading = false;
+    }
+  }
 
   function addInvitedUser() {
     const trimmed = inviteInput.trim();
@@ -29,13 +70,34 @@
   }
 
   async function handleSave() {
-    // TODO: Call share API endpoint
-    console.log("Saving share settings:", {
-      noteId,
-      accessLevel,
-      invitedUsers,
-    });
-    onClose();
+    saving = true;
+    error = null;
+    success = false;
+
+    try {
+      const res = await fetch(`/api/notes/${noteId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accessLevel,
+          invitedUsers: accessLevel === "invite_only" ? invitedUsers : [],
+        }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to save settings");
+      }
+
+      success = true;
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    } catch (err) {
+      error = err instanceof Error ? err.message : "Failed to save";
+    } finally {
+      saving = false;
+    }
   }
 
   function getShareUrl() {
@@ -44,7 +106,10 @@
 
   async function copyShareUrl() {
     await navigator.clipboard.writeText(getShareUrl());
-    // TODO: Show toast notification
+    copied = true;
+    setTimeout(() => {
+      copied = false;
+    }, 2000);
   }
 </script>
 
@@ -208,18 +273,51 @@
                 value={getShareUrl()}
                 class="input-bordered input flex-1 bg-base-200"
               />
-              <button onclick={copyShareUrl} class="btn btn-primary">
-                📋 Copy
+              <button
+                onclick={copyShareUrl}
+                class="btn btn-primary"
+                disabled={copied}
+              >
+                {#if copied}
+                  <Check class="h-4 w-4" /> Copied!
+                {:else}
+                  📋 Copy
+                {/if}
               </button>
             </div>
           </div>
         {/if}
       </div>
 
+      <!-- Error message -->
+      {#if error}
+        <div
+          class="border-t border-base-300 bg-error/10 px-4 py-2 text-sm text-error"
+        >
+          {error}
+        </div>
+      {/if}
+
       <!-- Footer -->
       <div class="flex justify-end gap-2 border-t border-base-300 p-4">
-        <button onclick={onClose} class="btn btn-ghost">Cancel</button>
-        <button onclick={handleSave} class="btn btn-primary">Save</button>
+        <button onclick={onClose} class="btn btn-ghost" disabled={saving}>
+          Cancel
+        </button>
+        <button
+          onclick={handleSave}
+          class="btn btn-primary"
+          disabled={saving || loading}
+        >
+          {#if saving}
+            <Loader2 class="h-4 w-4 animate-spin" />
+            Saving...
+          {:else if success}
+            <Check class="h-4 w-4" />
+            Saved!
+          {:else}
+            Save
+          {/if}
+        </button>
       </div>
     </div>
   </div>

@@ -1,6 +1,8 @@
-import { json } from "@sveltejs/kit";
+import { json, error } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
-import { federatedOps } from "$lib/server/db/schema";
+import { federatedOps, documents } from "$lib/server/db/schema";
+import { eq } from "drizzle-orm";
+import { signServerRequest } from "$lib/server/identity";
 
 export async function POST({ params, request, locals }) {
   const { doc_id } = params;
@@ -9,27 +11,84 @@ export async function POST({ params, request, locals }) {
   // Op structure: { op_id, actor_id, lamport_ts, encrypted_payload, signature }
 
   if (!locals.user) {
-    // Validation check (auth)
-    // Only members can write?
-    // Check member role.
+    throw error(401, "Unauthorized");
   }
 
-  // Store Op
-  await db
-    .insert(federatedOps)
-    .values({
-      id: op.op_id,
-      docId: doc_id,
-      opId: op.op_id,
-      actorId: op.actor_id,
-      lamportTs: op.lamport_ts,
-      payload: op.encrypted_payload, // or 'payload' in DB
-      signature: op.signature,
-    })
-    .onConflictDoNothing();
+  // Check if doc is remote
+  const doc = await db.query.documents.findFirst({
+    where: eq(documents.id, doc_id),
+  });
 
-  // Trigger SSE?
-  // If using in-memory bus, emit here.
+  if (doc && doc.hostServer !== "local") {
+    // Proxy to remote server
+    console.log(
+      `[CLIENT] Proxying push to remote server: ${doc.hostServer} for ${doc_id}`,
+    );
+
+    const remoteUrl = `http://${doc.hostServer}/federation/doc/${encodeURIComponent(doc_id)}/ops`;
+    const payload = { ops: [op] }; // Federation endpoint expects array of ops
+
+    console.log(`[CLIENT] Signing request...`);
+    const {
+      signature,
+      timestamp,
+      domain: requestDomain,
+    } = await signServerRequest(payload);
+
+    console.log(`[CLIENT] Sending fetch to ${remoteUrl}`);
+    const res = await fetch(remoteUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-notes-signature": signature,
+        "x-notes-timestamp": timestamp.toString(),
+        "x-notes-domain": requestDomain,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log(`[CLIENT] Remote response status: ${res.status}`);
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(
+        `[CLIENT] Failed to push to remote server: ${res.status}`,
+        text,
+      );
+      throw error(500, "Failed to push to remote server");
+    }
+
+    // We successfully pushed to remote.
+    // Do we store it locally too?
+    // Yes, otherwise we won't see our own changes if we reload/poll?
+    // But strictly speaking, we should receive it back via sync/events.
+    // However, for latency, we might want to store it.
+    // BUT, if we store it, we might duplicate it when we poll?
+    // `onConflictDoNothing` handles duplicates.
+    // So safe to store locally too.
+  }
+
+  // Store Op locally (even if remote, to cache/optimistic update)
+  try {
+    console.log(
+      `[CLIENT] Inserting op ${op.op_id} into federatedOps (docId: ${doc_id})`,
+    );
+    await db
+      .insert(federatedOps)
+      .values({
+        id: op.op_id,
+        docId: doc_id,
+        opId: op.op_id,
+        actorId: op.actor_id,
+        lamportTs: op.lamport_ts,
+        payload: op.encrypted_payload, // or 'payload' in DB
+        signature: op.signature,
+      })
+      .onConflictDoNothing();
+    console.log(`[CLIENT] Local insertion successful for ${op.op_id}`);
+  } catch (err) {
+    console.error(`[CLIENT] Local insertion failed for ${op.op_id}:`, err);
+    throw error(500, "Failed to store operation locally");
+  }
 
   return json({ success: true });
 }

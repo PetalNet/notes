@@ -11,7 +11,7 @@ import { loginSchema, signupSchema } from "./accounts.schema.ts";
 export const login = form(
   loginSchema,
   async ({ username, _password: password }) => {
-    const { cookies } = getRequestEvent();
+    const { cookies, url } = getRequestEvent();
 
     const results = await db
       .select()
@@ -41,7 +41,11 @@ export const login = form(
     const session = await auth.createSession(sessionToken, existingUser.id);
     auth.setSessionTokenCookie(cookies, sessionToken, session.expiresAt);
 
-    throw redirect(302, "/");
+    // Redirect to the original destination if provided, otherwise go home
+    const redirectTo = url.searchParams.get("redirectTo") || "/";
+    // Validate redirectTo to prevent open redirect attacks
+    const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
+    throw redirect(302, safeRedirect);
   },
 );
 

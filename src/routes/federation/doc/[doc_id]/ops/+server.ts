@@ -2,7 +2,7 @@ import { json, error } from "@sveltejs/kit";
 import { verify } from "$lib/crypto";
 import { db } from "$lib/server/db";
 import { federatedOps } from "$lib/server/db/schema";
-import { eq, gt, asc } from "drizzle-orm";
+import { eq, gt, asc, and } from "drizzle-orm";
 import { signServerRequest } from "$lib/server/identity";
 
 // Helper for verification (reuse from Join or export it? Duplicate for now to avoid logic split)
@@ -39,40 +39,43 @@ export async function GET({ params, url }) {
   const sinceTs = since ? parseInt(since) : 0;
 
   const ops = await db.query.federatedOps.findMany({
-    where: gt(federatedOps.lamportTs, sinceTs), // Actually need to filter by doc_id too
-    // TODO: fix query to use AND
+    where: and(
+      eq(federatedOps.docId, doc_id),
+      gt(federatedOps.lamportTs, sinceTs),
+    ),
+    orderBy: [asc(federatedOps.lamportTs)],
   });
 
-  // Fix:
-  // where: and(eq(federatedOps.docId, doc_id), gt(federatedOps.lamportTs, sinceTs))
-
-  // Sort by lamportTs
-  // orderBy: [asc(federatedOps.lamportTs)]
-
   return json({
-    ops: [], // TODO: correct query above
-    server_version: Date.now(), // placeholder
+    ops,
+    server_version: Date.now(),
   });
 }
 
 // PUSH Ops
 export async function POST({ params, request }) {
   const { doc_id } = params;
+  console.log(`[FED] Received ops push for ${doc_id}`);
+
   const body = await request.json();
   const { ops } = body;
+  console.log(`[FED] Ops count: ${ops?.length}`);
 
-  await verifyServerRequest(request, body);
+  try {
+    await verifyServerRequest(request, body);
+    console.log(`[FED] Verification successful`);
+  } catch (e) {
+    console.error(`[FED] Verification failed:`, e);
+    throw e;
+  }
 
   if (!Array.isArray(ops)) throw error(400);
 
-  for (const op of ops) {
-    // Verify op signature?
-    // Spec: "Receiving server verifies signatures" (of OP).
-    // Op structure: { doc_id, op_id, actor_id, signature, ... }
-    // Verify sig using User's device key?
-    // We need to fetch User/Device key.
-    // For MVP, just store.
+  // Validate that the document exists first?
+  // Ideally yes, but maybe we just accept ops for known docs.
 
+  for (const op of ops) {
+    console.log(`[FED] Inserting op ${op.op_id}`);
     await db
       .insert(federatedOps)
       .values({
@@ -81,11 +84,12 @@ export async function POST({ params, request }) {
         opId: op.op_id,
         actorId: op.actor_id,
         lamportTs: op.lamport_ts,
-        payload: op.encrypted_payload,
+        payload: op.encrypted_payload, // Note: client sends 'encrypted_payload' in JSON, but DB has 'payload'
         signature: op.signature,
       })
       .onConflictDoNothing();
   }
 
+  console.log(`[FED] Ops inserted successfully`);
   return json({ success: true });
 }

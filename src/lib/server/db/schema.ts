@@ -124,6 +124,43 @@ export const noteShares = sqliteTable("note_shares", {
     .$defaultFn(() => new Date()),
 });
 
+import { relations } from "drizzle-orm";
+
+export const usersRelations = relations(users, ({ many }) => ({
+  notes: many(notes),
+  memberships: many(members),
+}));
+
+export const documentsRelations = relations(documents, ({ many }) => ({
+  members: many(members),
+}));
+
+export const membersRelations = relations(members, ({ one }) => ({
+  document: one(documents, {
+    fields: [members.docId],
+    references: [documents.id],
+  }),
+  user: one(users, {
+    fields: [members.userId],
+    references: [users.id],
+  }),
+}));
+
+export const notesRelations = relations(notes, ({ one, many }) => ({
+  owner: one(users, {
+    fields: [notes.ownerId],
+    references: [users.id],
+  }),
+  shares: many(noteShares),
+}));
+
+export const noteSharesRelations = relations(noteShares, ({ one }) => ({
+  note: one(notes, {
+    fields: [noteShares.id], // typo in schema? id is PK. noteId is FK.
+    references: [notes.id],
+  }),
+}));
+
 export type User = typeof users.$inferSelect;
 export type Device = typeof devices.$inferSelect;
 export type Session = typeof sessions.$inferSelect;

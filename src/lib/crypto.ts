@@ -111,7 +111,8 @@ export function encryptKeyForDevice(
   result.set(nonce, 32);
   result.set(ciphertext, 56);
 
-  return encodeBase64(result);
+  const encoded = encodeBase64(result);
+  return encoded;
 }
 
 export function decryptKeyForDevice(

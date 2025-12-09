@@ -63,8 +63,12 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
 
       // 2. Subscribe to real-time updates
       const unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
-        // console.log(`[FED-SSE] Sending ${newOps.length} live ops`);
-        controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
+        try {
+          // console.log(`[FED-SSE] Sending ${newOps.length} live ops`);
+          controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
+        } catch (e) {
+          console.warn("[FED-SSE] Failed to enqueue (stream closed?):", e);
+        }
       });
 
       // Heartbeat to keep connection alive

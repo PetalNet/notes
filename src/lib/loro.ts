@@ -116,7 +116,14 @@ export class LoroNoteManager {
           // Loro import expects Uint8Array?
           // Wait, op.payload is base64 string provided by server.
           // Loro import expects Uint8Array.
-          const updateBytes = Uint8Array.fromBase64(op.payload);
+          // Loro import expects Uint8Array.
+          // Support both 'payload' (DB/PubSub normalized) and 'encrypted_payload' (Raw API)
+          const base64 = op.payload || op.encrypted_payload;
+          if (!base64) {
+            console.warn("[Loro] Received op without payload:", op);
+            continue;
+          }
+          const updateBytes = Uint8Array.fromBase64(base64);
           this.doc.import(updateBytes);
         }
         // console.debug(`[Loro] Applied ${ops.length} ops`);

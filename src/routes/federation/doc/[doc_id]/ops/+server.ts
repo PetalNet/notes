@@ -75,26 +75,30 @@ export async function POST({ params, request }) {
   // Validate that the document exists first?
   // Ideally yes, but maybe we just accept ops for known docs.
 
+  const normalizedOps = [];
+
   for (const op of ops) {
     console.log(`[FED] Inserting op ${op.op_id}`);
-    await db
-      .insert(federatedOps)
-      .values({
-        id: op.op_id, // ensure unique
-        docId: doc_id,
-        opId: op.op_id,
-        actorId: op.actor_id,
-        lamportTs: op.lamport_ts,
-        payload: op.encrypted_payload, // Note: client sends 'encrypted_payload' in JSON, but DB has 'payload'
-        signature: op.signature,
-      })
-      .onConflictDoNothing();
+    const newOp = {
+      id: op.op_id, // ensure unique
+      docId: doc_id,
+      opId: op.op_id,
+      actorId: op.actor_id,
+      lamportTs: op.lamport_ts,
+      payload: op.encrypted_payload, // Note: client sends 'encrypted_payload' in JSON, but DB has 'payload'
+      signature: op.signature,
+      createdAt: new Date(), // Add timestamp
+    };
+
+    await db.insert(federatedOps).values(newOp).onConflictDoNothing();
+
+    normalizedOps.push(newOp);
   }
 
   console.log(`[FED] Ops inserted successfully`);
 
   // Publish to PubSub for real-time subscribers
-  notePubSub.publish(doc_id, ops);
+  notePubSub.publish(doc_id, normalizedOps);
 
   return json({ success: true });
 }

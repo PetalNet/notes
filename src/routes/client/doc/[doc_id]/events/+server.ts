@@ -85,7 +85,17 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
           // 2. Subscribe
           const unsubscribe = notePubSub.subscribe(doc_id, (newOps) => {
-            controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
+            try {
+              controller.enqueue(`data: ${JSON.stringify(newOps)}\n\n`);
+            } catch (e) {
+              console.warn(
+                "[CLIENT-SSE] Failed to enqueue (stream closed?):",
+                e,
+              );
+              // Unsubscribe to prevent future errors?
+              // The controller.close() or cancel should have triggered cleanup,
+              // but if we are here, maybe it didn't yet.
+            }
           });
 
           // Keep alive

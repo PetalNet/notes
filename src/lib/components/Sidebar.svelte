@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -10,8 +9,6 @@
     Plus,
     Trash2,
     Pencil,
-    ChevronLeft,
-    ChevronRight,
     PanelLeftClose,
     LogOut,
     Globe,
@@ -329,17 +326,17 @@
         <div
           tabindex="0"
           role="button"
-          class="btn flex items-center gap-2 px-1 font-normal btn-ghost btn-sm"
+          class="btn h-auto min-h-0 gap-3 rounded-lg px-3 py-2 normal-case btn-ghost hover:bg-base-200"
         >
           <ProfilePicture name={user?.username ?? "A"} />
-          <span class="max-w-[120px] truncate text-sm font-medium">
+          <span class="max-w-[120px] truncate text-sm font-semibold">
             {user?.username ?? "Anonymous"}
           </span>
         </div>
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <ul
           tabindex="0"
-          class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
+          class="dropdown-content menu z-1 w-52 rounded-box bg-base-100 p-2 shadow"
         >
           <li>
             <form action="/logout" method="POST" class="w-full">

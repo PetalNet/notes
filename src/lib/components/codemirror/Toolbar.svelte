@@ -1,16 +1,10 @@
 <script lang="ts">
   import {
+    Ellipsis,
     type Icon as IconType,
-    ChevronRight,
-    ChevronDown,
-    MoreHorizontal,
     PanelLeftOpen,
   } from "@lucide/svelte";
-  import { onMount, getContext } from "svelte";
-  import {
-    SIDEBAR_CONTEXT_KEY,
-    type SidebarContext,
-  } from "$lib/components/sidebar-context";
+  import { getSidebarContext } from "$lib/components/sidebar-context";
 
   interface Tool {
     title: string;
@@ -20,8 +14,8 @@
 
   interface ToolGroup {
     tools: Tool[];
-    label?: string; // Label for dropdown
-    priority: number; // Higher priority = stays visible longer (1 = highest)
+    label?: string;
+    priority: number; // 1 = highest (always visible), 2 = medium, 3 = lowest (first to hide)
   }
 
   interface Props {
@@ -30,85 +24,22 @@
 
   const { toolGroups }: Props = $props();
 
-  const sidebarCtx = getContext<SidebarContext>(SIDEBAR_CONTEXT_KEY);
+  const sidebarCtx = getSidebarContext();
 
-  let toolbarElement: HTMLDivElement;
-  // Initialize with all groups visible by default
-  let visibleGroups = $state<number[]>(toolGroups.map((_, i) => i));
-
-  // Sort groups by priority (higher priority first)
+  // Sort groups by priority (lower number = higher priority)
   const sortedGroups = $derived(
     [...toolGroups].sort((a, b) => a.priority - b.priority),
   );
-
-  // Determine which groups should be visible vs in dropdown
-  const shouldShowAsButtons = $derived((groupIndex: number) => {
-    return visibleGroups.includes(groupIndex);
-  });
-
-  const collapsedGroups = $derived(
-    sortedGroups.filter((_, index) => !visibleGroups.includes(index)),
+  const disappearableGroups = $derived(
+    sortedGroups.filter((g) => g.priority > 1),
   );
-
-  // Check available space and update visible groups
-  function updateVisibleGroups() {
-    if (!toolbarElement) return;
-
-    const containerWidth = toolbarElement.clientWidth;
-    const buttonWidth = 40; // Approximate width per button
-    const groupSpacing = 12; // Spacing between groups
-    const dropdownWidth = 40; // Width for overflow dropdown
-
-    let availableWidth =
-      containerWidth -
-      (sidebarCtx?.isCollapsed ? buttonWidth + groupSpacing : 0);
-    let currentVisibleGroups: number[] = [];
-
-    // Try to fit groups by priority
-    for (let i = 0; i < sortedGroups.length; i++) {
-      const group = sortedGroups[i];
-      if (!group) continue;
-      const groupWidth = group.tools.length * buttonWidth + groupSpacing;
-
-      // Reserve space for dropdown if there are remaining groups
-      const remainingGroups = sortedGroups.length - i - 1;
-      const needsDropdown = remainingGroups > 0;
-      const requiredWidth = groupWidth + (needsDropdown ? dropdownWidth : 0);
-
-      if (availableWidth >= requiredWidth) {
-        currentVisibleGroups.push(i);
-        availableWidth -= groupWidth;
-      } else {
-        break; // No more space, rest go in dropdown
-      }
-    }
-
-    visibleGroups = currentVisibleGroups;
-  }
-
-  onMount(() => {
-    updateVisibleGroups();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateVisibleGroups();
-    });
-
-    if (toolbarElement) {
-      resizeObserver.observe(toolbarElement);
-    }
-
-    return () => {
-      resizeObserver.disconnect();
-    };
-  });
 </script>
 
 <div
-  bind:this={toolbarElement}
-  class="flex items-center gap-1 border-b border-base-content/10 px-2 py-1.5 sm:gap-2 sm:px-4"
+  class="@container flex items-center gap-1 border-b border-base-content/10 px-2 py-1.5 sm:gap-2 sm:px-4 last-of-type:[.division]:hidden"
 >
   <!-- Sidebar toggle (when collapsed) -->
-  {#if sidebarCtx?.isCollapsed}
+  {#if sidebarCtx.isCollapsed}
     <button
       onclick={sidebarCtx.toggleSidebar}
       class="btn h-8 min-h-8 w-8 p-0 btn-ghost btn-sm hover:bg-base-200"
@@ -120,62 +51,72 @@
     <div class="mx-0.5 h-5 w-px bg-base-300 sm:mx-1"></div>
   {/if}
 
-  <!-- Visible tool groups -->
-  {#each sortedGroups as group, index (index)}
-    {#if shouldShowAsButtons(index)}
-      <div class="flex items-center gap-0.5 rounded-lg p-0.5">
-        {#each group.tools as tool (tool.title)}
-          {@const Icon = tool.icon}
-          <button
-            onclick={tool.onclick}
-            class="btn h-8 min-h-8 w-8 p-0 btn-ghost btn-sm hover:bg-base-200"
-            title={tool.title}
-            aria-label={tool.title}
-          >
-            <Icon size={16} class="sm:h-[18px] sm:w-[18px]" />
-          </button>
-        {/each}
-      </div>
-      <div class="mx-0.5 h-5 w-px bg-base-300 sm:mx-1"></div>
+  <!-- Tool groups with priority-based visibility -->
+  {#each sortedGroups as group, i (group.label ?? group.priority)}
+    {@const isLast = i === sortedGroups.length - 1}
+    {@const priorityClass =
+      group.priority === 1
+        ? ""
+        : group.priority === 2
+          ? "hidden @md:flex"
+          : "hidden @lg:flex"}
+    <div class="flex items-center gap-0.5 rounded-lg p-0.5 {priorityClass}">
+      {#each group.tools as tool (tool.title)}
+        {@const Icon = tool.icon}
+        <button
+          onclick={tool.onclick}
+          class="btn h-8 min-h-8 w-8 p-0 btn-ghost btn-sm hover:bg-base-200"
+          title={tool.title}
+          aria-label={tool.title}
+        >
+          <Icon size={16} class="sm:h-[18px] sm:w-[18px]" />
+        </button>
+      {/each}
+    </div>
+    {#if !isLast}
+      <div
+        class="division mx-0.5 h-5 w-px bg-base-300 sm:mx-1 {priorityClass}"
+      ></div>
     {/if}
   {/each}
 
-  <!-- Overflow dropdown for collapsed groups -->
-  {#if collapsedGroups.length > 0}
-    <div class="dropdown dropdown-end">
-      <button
-        tabindex="0"
-        role="button"
-        class="btn h-8 min-h-8 w-8 p-0 btn-ghost btn-sm hover:bg-base-200"
-        title="More tools"
-        aria-label="More tools"
-      >
-        <MoreHorizontal size={16} class="sm:h-[18px] sm:w-[18px]" />
-      </button>
-      <ul
-        tabindex="0"
-        class="dropdown-content menu z-10 mt-1 w-52 rounded-box bg-base-200 p-2 shadow"
-      >
-        {#each collapsedGroups as group}
-          {#if group.label}
-            <li class="menu-title">
-              <span>{group.label}</span>
-            </li>
-          {/if}
-          {#each group.tools as tool}
-            {@const Icon = tool.icon}
-            <li>
-              <button onclick={tool.onclick} class="flex items-center gap-2">
-                <Icon size={16} />
-                <span>{tool.title}</span>
-              </button>
-            </li>
-          {/each}
-          {#if group !== collapsedGroups[collapsedGroups.length - 1]}
-            <li class="my-1"><hr /></li>
-          {/if}
-        {/each}
-      </ul>
+  <!-- Overflow dropdown - visible when lower priority items are hidden -->
+  <div class="dropdown dropdown-end @lg:hidden">
+    <div
+      tabindex="0"
+      role="button"
+      class="btn h-8 min-h-8 w-8 p-0 btn-ghost btn-sm hover:bg-base-200"
+      title="More tools"
+      aria-label="More tools"
+    >
+      <Ellipsis size={16} class="sm:h-[18px] sm:w-[18px]" />
     </div>
-  {/if}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <ul
+      tabindex="0"
+      class="dropdown-content menu z-10 w-52 rounded-box bg-base-200 p-2 shadow"
+    >
+      {#each disappearableGroups as group, i (group.label ?? group.priority)}
+        {@const isLast = i < disappearableGroups.length - 1}
+
+        {#if group.label}
+          <li class="menu-title">
+            <span>{group.label}</span>
+          </li>
+        {/if}
+        {#each group.tools as tool (tool.title)}
+          {@const Icon = tool.icon}
+          <li>
+            <button onclick={tool.onclick} class="flex items-center gap-2">
+              <Icon size={16} />
+              <span>{tool.title}</span>
+            </button>
+          </li>
+        {/each}
+        {#if isLast}
+          <li class="my-1 rounded-none"><hr /></li>
+        {/if}
+      {/each}
+    </ul>
+  </div>
 </div>

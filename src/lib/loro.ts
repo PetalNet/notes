@@ -263,16 +263,16 @@ export class LoroNoteManager {
    * Get version history with user attribution
    * Returns an array of version snapshots
    */
-  getHistory(): Array<{
+  getHistory(): {
     version: number;
     timestamp: Date;
     preview: string;
-  }> {
-    const history: Array<{
+  }[] {
+    const history: {
       version: number;
       timestamp: Date;
       preview: string;
-    }> = [];
+    }[] = [];
 
     // Get current version
     const currentVersion = this.doc.version();

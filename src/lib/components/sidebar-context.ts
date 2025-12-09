@@ -1,6 +1,9 @@
-export const SIDEBAR_CONTEXT_KEY = Symbol("sidebar-context");
+import { createContext } from "svelte";
 
 export interface SidebarContext {
   isCollapsed: boolean;
   toggleSidebar: () => void;
 }
+
+export const [getSidebarContext, setSidebarContext] =
+  createContext<SidebarContext>();

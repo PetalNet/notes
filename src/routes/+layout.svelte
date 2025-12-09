@@ -6,8 +6,7 @@
   import favicon from "$lib/assets/favicon.svg";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { getNotes } from "$lib/remote/notes.remote.ts";
-  import { setContext } from "svelte";
-  import { SIDEBAR_CONTEXT_KEY } from "$lib/components/sidebar-context";
+  import { setSidebarContext } from "$lib/components/sidebar-context.js";
 
   import { decryptWithPassword } from "$lib/crypto.ts";
 
@@ -97,7 +96,7 @@
     isCollapsed = !isCollapsed;
   }
 
-  setContext(SIDEBAR_CONTEXT_KEY, {
+  setSidebarContext({
     get isCollapsed() {
       return isCollapsed;
     },

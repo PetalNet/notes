@@ -4,6 +4,7 @@ import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
 import { LoroDoc, LoroText } from "loro-crdt";
 import { unawaited } from "./unawaited.ts";
+import { Temporal } from "temporal-polyfill";
 
 export type Doc = LoroDoc<{
   content: LoroText;
@@ -33,6 +34,7 @@ export class LoroNoteManager {
     this.#noteId = noteId;
     this.#noteKey = noteKey;
     this.doc = new LoroDoc();
+    this.doc.setRecordTimestamp(true);
     this.#text = LoroNoteManager.getTextFromDoc(this.doc);
     this.#onUpdate = onUpdate;
 
@@ -172,30 +174,43 @@ export class LoroNoteManager {
 
   /**
    * Get version history with user attribution
-   * Returns an array of version snapshots
+   * Returns an array of version snapshots traversing the oplog
    */
-  getHistory(): {
-    version: number;
-    timestamp: Date;
-    preview: string;
-  }[] {
-    const history: {
-      version: number;
-      timestamp: Date;
-      preview: string;
-    }[] = [];
+  getHistory(): HistoryEntry[] {
+    const history: HistoryEntry[] = [];
 
-    // Get current version
-    const currentVersion = this.doc.version();
+    // Get all changes from the oplog
+    const changes = this.doc.getAllChanges();
     const currentText = this.#text.toString();
 
-    // For now, just return the current version
-    // In a full implementation, you'd traverse the oplog
-    history.push({
-      version: currentVersion.get(this.doc.peerId) ?? 0,
-      timestamp: new Date(),
-      preview: currentText.slice(0, 100),
-    });
+    // Traverse all changes from all peers
+    for (const [peerId, peerChanges] of changes) {
+      for (const change of peerChanges) {
+        history.push({
+          version: change.lamport,
+          // Loro timestamps are in seconds, convert to milliseconds
+          timestamp: change.timestamp
+            ? Temporal.Instant.fromEpochMilliseconds(change.timestamp * 1000)
+            : Temporal.Instant.fromEpochMilliseconds(0),
+          preview: currentText.slice(0, 100),
+          peerId,
+        });
+      }
+    }
+
+    // Sort by lamport timestamp descending (most recent first)
+    history.sort((a, b) => b.version - a.version);
+
+    // If no changes found, return current state as fallback
+    if (history.length === 0) {
+      const currentVersion = this.doc.version();
+      history.push({
+        version: currentVersion.get(this.doc.peerId) ?? 0,
+        timestamp: Temporal.Now.instant(),
+        preview: currentText.slice(0, 100),
+        peerId: this.doc.peerId.toString(),
+      });
+    }
 
     return history;
   }
@@ -206,4 +221,11 @@ export class LoroNoteManager {
   subscribeToHistory(callback: () => void): () => void {
     return this.doc.subscribe(callback);
   }
+}
+
+export interface HistoryEntry {
+  version: number;
+  timestamp: Temporal.Instant;
+  preview: string;
+  peerId: string;
 }

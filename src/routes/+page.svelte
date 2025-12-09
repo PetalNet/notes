@@ -1,5 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { formatRelativeTime } from "$lib/utils/time.js";
+  import { Temporal } from "temporal-polyfill";
 
   let { data } = $props();
 </script>
@@ -31,9 +33,11 @@
                 {data.randomNote.title}
               </h3>
               <p class="text-sm text-base-content/60">
-                Last updated: {new Date(
-                  data.randomNote.updatedAt,
-                ).toLocaleDateString()}
+                Last updated: {formatRelativeTime(
+                  Temporal.Instant.fromEpochMilliseconds(
+                    data.randomNote.updatedAt.getTime(),
+                  ),
+                )}
               </p>
             </div>
             <div class="card-actions justify-end">

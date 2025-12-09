@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Clock, RotateCcw, User } from "@lucide/svelte";
-  import type { LoroNoteManager } from "$lib/loro.ts";
-  import { onMount } from "svelte";
+  import type { HistoryEntry, LoroNoteManager } from "$lib/loro.ts";
+  import { formatRelativeTime } from "$lib/utils/time.ts";
 
   interface Props {
     manager: LoroNoteManager | undefined;
@@ -10,12 +10,6 @@
   }
 
   let { manager, isOpen, onClose }: Props = $props();
-
-  interface HistoryEntry {
-    version: number;
-    timestamp: Date;
-    preview: string;
-  }
 
   let history = $state<HistoryEntry[]>([]);
   let selectedVersion = $state<number | null>(null);
@@ -53,19 +47,6 @@
   function restoreVersion(version: number) {
     // TODO: Implement version restoration using Loro's checkout functionality
     console.log("Restoring version:", version);
-  }
-
-  function formatTime(date: Date): string {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
   }
 </script>
 
@@ -114,20 +95,22 @@
               <!-- Version Header -->
               <div class="mb-2 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  {#if entry.author}
+                  {#if entry.peerId}
                     <div
                       class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-content"
                     >
-                      {entry.author[0].toUpperCase()}
+                      {entry.peerId.slice(0, 2).toUpperCase()}
                     </div>
-                    <span class="text-sm font-medium">{entry.author}</span>
+                    <span class="font-mono text-sm font-medium"
+                      >{entry.peerId.slice(0, 8)}</span
+                    >
                   {:else}
                     <User class="h-4 w-4 text-base-content/50" />
                     <span class="text-sm text-base-content/60">Unknown</span>
                   {/if}
                 </div>
                 <span class="text-xs text-base-content/50">
-                  {formatTime(entry.timestamp)}
+                  {formatRelativeTime(entry.timestamp)}
                 </span>
               </div>
 
@@ -157,9 +140,10 @@
 
     <!-- Actions -->
     {#if selectedVersion !== null && selectedVersion !== history[0]?.version}
+      {@const cachedVersion = selectedVersion}
       <div class="border-t border-base-content/10 p-4">
         <button
-          onclick={() => restoreVersion(selectedVersion)}
+          onclick={() => restoreVersion(cachedVersion)}
           class="btn w-full btn-primary"
         >
           <RotateCcw class="h-4 w-4" />

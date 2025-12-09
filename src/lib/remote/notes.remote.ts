@@ -5,6 +5,8 @@ import { db } from "$lib/server/db/index.ts";
 import { notes } from "$lib/server/db/schema.ts";
 import { error } from "@sveltejs/kit";
 import { and, eq } from "drizzle-orm";
+import { env } from "$env/dynamic/private";
+import { createNoteId } from "$lib/noteId.ts";
 import {
   createNoteSchema,
   deleteNoteSchema,
@@ -47,7 +49,8 @@ export const createNote = command(
         error(400, "Missing required fields");
       }
 
-      const id = crypto.randomUUID();
+      const serverDomain = env.SERVER_DOMAIN || "localhost:5173";
+      const id = createNoteId(serverDomain);
 
       await db.insert(notes).values({
         id,

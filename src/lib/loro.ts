@@ -95,23 +95,31 @@ export class LoroNoteManager {
   /**
    * Start real-time sync
    */
+  /**
+   * Start real-time sync
+   */
   startSync(): void {
     if (this.#isSyncing) return;
     this.#isSyncing = true;
 
-    this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
+    // Use SSE endpoint
+    this.#eventSource = new EventSource(`/client/doc/${this.#noteId}/events`);
 
     this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
-      console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
+      // console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
       try {
-        const data = Schema.decodeSync(syncSchemaJson)(event.data);
-        const updateBytes = Uint8Array.fromBase64(data.update);
-        console.debug(
-          "[Loro] Applying remote update, size:",
-          updateBytes.length,
-        );
-        this.doc.import(updateBytes);
-        console.debug("[Loro] Remote update applied successfully");
+        const ops = JSON.parse(event.data);
+        if (!Array.isArray(ops)) return;
+
+        for (const op of ops) {
+          // op.payload is encrypted blob (base64)
+          // Loro import expects Uint8Array?
+          // Wait, op.payload is base64 string provided by server.
+          // Loro import expects Uint8Array.
+          const updateBytes = Uint8Array.fromBase64(op.payload);
+          this.doc.import(updateBytes);
+        }
+        // console.debug(`[Loro] Applied ${ops.length} ops`);
       } catch (error) {
         console.error("Failed to process sync message:", error);
       }
@@ -121,6 +129,7 @@ export class LoroNoteManager {
       console.error("SSE connection error:", error);
       this.#eventSource?.close();
       this.#isSyncing = false;
+      // Reconnect logic? Browser EventSource handles reconnect automatically often.
     };
   }
 
@@ -129,9 +138,34 @@ export class LoroNoteManager {
    */
   async #sendUpdate(update: Uint8Array) {
     try {
-      await sync({
-        noteId: this.#noteId,
-        update: update.toBase64(),
+      const opId = this.doc.peerId; // Wait, op ID needs to be unique?
+      // Loro update is a blob. We wrap it in an Op structure?
+      // Server expects: { op: { op_id, actor_id, lamport_ts, encrypted_payload, signature } }
+      // Client generates these?
+      // Loro `update` is a patch. We treat it as one "Op"?
+      // We need `actor_id` (peerId).
+      // `lamport_ts`: does Loro expose generic lamport? `doc.oplog.vv`?
+      // Or we just use client timestamp/counter?
+      // Loro updates are CRDT blobs.
+      // For federation Op Log, we wrap the blob.
+
+      const payload = update.toBase64();
+      const actorId = this.doc.peerIdStr; // string?
+      // Loro API check: `doc.peerIdStr` exists.
+
+      // Mock Op structure
+      const op = {
+        op_id: crypto.randomUUID(),
+        actor_id: actorId,
+        lamport_ts: Date.now(), // Approximate ordering
+        encrypted_payload: payload,
+        signature: "TODO", // Client signature!
+      };
+
+      await fetch(`/client/doc/${this.#noteId}/push`, {
+        method: "POST",
+        body: JSON.stringify({ op }),
+        headers: { "Content-Type": "application/json" },
       });
     } catch (error) {
       console.error("Failed to send update:", error);

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from "$app/environment";
-  import type { Extension } from "@codemirror/state";
+  import { Compartment, type Extension } from "@codemirror/state";
   import { EditorView } from "@codemirror/view";
   import { onMount, onDestroy } from "svelte";
   import type { ClassValue } from "svelte/elements";
@@ -19,21 +19,20 @@
 
   let editorElement: HTMLElement;
   let extensionCompartment = new Compartment();
+  let extensionCompartment = new Compartment();
 
   onMount(() => {
     // Initialize CodeMirror
     editorView = new EditorView({
       parent: editorElement,
-      extensions: [extensionCompartment.of(extensions)],
+      extensions: extensionCompartment.of(extensions),
     });
   });
 
   $effect(() => {
-    if (editorView) {
-      editorView.dispatch({
-        effects: extensionCompartment.reconfigure(extensions),
-      });
-    }
+    editorView.dispatch({
+      effects: extensionCompartment.reconfigure(extensions),
+    });
   });
 
   onDestroy(() => {

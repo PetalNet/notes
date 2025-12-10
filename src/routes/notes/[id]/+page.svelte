@@ -157,7 +157,8 @@
 
   // Initialize Loro manager for the current note
   $effect(() => {
-    if (!id || !note) return;
+    const currentNote = note;
+    if (!id || !currentNote) return;
 
     if (!loroManagers.has(id)) {
       console.log(`Initializing Loro manager for ${id}`);
@@ -166,8 +167,8 @@
           try {
             // Decrypt the note key if it's an envelope (long)
             // If it's short (raw key), use it directly.
-            let noteKey = note.encryptedKey;
-            if (note.encryptedKey.length > 60) {
+            let noteKey = currentNote.encryptedKey;
+            if (currentNote.encryptedKey.length > 60) {
               const rawPrivKey = sessionStorage.getItem(
                 "notes_raw_private_key",
               );
@@ -177,7 +178,7 @@
                 );
                 return;
               }
-              noteKey = decryptKey(note.encryptedKey, rawPrivKey);
+              noteKey = decryptKey(currentNote.encryptedKey, rawPrivKey);
             }
 
             // Create manager
@@ -189,7 +190,7 @@
                 // But we do update 'updatedAt' and maybe 'loroSnapshot' column?
                 // The updateNote command handles updating the snapshot column.
                 // Re-check data.user here as it might have changed or TS doesn't know
-                if (data.user && note.ownerId === data.user.id) {
+                if (data.user && currentNote.ownerId === data.user.id) {
                   await updateNote({ noteId: id, loroSnapshot: snapshot });
                 } else {
                   // Federated/Shared notes: We don't save snapshots to 'notes' table (as we don't own it).
@@ -198,7 +199,7 @@
                   // console.debug("[Loro] Skipping snapshot save for non-owned note");
                 }
               },
-              note.loroSnapshot,
+              currentNote.loroSnapshot,
             );
 
             // Start sync

@@ -13,7 +13,9 @@ const handleAuth: Handle = async ({ event, resolve }) => {
       !event.route.id?.startsWith("/(auth)") &&
       !event.route.id?.startsWith("/federation") &&
       !event.route.id?.startsWith("/.well-known") &&
-      !event.route.id?.startsWith("/notes")
+      !event.route.id?.startsWith("/notes") &&
+      !event.route.id?.startsWith("/client") &&
+      !event.route.id?.startsWith("/api")
     ) {
       return new Response("Redirect", {
         status: 303,

@@ -104,7 +104,15 @@
     toggleSidebar,
   });
 
-  const notesList = $derived(data.user ? await getNotes() : []);
+  let notesList = $state<any[]>([]);
+
+  $effect(() => {
+    if (data.user) {
+      getNotes().then((notes) => (notesList = notes));
+    } else {
+      notesList = [];
+    }
+  });
 
   // Initialize from localStorage and handle responsive behavior
   onMount(() => {

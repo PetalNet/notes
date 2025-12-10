@@ -4,19 +4,38 @@ import { eq, gt, asc, and } from "drizzle-orm";
 import type { RequestHandler } from "./$types";
 import { error } from "@sveltejs/kit";
 import { notePubSub } from "$lib/server/pubsub";
+import { parseNoteId } from "$lib/noteId";
+import { env } from "$env/dynamic/private";
+
 export const GET: RequestHandler = async ({ params, url }) => {
   const { doc_id } = params;
+  console.log("HIT-SSE: Handler invoked for", doc_id);
   const since = url.searchParams.get("since");
   // Default to 0 (beginning of time) to fetch full history if 'since' is not provided.
-  // This ensures that when a client connects (especially for the first time),
-  // it receives all existing ops to reconstruct the document state.
   let lastTs = since ? parseInt(since) : 0;
 
   console.log(`[EVENTS] Connection request for ${doc_id}, since=${since}`);
 
-  const doc = await db.query.documents.findFirst({
+  let doc = await db.query.documents.findFirst({
     where: eq(documents.id, doc_id),
   });
+
+  // If not in DB, check if it's a valid remote ID (Ephemeral/Anonymous access)
+  if (!doc) {
+    try {
+      const { origin } = parseNoteId(doc_id);
+
+      if (origin) {
+        console.log(
+          `[EVENTS] Ephemeral note inferred from ID. Origin: ${origin}. Proxying...`,
+        );
+        doc = { hostServer: origin } as any;
+      }
+    } catch (e) {
+      console.error("[EVENTS] ERROR parsing note ID:", e);
+      // Fallthrough to 404
+    }
+  }
 
   if (!doc) {
     console.error(`[EVENTS] Document not found: ${doc_id}`);

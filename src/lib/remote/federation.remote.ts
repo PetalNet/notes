@@ -1,4 +1,4 @@
-import { command } from "$app/server";
+import { command, getRequestEvent } from "$app/server";
 import { db } from "$lib/server/db/index.ts";
 import { documents, members } from "$lib/server/db/schema.ts";
 import { requireLogin } from "$lib/server/auth.ts";
@@ -24,43 +24,44 @@ export const joinFederatedNote = command(
     console.log("  noteId:", noteId);
     console.log("  originServer:", originServer);
 
-    const { user } = requireLogin();
-    // ... (rest of setup)
-
-    const currentDomain = env["SERVER_DOMAIN"] || "localhost:5173";
-    const { uuid, origin } = parseNoteId(noteId);
+    const event = getRequestEvent();
+    const user = event?.locals.user;
 
     try {
-      // Check if already joined (check both full ID and uuid)
-      let existingDoc = await db.query.documents.findFirst({
-        where: eq(documents.id, noteId),
-        with: {
-          members: {
-            where: (members) => eq(members.userId, user.id),
-          },
-        },
-      });
+      const currentDomain = env["SERVER_DOMAIN"] || "localhost:5173";
+      const { uuid, origin } = parseNoteId(noteId);
 
-      if (!existingDoc) {
-        existingDoc = await db.query.documents.findFirst({
-          where: eq(documents.id, uuid),
-          with: { members: { where: (m) => eq(m.userId, user.id) } },
-        });
+      // Skip DB check if no user
+      if (user) {
+        try {
+          // Check if already joined (check both full ID and uuid)
+          let existingDoc = await db.query.documents.findFirst({
+            where: eq(documents.id, noteId),
+            with: {
+              members: {
+                where: (members) => eq(members.userId, user!.id),
+              },
+            },
+          });
+
+          if (!existingDoc) {
+            existingDoc = await db.query.documents.findFirst({
+              where: eq(documents.id, uuid),
+              with: { members: { where: (m) => eq(m.userId, user!.id) } },
+            });
+          }
+
+          const memberEntry = existingDoc?.members[0];
+          const hasKey = !!memberEntry?.encryptedKeyEnvelope;
+
+          if (existingDoc && hasKey) {
+            console.log(`Already joined note ${noteId} (Key found)`);
+            return { success: true, alreadyJoined: true };
+          }
+        } catch (e) {
+          console.error("DB check failed", e);
+        }
       }
-
-      const memberEntry = existingDoc?.members[0];
-      const hasKey = !!memberEntry?.encryptedKeyEnvelope;
-
-      if (existingDoc && hasKey) {
-        console.log(`Already joined note ${noteId} (Key found)`);
-        return { success: true, alreadyJoined: true };
-      }
-
-      // If we have a pre-computed key, use it directly without re-fetching signatures/remote if possible.
-      // But we still need to fetch remote to verify metadata if not exists?
-      // Actually, if we have preComputedKey, we assume the Client did the verification?
-      // No, Client only got the key from a previous failed attempt. We still need to create `documents` and `members` entries properly.
-      // So we PROCEED, but use `preComputedKey` instead of parsing envelopes.
 
       // Call origin server's join endpoint
       const joinUrl = `http://${originServer}/federation/doc/${encodeURIComponent(noteId)}/join`;
@@ -68,11 +69,13 @@ export const joinFederatedNote = command(
       // Get server identity for signing
       const serverIdentity = await getServerIdentity();
       const timestamp = Date.now().toString();
-      const userHandle = `@${user.username}:${currentDomain}`;
+      const userHandle = user
+        ? `@${user.username}:${currentDomain}`
+        : `@anonymous:${currentDomain}`;
 
       const requestBody = {
         requesting_server: currentDomain,
-        users: [userHandle],
+        users: user ? [userHandle] : [], // Send empty user list if anonymous
       };
 
       const message = `${currentDomain}:${timestamp}:${JSON.stringify(requestBody)}`;
@@ -124,36 +127,28 @@ export const joinFederatedNote = command(
         // Check for RAW KEY first (Open Public)
         if (joinData.rawKey) {
           console.log("  [Federation] Note is Open Public. Using Raw Key.");
-          // We need to ENCRYPT this raw key for the user, so it matches the expectation of 'encryptedKeyEnvelope'
-          // User expects: decrypt(envelope, userPrivateKey) -> rawKey
-          // So envelope = encrypt(rawKey, userPublicKey)
-          // But we are on Server. We don't have user's raw private key, but we have user's Public Key?
-          // Wait, server has user.publicKey (Ed25519) in `users` table, but we need encryption key?
-          // If user is local, `users` table has `publicKey`.
-          // Actually, `encryptKeyForUser` logic.
-          // Let's use `encryptKeyForUser` helper.
-          const { encryptKeyForUser } = await import("$lib/crypto");
-          // Note: This assumes `user.publicKey` is suitable for encryption or we derive it.
-          if (user.publicKey) {
+
+          if (user && user.publicKey) {
+            const { encryptKeyForUser } = await import("$lib/crypto");
             encryptedKeyEnvelope = await encryptKeyForUser(
               joinData.rawKey,
               user.publicKey,
             );
           } else {
-            // Fallback: store raw key? Leaky?
-            // No, we must encrypt.
-            console.error(
-              "  [Federation] Cannot encrypt public key: User has no Public Key.",
+            // Anonymous: We don't need an envelope because we don't save to DB.
+            // But we might want to return the rawKey directly in the response (handled by ...joinData)
+            console.log(
+              "  [Federation] Anonymous user: Skipping envelope creation.",
             );
           }
         } else {
           // Normal E2EE Envelope Logic
           let myEnvelope = joinData.envelopes?.find(
             (e: any) =>
-              e.user_id === userHandle ||
-              e.user_id === user.id ||
-              e.user_id === `@${user.username}` ||
-              e.user_id === user.username,
+              (user && e.user_id === userHandle) ||
+              (user && e.user_id === user.id) ||
+              (user && e.user_id === `@${user.username}`) ||
+              (user && e.user_id === user.username),
           );
 
           if (
@@ -168,55 +163,56 @@ export const joinFederatedNote = command(
         }
       }
 
-      if (!encryptedKeyEnvelope) {
-        console.error("  [Federation] No encrypted key envelope found!");
-        // Continue but without key? No, fatal for join.
-        // Unless it is a metadata-only join?
-      }
+      // If logged in, we expect an envelope/key to save
+      if (user) {
+        if (!encryptedKeyEnvelope) {
+          console.error("  [Federation] No encrypted key envelope found!");
+        }
 
-      // Store document metadata locally
-      // ... (existing db insert logic)
-      await db
-        .insert(documents)
-        .values({
-          id: noteId,
-          hostServer: originServer,
-          ownerId: joinData.ownerId || user.id,
-          title: joinData.title || "Federated Note",
-          accessLevel: joinData.accessLevel || "private",
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: documents.id,
-          set: {
+        // Store document metadata locally
+        // ... (existing db insert logic)
+        await db
+          .insert(documents)
+          .values({
+            id: noteId,
+            hostServer: originServer,
+            ownerId: joinData.ownerId || user.id,
             title: joinData.title || "Federated Note",
             accessLevel: joinData.accessLevel || "private",
+            createdAt: new Date(),
             updatedAt: new Date(),
-          },
-        });
+          })
+          .onConflictDoUpdate({
+            target: documents.id,
+            set: {
+              title: joinData.title || "Federated Note",
+              accessLevel: joinData.accessLevel || "private",
+              updatedAt: new Date(),
+            },
+          });
 
-      // Store member relationship
-      await db
-        .insert(members)
-        .values({
-          docId: noteId,
-          userId: user.id,
-          deviceId: "default",
-          role: joinData.role || "writer",
-          encryptedKeyEnvelope: encryptedKeyEnvelope,
-          createdAt: new Date(),
-        })
-        .onConflictDoUpdate({
-          target: [members.docId, members.userId, members.deviceId],
-          set: {
-            encryptedKeyEnvelope: encryptedKeyEnvelope,
+        // Store member relationship
+        await db
+          .insert(members)
+          .values({
+            docId: noteId,
+            userId: user.id,
+            deviceId: "default",
             role: joinData.role || "writer",
-          },
-        });
+            encryptedKeyEnvelope: encryptedKeyEnvelope,
+            createdAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [members.docId, members.userId, members.deviceId],
+            set: {
+              encryptedKeyEnvelope: encryptedKeyEnvelope,
+              role: joinData.role || "writer",
+            },
+          });
+      }
 
       console.log(`Successfully joined note ${uuid} from ${originServer}`);
-      return { success: true, alreadyJoined: false };
+      return { success: true, alreadyJoined: false, ...joinData };
     } catch (err) {
       console.error("Federation join error:", err);
       if (err instanceof Error) {

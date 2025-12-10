@@ -70,7 +70,7 @@
   // Auto-join foreign notes when authenticated
   $effect(() => {
     if (
-      data.user &&
+      // Remove data.user check to allow anonymous
       !data.isLocal &&
       id &&
       !note &&
@@ -106,11 +106,41 @@
             isJoining = false;
 
             // Force refresh notes list to include the new note
-            const updatedNotes = await getNotes();
-            notesList = updatedNotes;
+            try {
+              if (data.user) {
+                const updatedNotes = await getNotes();
+                notesList = updatedNotes;
+              } else {
+                throw new Error("Anonymous user cannot fetch notes");
+              }
+            } catch (e) {
+              // Anonymous or failure: Construct ephemeral note
+              console.log("Using ephemeral note for anonymous/failed fetch");
+              if (res && res.rawKey) {
+                notesList = [
+                  {
+                    id: res.doc_id || id,
+                    title: res.title || "Shared Note",
+                    ownerId: res.ownerId || "",
+                    encryptedKey: res.rawKey, // Use raw key directly
+                    isFolder: false,
+                    order: 0,
+                    parentId: null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    content: "",
+                    accessLevel: res.accessLevel || "public",
+                    loroSnapshot: res.snapshot || null,
+                    serverEncryptedKey: null,
+                  },
+                ];
+              }
+            }
 
-            // Invalidate data to reload everything else
-            await invalidateAll();
+            // Invalidate data to reload everything else (only if logged in)
+            if (data.user) {
+              await invalidateAll();
+            }
           })
           .catch((err) => {
             console.error("Federation join failed:", err);
@@ -181,7 +211,7 @@
 
   // Initialize Loro manager for the current note
   $effect(() => {
-    if (!id || !note || !data.user) return;
+    if (!id || !note) return;
 
     if (!loroManagers.has(id)) {
       console.log(`Initializing Loro manager for ${id}`);
@@ -296,7 +326,7 @@
 
 <div class="relative h-full flex-1 overflow-hidden">
   {#if note}
-    {#if note && !note.isFolder && data.user}
+    {#if note && !note.isFolder}
       <Editor
         noteId={id ?? ""}
         noteTitle={(note.title || "Untitled") as string}

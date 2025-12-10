@@ -127,7 +127,7 @@
   let loroExtensions = $state<Extension>([]);
 
   $effect(() => {
-    if (manager !== undefined && user !== undefined) {
+    if (manager !== undefined) {
       const ephemeral = new EphemeralStore();
       const undoManager = new UndoManager(manager.doc, {});
 
@@ -135,7 +135,9 @@
         manager.doc,
         {
           ephemeral,
-          user: { name: user.username, colorClassName: "bg-primary" },
+          user: user
+            ? { name: user.username, colorClassName: "bg-primary" }
+            : { name: "Anonymous", colorClassName: "bg-base-content" },
         },
         undoManager,
         LoroNoteManager.getTextFromDoc,

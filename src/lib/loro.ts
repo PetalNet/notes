@@ -1,4 +1,5 @@
 import { decryptData, encryptData } from "$lib/crypto";
+import { encodeBase64, decodeBase64 } from "@oslojs/encoding";
 import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
@@ -78,7 +79,7 @@ export class LoroNoteManager {
     const manager = new LoroNoteManager(noteId, noteKey, onUpdate);
 
     if (encryptedSnapshot) {
-      const encryptedBytes = Uint8Array.fromBase64(encryptedSnapshot);
+      const encryptedBytes = decodeBase64(encryptedSnapshot);
       const decrypted = await decryptData(encryptedBytes, manager.#noteKey);
       manager.doc.import(decrypted);
     }
@@ -148,13 +149,18 @@ export class LoroNoteManager {
             console.warn("[Loro] Received op without payload:", op);
             continue;
           }
-          const updateBytes = Uint8Array.fromBase64(base64);
+          const updateBytes = decodeBase64(base64);
           this.doc.import(updateBytes);
         }
         // console.debug(`[Loro] Applied ${ops.length} ops`);
       } catch (error) {
         console.error("Failed to process sync message:", error);
       }
+    };
+
+    this.#eventSource.onopen = () => {
+      console.log("[Loro] SSE connected");
+      this.connectionState.set("connected");
     };
 
     this.#eventSource.onerror = (error) => {
@@ -198,7 +204,7 @@ export class LoroNoteManager {
       // Loro updates are CRDT blobs.
       // For federation Op Log, we wrap the blob.
 
-      const payload = update.toBase64();
+      const payload = encodeBase64(update);
       const actorId = this.doc.peerIdStr; // string?
       // Loro API check: `doc.peerIdStr` exists.
 
@@ -229,7 +235,7 @@ export class LoroNoteManager {
       mode: "snapshot",
     }) as Uint8Array<ArrayBuffer>;
     const encrypted = await encryptData(snapshot, this.#noteKey);
-    return encrypted.toBase64();
+    return encodeBase64(encrypted);
   }
 
   /**

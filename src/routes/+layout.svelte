@@ -2,29 +2,80 @@
   import "./layout.css";
 
   import { onNavigate } from "$app/navigation";
-  import { onMount } from "svelte";
   import favicon from "$lib/assets/favicon.svg";
   import Sidebar from "$lib/components/Sidebar.svelte";
-  import { getNotes } from "$lib/remote/notes.remote.ts";
   import { setSidebarContext } from "$lib/components/sidebar-context.js";
-
-  import { decryptWithPassword } from "$lib/crypto.ts";
-
-  // ... (previous imports)
-
   import { setupEncryption } from "$lib/remote/accounts.remote.ts";
+  import { getNotes } from "$lib/remote/notes.remote.ts";
   import {
+    decryptWithPassword,
+    encryptWithPassword,
     generateSigningKeyPair,
     generateEncryptionKeyPair,
-    encryptWithPassword,
   } from "$lib/crypto.ts";
-
-  // ... (previous imports)
+  import { PersistedState } from "runed";
+  import { onMount } from "svelte";
+  import { unawaited } from "$lib/unawaited.js";
 
   let { children, data } = $props();
 
-  // Sidebar collapse state
-  let isCollapsed = $state(false);
+  // User's explicit preference (persisted to localStorage)
+  const collapsedDesktop = new PersistedState("sidebarCollapsed", false);
+  // Mobile state (always starts collapsed)
+  let collapsedMobile = $state(true);
+
+  // Track window width
+  let innerWidth = $state(0);
+  let isDesktop = $derived(innerWidth >= 768);
+
+  // Derived visual state
+  let isCollapsed = $derived(
+    isDesktop ? collapsedDesktop.current : collapsedMobile,
+  );
+
+  // Handle transitions between breakpoints
+  let wasDesktop = $state(true);
+
+  $effect(() => {
+    if (innerWidth === 0) return;
+
+    // Desktop -> Mobile: Always collapse
+    if (wasDesktop && !isDesktop) {
+      collapsedMobile = true;
+    }
+
+    // Mobile -> Desktop: If mobile was open, keep open
+    if (!wasDesktop && isDesktop) {
+      if (!collapsedMobile) {
+        collapsedDesktop.current = false;
+      }
+    }
+
+    wasDesktop = isDesktop;
+  });
+
+  function toggleSidebar() {
+    if (isDesktop) {
+      collapsedDesktop.current = !collapsedDesktop.current;
+    } else {
+      collapsedMobile = !collapsedMobile;
+    }
+  }
+
+  // Keyboard shortcut: Ctrl+\ (or Cmd+\ on Mac)
+  function handleKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
+      e.preventDefault();
+      toggleSidebar();
+    }
+  }
+
+  setSidebarContext({
+    get isCollapsed() {
+      return isCollapsed;
+    },
+    toggleSidebar,
+  });
 
   // Vault State
   let isVaultUnlocked = $state(false);
@@ -87,89 +138,34 @@
       sessionStorage.setItem("notes_raw_private_key", rawKey);
       isVaultUnlocked = true;
       unlockPassword = ""; // clear memory
-    } catch (e) {
+    } catch {
       unlockError = "Incorrect password";
     }
   }
 
-  function toggleSidebar() {
-    isCollapsed = !isCollapsed;
-  }
-
-  setSidebarContext({
-    get isCollapsed() {
-      return isCollapsed;
-    },
-    toggleSidebar,
-  });
-
-  let notesList = $state<any[]>([]);
-
-  $effect(() => {
-    if (data.user) {
-      getNotes().then((notes) => (notesList = notes));
-    } else {
-      notesList = [];
-    }
-  });
+  const notesList = $derived(data.user ? await getNotes() : []);
 
   // Initialize from localStorage and handle responsive behavior
   onMount(() => {
-    (async () => {
-      if (data.user) {
-        // Try to auto-unlock if key is already in session
-        const existingKey = sessionStorage.getItem("notes_raw_private_key");
-        if (existingKey) {
-          isVaultUnlocked = true;
-        } else {
-          // Try temporary password from login redirect
-          const tempPw = sessionStorage.getItem("notes_temp_password");
-          if (tempPw) {
-            unlockPassword = tempPw;
-            await unlockVault();
-            sessionStorage.removeItem("notes_temp_password");
+    unawaited(
+      (async () => {
+        if (data.user) {
+          // Try to auto-unlock if key is already in session
+          const existingKey = sessionStorage.getItem("notes_raw_private_key");
+          if (existingKey) {
+            isVaultUnlocked = true;
+          } else {
+            // Try temporary password from login redirect
+            const tempPw = sessionStorage.getItem("notes_temp_password");
+            if (tempPw) {
+              unlockPassword = tempPw;
+              await unlockVault();
+              sessionStorage.removeItem("notes_temp_password");
+            }
           }
         }
-      }
-    })();
-
-    // Load saved state from localStorage
-    const saved = localStorage.getItem("sidebarCollapsed");
-    if (saved !== null) {
-      isCollapsed = saved === "true";
-    } else {
-      // Auto-collapse on mobile screens
-      isCollapsed = window.innerWidth < 768;
-    }
-
-    // Handle window resize for automatic collapse
-    const handleResize = () => {
-      if (window.innerWidth < 768 && !isCollapsed) {
-        isCollapsed = true;
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    // Keyboard shortcut: Ctrl+B (or Cmd+B on Mac)
-    const handleKeydown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "b") {
-        e.preventDefault();
-        toggleSidebar();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeydown);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("keydown", handleKeydown);
-    };
-  });
-
-  // Save to localStorage whenever state changes
-  $effect(() => {
-    localStorage.setItem("sidebarCollapsed", String(isCollapsed));
+      })(),
+    );
   });
 
   onNavigate((navigation) => {
@@ -183,6 +179,8 @@
     return promise;
   });
 </script>
+
+<svelte:window bind:innerWidth onkeydown={handleKeydown} />
 
 <svelte:head>
   <link rel="icon" href={favicon} />

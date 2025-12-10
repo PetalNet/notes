@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -10,6 +9,8 @@
     Plus,
     Trash2,
     Pencil,
+    PanelLeftClose,
+    LogOut,
   } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
@@ -39,9 +40,11 @@
   interface Props {
     user: User | undefined;
     notesList: NoteOrFolder[];
+    isCollapsed: boolean;
+    toggleSidebar: () => void;
   }
 
-  let { user, notesList }: Props = $props();
+  let { user, notesList, isCollapsed, toggleSidebar }: Props = $props();
   let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
@@ -50,11 +53,14 @@
 
   let notesTree = $derived(buildNotesTree(notesList));
 
-  let rootContainer: HTMLElement;
+  let rootContainer = $state<HTMLElement>();
   let isRootDropTarget = $state(false);
 
   // Set up root drop target
-  onMount(() => {
+  // Set up root drop target
+  $effect(() => {
+    if (!rootContainer) return;
+
     const cleanup = dropTargetForElements({
       element: rootContainer,
       onDragEnter: () => {
@@ -205,84 +211,109 @@
 <svelte:window onclick={onWindowClick} />
 
 <div
-  class="sidebar flex h-full w-64 flex-col border-r border-base-content/10 [view-transition-name:sidebar]"
+  class="sidebar flex h-full flex-col border-r border-base-content/10 transition-all duration-300 [view-transition-name:sidebar]"
+  style="width: {isCollapsed ? '0' : '16rem'}"
 >
-  <!-- User Header -->
-  <div
-    class="flex items-center justify-between border-b border-base-content/10 p-4"
-  >
-    <div class="flex items-center gap-2">
-      <ProfilePicture name={user?.username ?? "A"} />
-      <span class="max-w-28 truncate text-sm font-medium"
-        >{user?.username ?? "Anonymous"}</span
+  {#if !isCollapsed}
+    <!-- User Header -->
+    <div
+      class="flex items-center justify-between border-b border-base-content/10 p-4"
+    >
+      <div class="dropdown dropdown-bottom">
+        <div
+          tabindex="0"
+          role="button"
+          class="btn h-auto min-h-0 gap-3 rounded-lg px-3 py-2 normal-case btn-ghost hover:bg-base-200"
+        >
+          <ProfilePicture name={user?.username[0] ?? "A"} />
+          <span class="max-w-[120px] truncate text-sm font-semibold">
+            {user?.username ?? "Anonymous"}
+          </span>
+        </div>
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <ul
+          tabindex="0"
+          class="dropdown-content menu z-1 w-52 rounded-box bg-base-100 p-2 shadow"
+        >
+          <li>
+            <form {...logout} class="w-full">
+              <button type="submit" class="flex w-full items-center gap-2">
+                <LogOut size={16} />
+                Log out
+              </button>
+            </form>
+          </li>
+        </ul>
+      </div>
+
+      <button
+        onclick={toggleSidebar}
+        class="btn btn-square btn-ghost btn-sm"
+        title="Collapse sidebar (Ctrl+B)"
+      >
+        <PanelLeftClose size={20} />
+      </button>
+    </div>
+
+    <!-- Actions -->
+    <div class="grid grid-cols-2 gap-2 p-3">
+      <button
+        onclick={async () => {
+          if (user === undefined) {
+            throw new Error("Cannot create note whilst logged out.");
+          }
+
+          await handleCreateNote("Untitled Note", null, false, user.publicKey);
+        }}
+        class="btn"><FilePlus /> Note</button
+      >
+      <button
+        onclick={async () => {
+          if (user === undefined) {
+            throw new Error("Cannot create folder whilst logged out.");
+          }
+
+          await handleCreateNote("New Folder", null, true, user.publicKey);
+        }}
+        class="btn"><FolderPlus /> Folder</button
       >
     </div>
-    <form {...logout}>
-      <button
-        type="submit"
-        class="text-xs text-base-content/40 transition-colors hover:text-base-content/60"
-      >
-        Log out
-      </button>
-    </form>
-  </div>
 
-  <!-- Actions -->
-  <div class="grid grid-cols-2 gap-2 p-3">
-    <button
-      onclick={async () => {
-        if (user === undefined) {
-          throw new Error("Cannot create note whilst logged out.");
-        }
-
-        await handleCreateNote("Untitled Note", null, false, user.publicKey);
-      }}
-      class="btn"><FilePlus /> Note</button
+    <!-- Note Tree -->
+    <div
+      bind:this={rootContainer}
+      class={[
+        "flex-1 space-y-1 overflow-y-auto px-2 py-2 transition-all",
+        isRootDropTarget && "bg-indigo-50 ring-2 ring-primary ring-inset",
+      ]}
     >
-    <button
-      onclick={async () => {
-        if (user === undefined) {
-          throw new Error("Cannot create folder whilst logged out.");
-        }
+      {#each notesTree as item, idx (item.id)}
+        <TreeItem
+          {item}
+          {expandedFolders}
+          {toggleFolder}
+          {handleContextMenu}
+          index={idx}
+          onReorder={handleRootReorder}
+          {notesList}
+          {notesTree}
+        />
+      {/each}
 
-        await handleCreateNote("New Folder", null, true, user.publicKey);
-      }}
-      class="btn"><FolderPlus /> Folder</button
-    >
-  </div>
-
-  <!-- Note Tree -->
-  <div
-    bind:this={rootContainer}
-    class={[
-      "flex-1 space-y-1 overflow-y-auto px-2 py-2 transition-all",
-      isRootDropTarget && "bg-indigo-50 ring-2 ring-primary ring-inset",
-    ]}
-  >
-    {#each notesTree as item, idx (item.id)}
-      <TreeItem
-        {item}
-        {expandedFolders}
-        {toggleFolder}
-        {handleContextMenu}
-        index={idx}
-        onReorder={handleRootReorder}
-        {notesList}
-        {notesTree}
-      />
-    {/each}
-
-    <!-- Empty state -->
-    {#if notesTree.length === 0}
-      <div class="flex flex-col items-center justify-center py-12 text-center">
-        <File />
-        <p class="text-sm text-base-content">No notes yet</p>
-        <p class="mt-1 text-xs text-base-content/75">
-          Create your first note to get started
-        </p>
-      </div>
-    {/if}
-  </div>
+      <!-- Empty state -->
+      {#if notesTree.length === 0}
+        <div
+          class="flex flex-col items-center justify-center py-12 text-center"
+        >
+          <File />
+          <p class="text-sm text-base-content">No notes yet</p>
+          <p class="mt-1 text-xs text-base-content/75">
+            Create your first note to get started
+          </p>
+        </div>
+      {/if}
+    </div>
+  {/if}
 </div>
 
 <!-- Context Menu -->

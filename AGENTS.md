@@ -183,39 +183,6 @@ Lints specified files and returns errors/warnings. Use this to validate your cod
 
 **Usage:** `mcp_eslint_lint-files` with an array of absolute file paths.
 
-### 4. Serena MCP Server (`mcp_oraios_serena_*`)
-
-Intelligent code navigation and symbolic editing:
-
-#### Code Exploration
-
-- `get_symbols_overview` - Get high-level view of symbols in a file (use this FIRST)
-- `find_symbol` - Find and read specific symbols by name path
-- `find_referencing_symbols` - Find where symbols are used
-- `search_for_pattern` - Flexible regex-based code search
-
-#### Code Editing
-
-- `replace_symbol_body` - Replace entire symbol body (methods, classes, etc.)
-- `insert_after_symbol` - Insert code after a symbol
-- `insert_before_symbol` - Insert code before a symbol
-- `rename_symbol` - Rename symbols throughout codebase
-
-#### Memory Management
-
-- `write_memory` - Save project information for future reference
-- `read_memory` - Retrieve saved project context
-- `edit_memory` - Update existing memories
-- `delete_memory` - Remove outdated memories
-
-#### Project Management
-
-- `activate_project` - Switch between registered projects
-- `get_current_config` - View current configuration
-
-> [!TIP]
-> Use symbolic tools to read only necessary code. Start with `get_symbols_overview` before reading full files.
-
 ### 5. Socket MCP Server (`mcp__extension_so_depscore`)
 
 Dependency security and quality scoring:
@@ -504,14 +471,14 @@ Since Svelte 5.25, you can reassign `$derived` values to temporarily override th
 When using SvelteKit remote functions, you can use `.updates()` with `.withOverride()` to optimistically update the cache of a query.
 
 ```typescript
-import { getPosts, createPost } from '$lib/remote/posts.remote';
+import { getPosts, createPost } from "$lib/remote/posts.remote";
 
 async function handleSubmit() {
-  const newPost = { id: 'temp', title: 'New Post' };
+  const newPost = { id: "temp", title: "New Post" };
 
   // Optimistically update the getPosts query cache
   await createPost(newPost).updates(
-    getPosts().withOverride((posts) => [newPost, ...posts])
+    getPosts().withOverride((posts) => [newPost, ...posts]),
   );
 }
 ```

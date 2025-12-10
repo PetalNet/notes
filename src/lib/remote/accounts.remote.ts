@@ -41,7 +41,7 @@ export const login = form(
     const session = await auth.createSession(sessionToken, existingUser.id);
     auth.setSessionTokenCookie(cookies, sessionToken, session.expiresAt);
 
-    return redirect(302, "/");
+    redirect(302, "/");
   },
 );
 

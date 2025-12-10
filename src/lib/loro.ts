@@ -4,6 +4,7 @@ import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
 import { LoroDoc, LoroText } from "loro-crdt";
 import { unawaited } from "./unawaited.ts";
+import { Temporal } from "temporal-polyfill";
 
 export type Doc = LoroDoc<{
   content: LoroText;
@@ -33,14 +34,17 @@ export class LoroNoteManager {
     this.#noteId = noteId;
     this.#noteKey = noteKey;
     this.doc = new LoroDoc();
+    this.doc.setRecordTimestamp(true);
     this.#text = LoroNoteManager.getTextFromDoc(this.doc);
     this.#onUpdate = onUpdate;
 
     // Subscribe to changes
     this.doc.subscribeLocalUpdates((update) => {
       console.debug(
-        "Loro document changed. Preview:",
+        "[Loro] Local update detected. Preview:",
         this.#text.toString().slice(0, 20),
+        "Update size:",
+        update.length,
       );
 
       // Persist changes
@@ -48,6 +52,7 @@ export class LoroNoteManager {
 
       // Send local changes immediately
       if (this.#isSyncing) {
+        console.debug("[Loro] Sending local update to server");
         unawaited(this.#sendUpdate(update));
       }
     });
@@ -99,10 +104,16 @@ export class LoroNoteManager {
     this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
 
     this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
+      console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
       try {
         const data = Schema.decodeSync(syncSchemaJson)(event.data);
         const updateBytes = Uint8Array.fromBase64(data.update);
+        console.debug(
+          "[Loro] Applying remote update, size:",
+          updateBytes.length,
+        );
         this.doc.import(updateBytes);
+        console.debug("[Loro] Remote update applied successfully");
       } catch (error) {
         console.error("Failed to process sync message:", error);
       }
@@ -139,4 +150,82 @@ export class LoroNoteManager {
     const encrypted = await encryptData(snapshot, this.#noteKey);
     return encrypted.toBase64();
   }
+
+  /**
+   * Get the current version/frontiers of the document
+   */
+  getVersion() {
+    return this.doc.version();
+  }
+
+  /**
+   * Get frontiers (latest version points) of the document
+   */
+  getFrontiers() {
+    return this.doc.frontiers();
+  }
+
+  /**
+   * Get the text content
+   */
+  getText(): string {
+    return this.#text.toString();
+  }
+
+  /**
+   * Get version history with user attribution
+   * Returns an array of version snapshots traversing the oplog
+   */
+  getHistory(): HistoryEntry[] {
+    const history: HistoryEntry[] = [];
+
+    // Get all changes from the oplog
+    const changes = this.doc.getAllChanges();
+    const currentText = this.#text.toString();
+
+    // Traverse all changes from all peers
+    for (const [peerId, peerChanges] of changes) {
+      for (const change of peerChanges) {
+        history.push({
+          version: change.lamport,
+          // Loro timestamps are in seconds, convert to milliseconds
+          timestamp: change.timestamp
+            ? Temporal.Instant.fromEpochMilliseconds(change.timestamp * 1000)
+            : Temporal.Instant.fromEpochMilliseconds(0),
+          preview: currentText.slice(0, 100),
+          peerId,
+        });
+      }
+    }
+
+    // Sort by lamport timestamp descending (most recent first)
+    history.sort((a, b) => b.version - a.version);
+
+    // If no changes found, return current state as fallback
+    if (history.length === 0) {
+      const currentVersion = this.doc.version();
+      history.push({
+        version: currentVersion.get(this.doc.peerId) ?? 0,
+        timestamp: Temporal.Now.instant(),
+        preview: currentText.slice(0, 100),
+        peerId: this.doc.peerId.toString(),
+      });
+    }
+
+    return history;
+  }
+
+  /**
+   * Subscribe to history changes (live updates)
+   */
+  subscribeToHistory(callback: () => void): () => void {
+    return this.doc.subscribe(callback);
+  }
+}
+
+export interface HistoryEntry {
+  version: number;
+  timestamp: Temporal.Instant;
+  preview: string;
+  peerId: string;
 }

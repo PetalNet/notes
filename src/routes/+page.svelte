@@ -1,10 +1,12 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { formatRelativeTime } from "$lib/utils/time.js";
+  import { Temporal } from "temporal-polyfill";
 
   let { data } = $props();
 </script>
 
-<div class="min-h-screen bg-base-100 p-8">
+<div class="h-full bg-base-100 p-8">
   <div class="mx-auto max-w-6xl">
     <h1 class="mb-8 text-4xl font-bold">Dashboard</h1>
 
@@ -31,9 +33,11 @@
                 {data.randomNote.title}
               </h3>
               <p class="text-sm text-base-content/60">
-                Last updated: {new Date(
-                  data.randomNote.updatedAt,
-                ).toLocaleDateString()}
+                Last updated: {formatRelativeTime(
+                  Temporal.Instant.fromEpochMilliseconds(
+                    data.randomNote.updatedAt.getTime(),
+                  ),
+                )}
               </p>
             </div>
             <div class="card-actions justify-end">
@@ -57,9 +61,9 @@
               </p>
             </div>
             <div class="card-actions justify-end">
-              <a href={resolve("/notes")} class="btn btn-accent"
-                >Create New Note</a
-              >
+              <p class="text-sm text-base-content/60">
+                Use the sidebar to create your first note
+              </p>
             </div>
           </div>
         </div>

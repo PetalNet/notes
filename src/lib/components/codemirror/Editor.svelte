@@ -106,34 +106,35 @@
     },
   });
 
-  let loroExtensions: Extension;
-  if (manager !== undefined && user !== undefined) {
-    const ephemeral = new EphemeralStore();
-    const undoManager = new UndoManager(manager.doc, {});
+  let loroExtensions = $state<Extension>([]);
 
-    onDestroy(() => {
-      ephemeral.destroy();
-    });
+  $effect.pre(() => {
+    if (manager !== undefined && user !== undefined) {
+      const ephemeral = new EphemeralStore();
+      const undoManager = new UndoManager(manager.doc, {});
 
-    loroExtensions = LoroExtensions(
-      manager.doc,
-      {
-        ephemeral,
-        user: { name: user.username, colorClassName: "bg-primary" },
-      },
-      undoManager,
-      LoroNoteManager.getTextFromDoc,
-    );
-  } else {
-    loroExtensions = [];
-  }
+      onDestroy(() => {
+        ephemeral.destroy();
+      });
 
-  const extensions: Extension[] = [
+      loroExtensions = LoroExtensions(
+        manager.doc,
+        {
+          ephemeral,
+          user: { name: user.username, colorClassName: "bg-primary" },
+        },
+        undoManager,
+        LoroNoteManager.getTextFromDoc,
+      );
+    }
+  });
+
+  const extensions: Extension[] = $derived([
     coreExtensions,
     wikilinksExtension(notesList),
     loroExtensions,
     editorTheme,
-  ];
+  ]);
 
   const tools = [
     {
@@ -228,9 +229,5 @@
 
   <Codemirror bind:editorView {extensions} class="flex-1 overflow-y-auto" />
 
-  <HistoryPanel
-    {manager}
-    isOpen={isHistoryOpen}
-    onClose={() => (isHistoryOpen = false)}
-  />
+  <HistoryPanel {manager} bind:isOpen={isHistoryOpen} />
 </div>

@@ -19,7 +19,6 @@
   } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
-  import { logout } from "$lib/remote/accounts.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
   import {
     createNote,
@@ -207,9 +206,32 @@
     // Encrypt note key with user's public key
     const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
 
+    // Encrypt note key for Server (Broker Escrow)
+    let serverEncryptedKey = "";
+    try {
+      const res = await fetch(`${base}/api/server-identity`);
+      if (res.ok) {
+        const identity = await res.json();
+        // Use the dedicated Encryption Key (X25519)
+        if (identity.encryptionPublicKey) {
+          serverEncryptedKey = await encryptKeyForUser(
+            noteKey,
+            identity.encryptionPublicKey,
+          );
+        } else {
+          console.warn(
+            "Server identity missing encryption key. Auto-join will not work.",
+          );
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch server identity for key escrow:", e);
+    }
+
     const newNote = await createNote({
       title,
       encryptedKey,
+      serverEncryptedKey,
       parentId,
       isFolder,
     }).updates(
@@ -221,6 +243,67 @@
       goto(`${base}/notes/${newNote.id}`);
     }
   }
+
+  // Silent Migration: Escrow keys for legacy notes
+  $effect(() => {
+    if (!user || !user.privateKeyEncrypted || !user.publicKey) return;
+
+    unawaited(
+      (async () => {
+        // Find notes that need migration (owned by us, missing serverEncryptedKey)
+        const notesToMigrate = notesList.filter(
+          (n) =>
+            n.ownerId === user.id && !n.serverEncryptedKey && n.encryptedKey,
+        );
+
+        if (notesToMigrate.length === 0) return;
+
+        console.log(
+          `[Escrow] Found ${notesToMigrate.length} notes needing key escrow migration.`,
+        );
+
+        // Fetch Server Identity Key
+        let serverIdentityKey = "";
+        try {
+          const res = await fetch(`${base}/api/server-identity`);
+          if (res.ok) {
+            const identity = await res.json();
+            serverIdentityKey = identity.encryptionPublicKey;
+          }
+        } catch {
+          /* ignore */
+        }
+
+        if (!serverIdentityKey) return;
+
+        const { decryptKey } = await import("$lib/crypto");
+
+        for (const note of notesToMigrate) {
+          try {
+            // 1. Decrypt Note Key
+            const noteKey = await decryptKey(
+              note.encryptedKey,
+              user.privateKeyEncrypted,
+            );
+            // 2. Encrypt for Server
+            const serverEncryptedKey = await encryptKeyForUser(
+              noteKey,
+              serverIdentityKey,
+            );
+            // 3. Upload (using a unified update endpoint? notes.remote doesn't have one for keys yet)
+            // We need to extend updateNote to support serverEncryptedKey.
+            // For now, let's assume we update the schema first.
+            await updateNote({ noteId: note.id, serverEncryptedKey }).updates(
+              getNotes(),
+            );
+            console.log(`[Escrow] Migrated note ${note.id}`);
+          } catch (e) {
+            console.error(`[Escrow] Failed to migrate note ${note.id}`, e);
+          }
+        }
+      })(),
+    );
+  });
 
   $effect(() => {
     if (renamingId && !renameModal.open) {
@@ -259,7 +342,7 @@
           class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
         >
           <li>
-            <form {...logout} class="w-full">
+            <form action="/logout" method="POST" class="w-full">
               <button type="submit" class="flex w-full items-center gap-2">
                 <LogOut size={16} />
                 Log out
@@ -286,7 +369,13 @@
             throw new Error("Cannot create note whilst logged out.");
           }
 
-          await handleCreateNote("Untitled Note", null, false, user.publicKey);
+          // Use empty string as fallback for publicKey if null (though it should be set)
+          await handleCreateNote(
+            "Untitled Note",
+            null,
+            false,
+            user.publicKey || "",
+          );
         }}
         class="btn"><FilePlus /> Note</button
       >
@@ -296,7 +385,12 @@
             throw new Error("Cannot create folder whilst logged out.");
           }
 
-          await handleCreateNote("New Folder", null, true, user.publicKey);
+          await handleCreateNote(
+            "New Folder",
+            null,
+            true,
+            user.publicKey || "",
+          );
         }}
         class="btn"><FolderPlus /> Folder</button
       >
@@ -399,7 +493,7 @@
               "An Untitled Note",
               clickedId,
               false,
-              user.publicKey,
+              user.publicKey || "",
             ),
           );
           closeContextMenu();

@@ -12,7 +12,7 @@ export const users = sqliteTable("users", {
   handle: text("handle").unique(), // Federated handle, e.g. "alice"
   passwordHash: text("password_hash").notNull(),
   publicKey: text("public_key"), // Ed25519 public key
-  privateKeyEncrypted: text("private_key_encrypted").notNull(), // Existing field, maybe reuse or deprecate
+  privateKeyEncrypted: text("private_key_encrypted").notNull(), // Existing field, encrypted with password
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -46,6 +46,8 @@ export const documents = sqliteTable("documents", {
   title: text("title"),
   accessLevel: text("access_level").notNull().default("private"),
   documentKeyEncrypted: text("document_key_encrypted"),
+  serverEncryptedKey: text("server_encrypted_key"), // Encrypted for the Home Server (Key Broker)
+  passwordEncryptedKey: text("password_encrypted_key"), // Encrypted with Note Password (for password-protected access)
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -152,12 +154,40 @@ export const notesRelations = relations(notes, ({ one, many }) => ({
     references: [users.id],
   }),
   shares: many(noteShares),
+  document: one(documents, {
+    fields: [notes.id],
+    references: [documents.id],
+  }),
 }));
 
 export const noteSharesRelations = relations(noteShares, ({ one }) => ({
   note: one(notes, {
     fields: [noteShares.id], // typo in schema? id is PK. noteId is FK.
     references: [notes.id],
+  }),
+}));
+
+export const joinRequests = sqliteTable("join_requests", {
+  id: text("id").primaryKey(), // UUID
+  docId: text("doc_id")
+    .notNull()
+    .references(() => documents.id),
+  userId: text("user_id").notNull(), // The user requesting access
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  publicKey: text("public_key").notNull(), // The requester's public key (to lock the note key against)
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export const joinRequestsRelations = relations(joinRequests, ({ one }) => ({
+  document: one(documents, {
+    fields: [joinRequests.docId],
+    references: [documents.id],
+  }),
+  user: one(users, {
+    fields: [joinRequests.userId],
+    references: [users.id],
   }),
 }));
 
@@ -169,3 +199,4 @@ export type Member = typeof members.$inferSelect;
 export type FederatedOp = typeof federatedOps.$inferSelect;
 export type Note = typeof notes.$inferSelect;
 export type NoteShare = typeof noteShares.$inferSelect;
+export type JoinRequest = typeof joinRequests.$inferSelect;

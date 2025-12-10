@@ -15,6 +15,7 @@
     version: number;
     timestamp: Date;
     preview: string;
+    author?: string;
   }
 
   let history = $state<HistoryEntry[]>([]);
@@ -118,7 +119,7 @@
                     <div
                       class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-content"
                     >
-                      {entry.author[0].toUpperCase()}
+                      {(entry.author ?? "?").charAt(0).toUpperCase()}
                     </div>
                     <span class="text-sm font-medium">{entry.author}</span>
                   {:else}
@@ -159,7 +160,7 @@
     {#if selectedVersion !== null && selectedVersion !== history[0]?.version}
       <div class="border-t border-base-content/10 p-4">
         <button
-          onclick={() => restoreVersion(selectedVersion)}
+          onclick={() => restoreVersion(selectedVersion as number)}
           class="btn w-full btn-primary"
         >
           <RotateCcw class="h-4 w-4" />

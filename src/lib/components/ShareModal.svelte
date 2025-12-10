@@ -9,16 +9,27 @@
     Check,
   } from "@lucide/svelte";
 
+  import { decryptKey, encryptWithPassword } from "$lib/crypto";
+
+  // ...
+
   interface Props {
     isOpen: boolean;
     noteId: string;
     noteTitle: string;
+    noteEncryptedKey?: string | undefined;
     onClose: () => void;
   }
 
-  let { isOpen, noteId, noteTitle, onClose }: Props = $props();
+  let { isOpen, noteId, noteTitle, noteEncryptedKey, onClose }: Props =
+    $props();
 
-  type AccessLevel = "private" | "invite_only" | "authenticated" | "open";
+  type AccessLevel =
+    | "private"
+    | "invite_only"
+    | "authenticated"
+    | "open"
+    | "password_protected";
 
   let accessLevel = $state<AccessLevel>("private");
   let invitedUsers = $state<string[]>([]);
@@ -28,6 +39,7 @@
   let error = $state<string | null>(null);
   let success = $state(false);
   let copied = $state(false);
+  let sharePassword = $state("");
 
   // Load existing settings when modal opens
   $effect(() => {
@@ -75,12 +87,56 @@
     success = false;
 
     try {
+      let passwordEncryptedKey: string | undefined;
+
+      if (accessLevel === "password_protected") {
+        if (!sharePassword) {
+          throw new Error("Password is required.");
+        }
+
+        // 1. Get Owner Key
+        const ownerPrivateKey = sessionStorage.getItem("notes_raw_private_key");
+        if (!ownerPrivateKey) {
+          throw new Error(
+            "Vault is locked (Private Key unavailable). Cannot set password protection.",
+          );
+        }
+
+        if (!noteEncryptedKey) {
+          throw new Error(
+            "Note Key not found. Cannot set password protection.",
+          );
+        }
+
+        // 2. Decrypt Note Key
+        // Note: If noteEncryptedKey is already "raw" (<=44 chars), we use it directly.
+        // Otherwise we decrypt it.
+        let rawNoteKey = noteEncryptedKey;
+        if (noteEncryptedKey.length > 44) {
+          try {
+            rawNoteKey = await decryptKey(noteEncryptedKey, ownerPrivateKey);
+          } catch (e) {
+            console.error("Failed to decrypt note key for re-encryption:", e);
+            throw new Error(
+              "Failed to decrypt note key. Verify your vault is unlocked.",
+            );
+          }
+        }
+
+        // 3. Encrypt for new Password
+        passwordEncryptedKey = await encryptWithPassword(
+          rawNoteKey,
+          sharePassword,
+        );
+      }
+
       const res = await fetch(`/api/notes/${noteId}/share`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accessLevel,
           invitedUsers: accessLevel === "invite_only" ? invitedUsers : [],
+          passwordEncryptedKey,
         }),
       });
 
@@ -89,10 +145,18 @@
         throw new Error(text || "Failed to save settings");
       }
 
-      success = true;
-      setTimeout(() => {
-        onClose();
-      }, 500);
+      const data = await res.json();
+
+      if (data.failedInvites && data.failedInvites.length > 0) {
+        error = `Saved, but failed to invite: ${data.failedInvites.join(", ")}`;
+        // Don't close automatically so user sees the error
+        success = false;
+      } else {
+        success = true;
+        setTimeout(() => {
+          onClose();
+        }, 500);
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to save";
     } finally {
@@ -218,7 +282,46 @@
               </div>
             </div>
           </label>
+
+          <label
+            class="flex cursor-pointer items-center gap-3 rounded-lg border border-base-300 p-3 hover:bg-base-200"
+          >
+            <input
+              type="radio"
+              name="access"
+              value="password_protected"
+              bind:group={accessLevel}
+              class="radio radio-primary"
+            />
+            <Lock class="h-4 w-4" />
+            <div class="flex-1">
+              <div class="font-medium">Password Protected</div>
+              <div class="text-sm text-base-content/60">
+                Requires a password to access
+              </div>
+            </div>
+          </label>
         </div>
+
+        <!-- Password Input (only shown for password_protected) -->
+        {#if accessLevel === "password_protected"}
+          <div class="space-y-2 rounded bg-base-200 p-3">
+            <label class="label">
+              <span class="label-text font-medium">Set Password</span>
+            </label>
+            <input
+              type="password"
+              bind:value={sharePassword}
+              placeholder="Enter password..."
+              class="input-bordered input w-full"
+            />
+            <p class="text-xs text-base-content/60">
+              Note: Because we use End-to-End Encryption, if you lose this
+              password, nobody (including the server) can recover the access for
+              others.
+            </p>
+          </div>
+        {/if}
 
         <!-- Invite Users (only shown for invite_only) -->
         {#if accessLevel === "invite_only"}
@@ -228,7 +331,9 @@
             </label>
 
             <div class="flex gap-2">
+              <label class="sr-only" for="invite-user-input">User Handle</label>
               <input
+                id="invite-user-input"
                 type="text"
                 bind:value={inviteInput}
                 placeholder="@user:server.com"
@@ -267,7 +372,9 @@
               <span class="label-text font-medium">Share Link</span>
             </label>
             <div class="flex gap-2">
+              <label class="sr-only" for="share-url">Share Link URL</label>
               <input
+                id="share-url"
                 type="text"
                 readonly
                 value={getShareUrl()}
@@ -277,6 +384,7 @@
                 onclick={copyShareUrl}
                 class="btn btn-primary"
                 disabled={copied}
+                aria-label="Copy share link"
               >
                 {#if copied}
                   <Check class="h-4 w-4" /> Copied!

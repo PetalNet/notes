@@ -188,8 +188,6 @@
       </div>
     </div>
   </div>
-</dialog>
-  </div>
 {/if}
 
 <ConfirmationModal

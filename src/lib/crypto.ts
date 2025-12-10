@@ -174,10 +174,58 @@ export function decryptData(
   return chacha.decrypt(ciphertext);
 }
 
-// ----------------------------------------------------------------------------
-// Aliases for Client Compatibility
-// ----------------------------------------------------------------------------
-
 export const encryptKeyForUser = encryptKeyForDevice;
 export const decryptKey = decryptKeyForDevice;
 export const generateUserKeys = generateEncryptionKeyPair;
+
+// ----------------------------------------------------------------------------
+// Password Encryption (PBKDF2 + XChaCha20Poly1305)
+// ----------------------------------------------------------------------------
+
+import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
+
+export async function encryptWithPassword(
+  dataBase64: string,
+  password: string,
+): Promise<string> {
+  const data = decodeBase64(dataBase64);
+  const salt = getRandomBytes(16);
+  // Derive key from password
+  const kek = pbkdf2(sha256, password, salt, { c: 600000, dkLen: 32 });
+
+  // Encrypt
+  const nonce = getRandomBytes(24);
+  const chacha = xchacha20poly1305(kek, nonce);
+  const ciphertext = chacha.encrypt(data);
+
+  // Pack: salt(16) + nonce(24) + ciphertext
+  const result = new Uint8Array(16 + 24 + ciphertext.length);
+  result.set(salt, 0);
+  result.set(nonce, 16);
+  result.set(ciphertext, 40);
+
+  return encodeBase64(result);
+}
+
+export async function decryptWithPassword(
+  encryptedBase64: string,
+  password: string,
+): Promise<string> {
+  const encrypted = decodeBase64(encryptedBase64);
+
+  if (encrypted.length < 40) throw new Error("Encrypted data too short");
+
+  const salt = encrypted.slice(0, 16);
+  const nonce = encrypted.slice(16, 40);
+  const ciphertext = encrypted.slice(40);
+
+  const kek = pbkdf2(sha256, password, salt, { c: 600000, dkLen: 32 });
+  const chacha = xchacha20poly1305(kek, nonce);
+
+  try {
+    const data = chacha.decrypt(ciphertext);
+    return encodeBase64(data);
+  } catch (e) {
+    throw new Error("Incorrect password or corrupted data");
+  }
+}

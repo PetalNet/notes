@@ -267,6 +267,7 @@
   <ShareModal
     {noteId}
     {noteTitle}
+    noteEncryptedKey={notesList?.find((n) => n.id === noteId)?.encryptedKey}
     isOpen={isShareOpen}
     onClose={() => (isShareOpen = false)}
   />

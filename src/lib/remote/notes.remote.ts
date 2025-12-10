@@ -2,7 +2,12 @@ import { command, query } from "$app/server";
 import type { NoteOrFolder } from "$lib/schema.ts";
 import { requireLogin } from "$lib/server/auth.ts";
 import { db } from "$lib/server/db/index.ts";
-import { notes, documents, members } from "$lib/server/db/schema.ts";
+import {
+  notes,
+  documents,
+  members,
+  noteShares,
+} from "$lib/server/db/schema.ts";
 import { error } from "@sveltejs/kit";
 import { and, eq, ne } from "drizzle-orm";
 import { env } from "$env/dynamic/private";
@@ -20,6 +25,9 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   // 1. Get owned notes from 'notes' table
   const userNotes = await db.query.notes.findMany({
     where: (notes) => eq(notes.ownerId, user.id),
+    with: {
+      document: true,
+    },
   });
 
   const notesList: NoteOrFolder[] = userNotes.map(
@@ -30,6 +38,7 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
         order: n.order,
         createdAt: new Date(n.createdAt),
         updatedAt: new Date(n.updatedAt),
+        serverEncryptedKey: n.document?.serverEncryptedKey || null,
       }) satisfies NoteOrFolder,
   );
 
@@ -58,35 +67,6 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
     // We get encryptedKey from the member envelope
     if (m.encryptedKeyEnvelope) {
       let documentKey = m.encryptedKeyEnvelope;
-
-      // If it's a shared note, the key in the envelope is encrypted for this user.
-      // We must decrypt it so the client (Loro) gets the raw key (32 bytes).
-      if (m.encryptedKeyEnvelope.length > 44) {
-        // Basic check: 32 bytes base64 is ~44 chars. Envelope is much larger.
-        try {
-          const { decryptKey } = await import("$lib/crypto");
-          // Note: user.privateKeyEncrypted is used here.
-          if (user.privateKeyEncrypted) {
-            documentKey = decryptKey(
-              m.encryptedKeyEnvelope,
-              user.privateKeyEncrypted,
-            );
-          } else {
-            console.error(
-              `[getNotes] User ${user.id} has no private key to decrypt note ${m.document.id}`,
-            );
-            continue; // Cannot access note without key
-          }
-        } catch (e) {
-          console.error(
-            `[getNotes] Failed to decrypt key for note ${m.document.id}:`,
-            e,
-          );
-          continue; // Skip notes we can't decrypt
-        }
-      } else {
-        // Key is already short, assuming raw key.
-      }
 
       notesList.push({
         id: m.document.id,
@@ -139,6 +119,7 @@ export const createNote = command(
   async ({
     title,
     encryptedKey,
+    serverEncryptedKey,
     parentId,
     isFolder,
   }): Promise<Omit<NoteOrFolder, "content">> => {
@@ -149,7 +130,7 @@ export const createNote = command(
         error(400, "Missing required fields");
       }
 
-      const serverDomain = env.SERVER_DOMAIN || "localhost:5173";
+      const serverDomain = env["SERVER_DOMAIN"] || "localhost:5173";
       const id = createNoteId(serverDomain);
 
       // Dual-write to documents table to support federatedOps
@@ -160,6 +141,7 @@ export const createNote = command(
         title: title,
         accessLevel: "private", // Default
         documentKeyEncrypted: null, // Local notes use encryptedKey in notes table for now? Or should we populate this?
+        serverEncryptedKey, // Key Broker Escrow
         // Ideally we migrate to using documents entirely, but for now dual-write.
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -205,9 +187,22 @@ export const deleteNote = command(
 
       if (!note || note.ownerId !== user.id) error(404, "Not found");
 
+      // Cascading delete
+      // 1. Delete shares (depend on notes)
+      await db.delete(noteShares).where(eq(noteShares.noteId, noteId));
+
+      // 2. Delete members (depend on documents)
+      await db.delete(members).where(eq(members.docId, noteId));
+
+      // 3. Delete note (the main target)
       await db.delete(notes).where(eq(notes.id, noteId));
+
+      // 4. Delete document entry (if exists, depends on nothing else usually, but members depend on it)
+      // We do this last or after members
+      await db.delete(documents).where(eq(documents.id, noteId));
     } catch (err) {
       console.error("Delete note error:", err);
+      // Don't expose internal DB errors, but useful to know if FK failed
       error(500, "Failed to delete note");
     }
   },
@@ -220,6 +215,7 @@ export const updateNote = command(
     title,
     loroSnapshot,
     parentId,
+    serverEncryptedKey,
   }): Promise<Omit<NoteOrFolder, "content">> => {
     const { user } = requireLogin();
 
@@ -227,6 +223,7 @@ export const updateNote = command(
       // Verify ownership
       const existingNote = await db.query.notes.findFirst({
         where: eq(notes.id, noteId),
+        with: { document: true },
       });
 
       if (!existingNote || existingNote.ownerId !== user.id) {
@@ -243,6 +240,14 @@ export const updateNote = command(
           updatedAt: new Date(),
         })
         .where(eq(notes.id, noteId));
+
+      // Update serverEncryptedKey in documents table if provided
+      if (serverEncryptedKey) {
+        await db
+          .update(documents)
+          .set({ serverEncryptedKey, updatedAt: new Date() })
+          .where(eq(documents.id, noteId));
+      }
 
       const updated = await db.query.notes.findFirst({
         where: eq(notes.id, noteId),

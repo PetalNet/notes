@@ -67,6 +67,7 @@
     // Try to fit groups by priority
     for (let i = 0; i < sortedGroups.length; i++) {
       const group = sortedGroups[i];
+      if (!group) continue;
       const groupWidth = group.tools.length * buttonWidth + groupSpacing;
 
       // Reserve space for dropdown if there are remaining groups

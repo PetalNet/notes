@@ -5,6 +5,7 @@ export const CreateNoteSchema = Schema.Struct({
   parentId: Schema.String.pipe(Schema.NullOr),
   isFolder: Schema.Boolean,
   encryptedKey: Schema.String,
+  serverEncryptedKey: Schema.String,
 });
 export const createNoteSchema = CreateNoteSchema.pipe(Schema.standardSchemaV1);
 
@@ -16,6 +17,7 @@ export const UpdateNoteSchema = Schema.Struct({
   title: Schema.optional(Schema.String),
   loroSnapshot: Schema.optional(Schema.String),
   parentId: Schema.optional(Schema.String.pipe(Schema.NullOr)),
+  serverEncryptedKey: Schema.optional(Schema.String),
 });
 export const updateNoteSchema = UpdateNoteSchema.pipe(Schema.standardSchemaV1);
 

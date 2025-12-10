@@ -37,7 +37,22 @@
           </div>
 
           <div class="form-control mt-6">
-            <button type="submit" class="btn btn-primary">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              disabled={login.pending !== 0}
+              onclick={(e) => {
+                // Cache password for the layout to use for decryption
+                const form = e.currentTarget.form;
+                if (!form) return;
+                const password = (
+                  form.elements.namedItem("_password") as HTMLInputElement
+                )?.value;
+                if (password) {
+                  sessionStorage.setItem("notes_temp_password", password);
+                }
+              }}
+            >
               {login.pending !== 0 ? "Logging in..." : "Log In"}
             </button>
           </div>

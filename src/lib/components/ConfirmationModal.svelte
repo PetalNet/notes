@@ -34,10 +34,14 @@
 
 {#if isOpen}
   <div
-    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4"
+    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 focus:outline-none"
     role="dialog"
     aria-modal="true"
+    tabindex="-1"
     onclick={handleBackdropClick}
+    onkeydown={(e) => {
+      if (e.key === "Escape") onCancel();
+    }}
   >
     <div
       class="w-full max-w-sm overflow-hidden rounded-lg bg-base-100 shadow-xl"

@@ -23,11 +23,11 @@
   let notesList = $state<NoteOrFolder[]>([]);
   let isLoadingNotes = $state(true);
   let id = $derived(page.params.id);
-  const userPrivateKey = data.user?.privateKeyEncrypted;
 
   let loroManager = $derived(
     id !== undefined ? loroManagers.get(id) : undefined,
   );
+
   // TODO: Use codemirror-server-render to SSR the editor
   let editorContent = $state("");
 
@@ -61,6 +61,12 @@
   let joinError = $state<string | null>(null);
   let redirectError = $state<string | null>(null);
 
+  // Password Protection State
+  let showPasswordPrompt = $state(false);
+  let passwordInput = $state("");
+  let passwordEncryptedBlob = $state<string | null>(null);
+  let passwordError = $state<string | null>(null);
+
   // Auto-join foreign notes when authenticated
   $effect(() => {
     if (
@@ -70,7 +76,8 @@
       !note &&
       data.originServer &&
       !joinedNotes.has(id) &&
-      !isJoining
+      !isJoining &&
+      !showPasswordPrompt // Don't auto-join if we are prompting for password
     ) {
       // This is a foreign note we haven't joined yet
       console.log(`Auto-joining foreign note from ${data.originServer}`);
@@ -80,10 +87,29 @@
 
       unawaited(
         joinFederatedNote({ noteId: id, originServer: data.originServer })
-          .then(async () => {
+          .then(async (res) => {
+            if (
+              res &&
+              res.status === "needs_password" &&
+              res.passwordEncryptedKey
+            ) {
+              console.log("Note requires password.");
+              passwordEncryptedBlob = res.passwordEncryptedKey;
+              showPasswordPrompt = true;
+              isJoining = false;
+              // Don't mark as joined yet
+              joinedNotes.delete(id);
+              return;
+            }
+
             console.log("Successfully joined federated note");
             isJoining = false;
-            // Invalidate data to reload notes list without full page refresh
+
+            // Force refresh notes list to include the new note
+            const updatedNotes = await getNotes();
+            notesList = updatedNotes;
+
+            // Invalidate data to reload everything else
             await invalidateAll();
           })
           .catch((err) => {
@@ -97,9 +123,65 @@
     }
   });
 
+  async function handlePasswordSubmit() {
+    if (
+      !passwordInput ||
+      !passwordEncryptedBlob ||
+      !data.user ||
+      !data.user.publicKey ||
+      !data.originServer
+    )
+      return;
+
+    passwordError = null;
+    isJoining = true;
+
+    try {
+      // 1. Decrypt the blob using the password
+      const { decryptWithPassword, encryptKeyForUser } =
+        await import("$lib/crypto");
+      let rawKey = "";
+      try {
+        rawKey = await decryptWithPassword(
+          passwordEncryptedBlob,
+          passwordInput,
+        );
+      } catch (e) {
+        console.error("Password decryption failed:", e);
+        passwordError = "Incorrect password";
+        isJoining = false;
+        return;
+      }
+
+      // 2. Encrypt for myself
+      const preComputedKey = await encryptKeyForUser(
+        rawKey,
+        data.user.publicKey,
+      );
+
+      // 3. Complete Join
+      await joinFederatedNote({
+        noteId: id!,
+        originServer: data.originServer,
+        preComputedKey,
+      });
+
+      // Success!
+      showPasswordPrompt = false;
+      const updatedNotes = await getNotes();
+      notesList = updatedNotes;
+      invalidateAll();
+    } catch (e) {
+      console.error("Failed to complete password join:", e);
+      passwordError = "Failed to unlock note. Please try again.";
+    } finally {
+      isJoining = false;
+    }
+  }
+
   // Initialize Loro manager for the current note
   $effect(() => {
-    if (!id || !note || !userPrivateKey || !data.user) return;
+    if (!id || !note || !data.user) return;
 
     if (!loroManagers.has(id)) {
       console.log(`Initializing Loro manager for ${id}`);
@@ -110,7 +192,16 @@
             // If it's short (raw key), use it directly.
             let noteKey = note.encryptedKey;
             if (note.encryptedKey.length > 60) {
-              noteKey = await decryptKey(note.encryptedKey, userPrivateKey);
+              const rawPrivKey = sessionStorage.getItem(
+                "notes_raw_private_key",
+              );
+              if (!rawPrivKey) {
+                console.warn(
+                  "No raw private key found, cannot decrypt note key",
+                );
+                return;
+              }
+              noteKey = await decryptKey(note.encryptedKey, rawPrivKey);
             }
 
             // Create manager
@@ -121,7 +212,8 @@
                 // onUpdate: save snapshot (optional, mostly for backup since Ops are source of truth)
                 // But we do update 'updatedAt' and maybe 'loroSnapshot' column?
                 // The updateNote command handles updating the snapshot column.
-                if (note.ownerId === data.user.id) {
+                // Re-check data.user here as it might have changed or TS doesn't know
+                if (data.user && note.ownerId === data.user.id) {
                   await updateNote({ noteId: id, loroSnapshot: snapshot });
                 } else {
                   // Federated/Shared notes: We don't save snapshots to 'notes' table (as we don't own it).
@@ -204,10 +296,10 @@
 
 <div class="relative h-full flex-1 overflow-hidden">
   {#if note}
-    {#if !note?.isFolder}
+    {#if note && !note.isFolder && data.user}
       <Editor
-        noteId={id}
-        noteTitle={note.title}
+        noteId={id ?? ""}
+        noteTitle={(note.title || "Untitled") as string}
         manager={loroManager}
         {notesList}
         user={data.user}
@@ -268,6 +360,45 @@
             class="btn btn-primary"
             onclick={() => window.location.reload()}>Retry</button
           >
+        </div>
+      {:else if showPasswordPrompt}
+        <div class="max-w-md rounded-lg bg-base-100 p-8 text-center shadow-xl">
+          <h3 class="mb-4 text-xl font-bold">Password Protected Note</h3>
+          <p class="mb-4 text-sm text-base-content/70">
+            This note requires a password to access.
+          </p>
+
+          {#if passwordError}
+            <div class="mb-4 alert text-sm alert-error">{passwordError}</div>
+          {/if}
+
+          <input
+            type="password"
+            placeholder="Enter Password"
+            class="input-bordered input mb-4 w-full"
+            bind:value={passwordInput}
+            onkeydown={(e) => e.key === "Enter" && handlePasswordSubmit()}
+          />
+
+          <div class="flex justify-end gap-2">
+            <button
+              class="btn btn-ghost"
+              onclick={() => {
+                showPasswordPrompt = false;
+                window.location.href = "/";
+              }}>Cancel</button
+            >
+            <button
+              class="btn btn-primary"
+              onclick={handlePasswordSubmit}
+              disabled={isJoining}
+            >
+              {#if isJoining}
+                <span class="loading loading-xs loading-spinner"></span>
+              {/if}
+              Unlock
+            </button>
+          </div>
         </div>
       {:else if !data.user}
         <div class="max-w-md p-8 text-center">

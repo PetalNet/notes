@@ -4,6 +4,7 @@ import { notes, noteShares, members, documents } from "$lib/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireLogin } from "$lib/server/auth";
 import { env } from "$env/dynamic/private";
+import { decryptKeyForDevice } from "$lib/crypto";
 import {
   fetchUserIdentity,
   encryptDocumentKeyForUser,
@@ -17,8 +18,14 @@ import {
  */
 
 export interface ShareSettings {
-  accessLevel: "private" | "invite_only" | "authenticated" | "open";
+  accessLevel:
+    | "private"
+    | "invite_only"
+    | "authenticated"
+    | "open"
+    | "password_protected";
   invitedUsers?: string[]; // Federated handles like @user:domain.com
+  passwordEncryptedKey?: string; // Encrypted with the password
 }
 
 // GET current share settings
@@ -46,6 +53,7 @@ export async function GET({ params, locals }) {
   return json({
     accessLevel: note.accessLevel || "private",
     invitedUsers: shares.map((s) => s.sharedWithUser),
+    // We do NOT return the passwordEncryptedKey to the owner here, they don't need it (they have the original key)
   });
 }
 
@@ -55,11 +63,18 @@ export async function POST({ params, request, locals }) {
   const { id: noteId } = params;
 
   const body = await request.json();
-  const { accessLevel, invitedUsers } = body as ShareSettings;
+  const { accessLevel, invitedUsers, passwordEncryptedKey } =
+    body as ShareSettings;
 
   // Validate access level
   if (
-    !["private", "invite_only", "authenticated", "open"].includes(accessLevel)
+    ![
+      "private",
+      "invite_only",
+      "authenticated",
+      "open",
+      "password_protected",
+    ].includes(accessLevel)
   ) {
     throw error(400, "Invalid access level");
   }
@@ -110,22 +125,29 @@ export async function POST({ params, request, locals }) {
 
       // Try to fetch user's public key and encrypt document key
       try {
+        console.log(`[SHARE] Fetching identity for ${userHandle}...`);
         const identity = await fetchUserIdentity(userHandle, serverDomain);
+
         if (identity) {
+          console.log(
+            `[SHARE] Found identity for ${userHandle}:`,
+            identity.handle,
+          );
           const encrypted = encryptDocumentKeyForUser(
             encryptedDocKey,
             identity,
           );
+
           if (encrypted) {
             encryptedKey = encrypted;
-            successfulInvites.push(userHandle);
+            successfulInvites.push(identity.handle); // Use canonical handle
 
             // Also add to members table for federation
             await db
               .insert(members)
               .values({
                 docId: noteId,
-                userId: identity.handle || userHandle,
+                userId: identity.handle, // Canonical handle
                 deviceId: "primary",
                 role: "writer",
                 encryptedKeyEnvelope: encryptedKey,
@@ -133,14 +155,19 @@ export async function POST({ params, request, locals }) {
               })
               .onConflictDoNothing();
           } else {
+            console.error(`[SHARE] Failed to encrypt key for ${userHandle}`);
             failedInvites.push(userHandle);
           }
         } else {
           // User not found - still add share, key will be generated on join
+          console.warn(`[SHARE] User not found: ${userHandle}`);
           failedInvites.push(userHandle);
         }
       } catch (err) {
-        console.error(`Failed to encrypt key for ${userHandle}:`, err);
+        console.error(
+          `[SHARE] Error processing invite for ${userHandle}:`,
+          err,
+        );
         failedInvites.push(userHandle);
       }
 
@@ -170,6 +197,8 @@ export async function POST({ params, request, locals }) {
       .update(documents)
       .set({
         accessLevel,
+        // Only update if provided (don't overwrite with undefined)
+        ...(passwordEncryptedKey ? { passwordEncryptedKey } : {}),
         updatedAt: new Date(),
       })
       .where(eq(documents.id, noteId));

@@ -4,7 +4,7 @@ import { env } from "$env/dynamic/private";
 
 export const load: PageServerLoad = async ({ params, locals }) => {
   const { id } = params;
-  const currentDomain = env.SERVER_DOMAIN || "localhost:5173";
+  const currentDomain = env["SERVER_DOMAIN"] || "localhost:5173";
 
   // Parse note ID to check origin
   const { origin, uuid } = parseNoteId(id);

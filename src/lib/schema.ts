@@ -12,6 +12,7 @@ const NoteBaseSchema = Schema.Struct({
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   accessLevel: Schema.optional(Schema.String),
+  serverEncryptedKey: Schema.optional(Schema.NullOr(Schema.String)),
 });
 
 export const NoteSchema = Schema.extend(
@@ -38,6 +39,6 @@ export type NoteOrFolder = Note | Folder;
 export interface User {
   id: string;
   username: string;
-  publicKey: string;
+  publicKey: string | null;
   privateKeyEncrypted: string;
 }

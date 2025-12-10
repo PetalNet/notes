@@ -63,53 +63,21 @@ export async function POST({ params, request }) {
   console.log("  remoteServer verified:", remoteServer?.domain);
 
   // 1. Check if doc exists
-  // The doc_id may be a full portable ID (e.g., bG9jYWxob3N0OjUxNzM~uuid) or just a UUID
-  // Try the full ID first, then try to parse and use UUID as fallback
-
-  // First try with the raw doc_id from params
+  // The doc_id MUST be a full portable ID (e.g., bG9jYWxob3N0OjUxNzM~uuid)
   console.log("  Searching for doc_id:", doc_id);
-  let doc = await db.query.documents.findFirst({
-    where: eq(documents.id, doc_id),
-  });
-  console.log("  documents.findFirst(doc_id):", doc?.id || "NOT FOUND");
-
-  let note = await db.query.notes.findFirst({
-    where: eq(notes.id, doc_id),
-  });
-  console.log("  notes.findFirst(doc_id):", note?.id || "NOT FOUND");
 
   // Try with decoded doc_id (in case it was URL-encoded)
   const decodedDocId = decodeURIComponent(doc_id);
-  if (!note && !doc && decodedDocId !== doc_id) {
-    console.log("  Trying decoded doc_id:", decodedDocId);
-    doc = await db.query.documents.findFirst({
-      where: eq(documents.id, decodedDocId),
-    });
-    console.log("  documents.findFirst(decoded):", doc?.id || "NOT FOUND");
 
-    note = await db.query.notes.findFirst({
-      where: eq(notes.id, decodedDocId),
-    });
-    console.log("  notes.findFirst(decoded):", note?.id || "NOT FOUND");
-  }
+  let doc = await db.query.documents.findFirst({
+    where: eq(documents.id, decodedDocId),
+  });
+  console.log("  documents.findFirst(decoded):", doc?.id || "NOT FOUND");
 
-  // If not found with full ID, the ID might already exist as just a UUID (legacy)
-  if (!note && !doc) {
-    // Try parsing the portable ID to extract the UUID
-    const { uuid } = parseNoteId(decodedDocId);
-    console.log("  Parsed UUID from portable ID:", uuid);
-    if (uuid && uuid !== decodedDocId) {
-      doc = await db.query.documents.findFirst({
-        where: eq(documents.id, uuid),
-      });
-      console.log("  documents.findFirst(uuid):", doc?.id || "NOT FOUND");
-
-      note = await db.query.notes.findFirst({
-        where: eq(notes.id, uuid),
-      });
-      console.log("  notes.findFirst(uuid):", note?.id || "NOT FOUND");
-    }
-  }
+  let note = await db.query.notes.findFirst({
+    where: eq(notes.id, decodedDocId),
+  });
+  console.log("  notes.findFirst(decoded):", note?.id || "NOT FOUND");
 
   if (!note && !doc) {
     // List all notes in DB for debugging
@@ -131,7 +99,7 @@ export async function POST({ params, request }) {
     // Require pre-existing membership for private/invite-only notes
     const memberRows = await db.query.members.findMany({
       where: and(
-        eq(members.docId, doc_id),
+        eq(members.docId, decodedDocId),
         inArray(members.userId, joiningUsers),
       ),
     });
@@ -142,20 +110,7 @@ export async function POST({ params, request }) {
         "This note is private. You must be invited to access it.",
       );
     }
-
-    // Return existing envelopes for invited users
-    const snapshot = note?.loroSnapshot || null;
-    return json({
-      doc_id,
-      snapshot,
-      envelopes: memberRows.map((m) => ({
-        user_id: m.userId,
-        device_id: m.deviceId,
-        encrypted_key: m.encryptedKeyEnvelope,
-      })),
-      title: note?.title || "Untitled",
-      ownerId: note?.ownerId,
-    });
+    // Permission granted! Fall through to generate fresh envelopes.
   }
 
   // 3. For authenticated/open notes, generate encrypted keys for joining users
@@ -183,51 +138,105 @@ export async function POST({ params, request }) {
 
   const serverIdentity = await getServerIdentity();
 
-  // Decrypt the doc key first!
-  // Decrypt the doc key first!
-  let rawDocKey = encryptedDocKey;
-  console.log(`[JOIN] encryptedDocKey Length: ${encryptedDocKey.length}`);
+  // 4. Try to use Server Escrow (Key Broker)
+  let rawDocKey = "";
 
-  if (encryptedDocKey.length > 44) {
-    if (owner.privateKeyEncrypted) {
-      console.log(
-        `[JOIN] Owner PrivKey Length: ${owner.privateKeyEncrypted.length}`,
-      );
+  // Special Handling for Open Public Notes
+  if (accessLevel === "public" || accessLevel === "open") {
+    console.log(
+      "[JOIN] Public Note Access. Decrypting for anonymous access...",
+    );
+    if (doc?.serverEncryptedKey) {
       try {
-        console.log(`[JOIN] Decrypting owner key for re-encryption...`);
-        rawDocKey = decryptKeyForDevice(
-          encryptedDocKey,
-          owner.privateKeyEncrypted,
+        rawDocKey = await decryptKeyForDevice(
+          doc.serverEncryptedKey,
+          serverIdentity.encryptionPrivateKey,
         );
-        console.log(`[JOIN] Decrypted Raw Key Length: ${rawDocKey.length}`);
       } catch (e) {
-        console.error(`[JOIN] Failed to decrypt owner key:`, e);
-        throw error(500, "Failed to decrypt note key for sharing");
+        console.error("[JOIN] Failed to decrypt public note key:", e);
+        throw error(500, "Failed to unlock public note");
       }
+    } else if (encryptedDocKey.length <= 44) {
+      rawDocKey = encryptedDocKey; // Legacy public
+    }
+
+    // If we have the raw key, return it immediately for the anonymous user
+    if (rawDocKey) {
+      return json({
+        doc_id: decodedDocId,
+        snapshot,
+        envelopes: [], // No envelopes needed for public Key
+        rawKey: rawDocKey, // Send RAW key to anonymous user
+        title: note?.title || "Untitled",
+        ownerId: note?.ownerId,
+        accessLevel,
+      });
+    }
+  }
+
+  // Check if we have the key escrowed in the documents table
+  if (doc?.serverEncryptedKey) {
+    console.log(
+      "[JOIN] Found serverEncryptedKey. Attempting to broker key exchange...",
+    );
+    try {
+      rawDocKey = await decryptKeyForDevice(
+        doc.serverEncryptedKey,
+        serverIdentity.encryptionPrivateKey,
+      );
+      console.log(
+        "[JOIN] Successfully decrypted Note Key using Server Identity.",
+      );
+    } catch (e) {
+      console.error("[JOIN] Server failed to decrypt escrowed key:", e);
+    }
+  }
+
+  // Fallback: If no server key, check if existing doc key is already raw (public/legacy)
+  if (!rawDocKey) {
+    if (encryptedDocKey.length <= 44) {
+      console.log(
+        `[JOIN] Key appears to be raw (Length: ${encryptedDocKey.length})`,
+      );
+      rawDocKey = encryptedDocKey;
     } else {
-      console.error(`[JOIN] Owner has no private key! CANNOT DECRYPT.`);
-      // CRITICAL: Do not allow double encryption. Fail here.
+      // The key is encrypted (E2EE) and we don't have a broker copy.
+      // The server CANNOT decrypt the note key to re-encrypt it for the joining user.
+      console.warn(
+        `[JOIN] Request for E2EE note ${note?.id}. Server cannot fulfill automatically (No Escrow).`,
+      );
       throw error(
-        500,
-        "Owner missing private key - cannot share authenticated note",
+        424,
+        "E2EE_KEY_UNAVAILABLE: Server cannot decrypt note key. The owner must be online to approve or the note must be shared via client-side flow.",
       );
     }
-  } else {
-    console.log(
-      `[JOIN] Key is already raw (Length: ${encryptedDocKey.length})`,
-    );
+  }
+
+  // Special Handling for Password Protected Notes
+  if (accessLevel === "password_protected") {
+    console.log("[JOIN] Password Protected Note.");
+    if (doc?.passwordEncryptedKey) {
+      return json({
+        doc_id: decodedDocId,
+        snapshot,
+        envelopes: [],
+        passwordEncryptedKey: doc.passwordEncryptedKey,
+        title: note?.title || "Untitled",
+        ownerId: note?.ownerId,
+        accessLevel,
+      });
+    } else {
+      // If password key is missing, it's an error state for this mode
+      throw error(
+        424,
+        "PASSWORD_KEY_UNAVAILABLE: Note is password protected but no password key was found.",
+      );
+    }
   }
 
   // Debug Identity Fetching
   for (const handle of joiningUsers) {
     const id = await fetchUserIdentity(handle, requesting_server);
-    console.log(
-      `  [DEBUG] Fetched Identity for ${handle}:`,
-      JSON.stringify(id),
-    );
-    if (id?.publicKey) {
-      console.log(`  [DEBUG] Public Key for ${handle}: ${id.publicKey}`);
-    }
   }
 
   const envelopes = await generateKeyEnvelopesForUsers(
@@ -238,7 +247,7 @@ export async function POST({ params, request }) {
 
   // Ensure documents entry exists (required for members FK constraint)
   // Use the actual note ID (which may be a portable ID)
-  const noteId = note?.id || doc_id;
+  const noteId = note?.id || decodedDocId;
   const docEntry = await db.query.documents.findFirst({
     where: eq(documents.id, noteId),
   });
@@ -282,7 +291,7 @@ export async function POST({ params, request }) {
   }
 
   return json({
-    doc_id,
+    doc_id: decodedDocId,
     snapshot,
     envelopes,
     title: note?.title || "Untitled",

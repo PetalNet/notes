@@ -328,7 +328,7 @@
           role="button"
           class="btn h-auto min-h-0 gap-3 rounded-lg px-3 py-2 normal-case btn-ghost hover:bg-base-200"
         >
-          <ProfilePicture name={user?.username ?? "A"} />
+          <ProfilePicture name={user?.username[0] ?? "A"} />
           <span class="max-w-[120px] truncate text-sm font-semibold">
             {user?.username ?? "Anonymous"}
           </span>

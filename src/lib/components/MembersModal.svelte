@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { X, Crown, Pencil, Eye, Trash2, Loader2 } from "@lucide/svelte";
+  import ConfirmationModal from "./ConfirmationModal.svelte";
+  import { X, Crown, Pencil, Eye, Trash2, LoaderCircle } from "@lucide/svelte";
 
   interface Member {
     userId: string;
@@ -15,10 +16,6 @@
     onClose: () => void;
     onRemoveMember?: (userId: string) => void;
   }
-
-  import ConfirmationModal from "./ConfirmationModal.svelte";
-
-  // ... (Props definition)
 
   let { isOpen, noteId, noteTitle, isOwner, onClose, onRemoveMember }: Props =
     $props();
@@ -42,7 +39,7 @@
       const res = await fetch(`/api/notes/${noteId}/members`);
       if (res.ok) {
         const data = await res.json();
-        members = data.members || [];
+        members = data.members ?? [];
       } else {
         throw new Error("Failed to load members");
       }
@@ -131,7 +128,7 @@
       <div class="max-h-80 overflow-y-auto p-4">
         {#if loading}
           <div class="flex items-center justify-center py-8">
-            <Loader2 class="h-6 w-6 animate-spin text-primary" />
+            <LoaderCircle class="h-6 w-6 animate-spin text-primary" />
           </div>
         {:else if error}
           <div class="py-4 text-center text-error">

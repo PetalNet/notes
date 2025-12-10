@@ -7,7 +7,7 @@
 </script>
 
 <div
-  class="flex size-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-600"
+  class="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-content"
 >
-  {name[0]?.toUpperCase()}
+  {name.toUpperCase()}
 </div>

@@ -2,19 +2,63 @@
   import "./layout.css";
 
   import { onNavigate } from "$app/navigation";
-  import { onMount } from "svelte";
   import favicon from "$lib/assets/favicon.svg";
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { getNotes } from "$lib/remote/notes.remote.ts";
   import { setSidebarContext } from "$lib/components/sidebar-context.js";
+  import { PersistedState } from "runed";
 
   let { children, data } = $props();
 
-  // Sidebar collapse state
-  let isCollapsed = $state(false);
+  // User's explicit preference (persisted to localStorage)
+  const collapsedDesktop = new PersistedState("sidebarCollapsed", false);
+  // Mobile state (always starts collapsed)
+  let collapsedMobile = $state(true);
+
+  // Track window width
+  let innerWidth = $state(0);
+  let isDesktop = $derived(innerWidth >= 768);
+
+  // Derived visual state
+  let isCollapsed = $derived(
+    isDesktop ? collapsedDesktop.current : collapsedMobile,
+  );
+
+  // Handle transitions between breakpoints
+  let wasDesktop = $state(true);
+
+  $effect(() => {
+    if (innerWidth === 0) return;
+
+    // Desktop -> Mobile: Always collapse
+    if (wasDesktop && !isDesktop) {
+      collapsedMobile = true;
+    }
+
+    // Mobile -> Desktop: If mobile was open, keep open
+    if (!wasDesktop && isDesktop) {
+      if (!collapsedMobile) {
+        collapsedDesktop.current = false;
+      }
+    }
+
+    wasDesktop = isDesktop;
+  });
 
   function toggleSidebar() {
-    isCollapsed = !isCollapsed;
+    if (isDesktop) {
+      collapsedDesktop.current = !collapsedDesktop.current;
+    } else {
+      collapsedMobile = !collapsedMobile;
+    }
+  }
+
+  // Keyboard shortcut: Ctrl+\ (or Cmd+\ on Mac)
+  function handleKeydown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "\\") {
+      e.preventDefault();
+      toggleSidebar();
+    }
   }
 
   setSidebarContext({
@@ -25,47 +69,6 @@
   });
 
   const notesList = $derived(data.user ? await getNotes() : []);
-
-  // Initialize from localStorage and handle responsive behavior
-  onMount(() => {
-    // Load saved state from localStorage
-    const saved = localStorage.getItem("sidebarCollapsed");
-    if (saved !== null) {
-      isCollapsed = saved === "true";
-    } else {
-      // Auto-collapse on mobile screens
-      isCollapsed = window.innerWidth < 768;
-    }
-
-    // Handle window resize for automatic collapse
-    const handleResize = () => {
-      if (window.innerWidth < 768 && !isCollapsed) {
-        isCollapsed = true;
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    // Keyboard shortcut: Ctrl+B (or Cmd+B on Mac)
-    const handleKeydown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "b") {
-        e.preventDefault();
-        toggleSidebar();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeydown);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("keydown", handleKeydown);
-    };
-  });
-
-  // Save to localStorage whenever state changes
-  $effect(() => {
-    localStorage.setItem("sidebarCollapsed", String(isCollapsed));
-  });
 
   onNavigate((navigation) => {
     const { promise, resolve } = Promise.withResolvers<void>();
@@ -78,6 +81,8 @@
     return promise;
   });
 </script>
+
+<svelte:window bind:innerWidth onkeydown={handleKeydown} />
 
 <svelte:head>
   <link rel="icon" href={favicon} />

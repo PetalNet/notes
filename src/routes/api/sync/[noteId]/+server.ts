@@ -43,7 +43,7 @@ export const GET = async ({ params, locals }) => {
       keepAliveInterval = setInterval(() => {
         try {
           c.enqueue(encoder.encode(`: keep-alive\n\n`));
-        } catch (e) {
+        } catch {
           clearInterval(keepAliveInterval);
         }
       }, 15000);

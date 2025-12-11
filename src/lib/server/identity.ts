@@ -4,17 +4,22 @@ import {
   generateEncryptionKeyPair,
   sign,
 } from "$lib/crypto";
+import { Schema } from "effect";
 import fs from "node:fs/promises";
 
 const IDENTITY_FILE = env["SERVER_IDENTITY_FILE"] ?? "server-identity.json";
 
-interface ServerIdentity {
-  publicKey: string; // Ed25519 (Signing)
-  privateKey: string;
-  encryptionPublicKey: string; // X25519 (Broker Encryption)
-  encryptionPrivateKey: string;
-  domain: string;
-}
+const ServerIdentitySchema = Schema.Struct({
+  publicKey: Schema.String, // Ed25519 (Signing)
+  privateKey: Schema.String,
+  encryptionPublicKey: Schema.String, // X25519 (Broker Encryption)
+  encryptionPrivateKey: Schema.String,
+  domain: Schema.String,
+}).pipe(Schema.mutable);
+
+type ServerIdentity = typeof ServerIdentitySchema.Type;
+
+const serverIdentityJson = Schema.parseJson(ServerIdentitySchema);
 
 // Singleton identity
 // Gosh plz no...
@@ -24,12 +29,11 @@ let identity: ServerIdentity | null = null;
 export async function getServerIdentity(): Promise<ServerIdentity> {
   if (identity) return identity;
 
-  // TODO: Determine domain dynamically or from config
-  const domain = process.env["SERVER_DOMAIN"] ?? "localhost:5173";
+  const domain = env["SERVER_DOMAIN"] ?? "localhost:5173";
 
   try {
     const data = await fs.readFile(IDENTITY_FILE, "utf-8");
-    const loaded = JSON.parse(data) as unknown as ServerIdentity;
+    const loaded = Schema.decodeUnknownSync(serverIdentityJson)(data);
 
     // Backwards compatibility: Generate encryption keys if missing
     if (loaded.publicKey && !loaded.encryptionPublicKey) {

@@ -20,7 +20,8 @@ const config = {
       config(config) {
         config["include"] = /** @type {string[]} */ (config["include"])
           .map((path) => path.replace("vite.config", "*.config"))
-          .concat("../scripts/*.ts");
+          .concat("../scripts/*.ts")
+          .concat("../src/routes/.well-known/**/*.ts");
       },
     },
   },

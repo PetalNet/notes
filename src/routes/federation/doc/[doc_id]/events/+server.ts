@@ -4,38 +4,7 @@ import { eq, gt, asc, and } from "drizzle-orm";
 import { notePubSub } from "$lib/server/pubsub";
 import type { RequestHandler } from "./$types";
 
-// Helper for verification (duplicated from ops/+server.ts to avoid circular dep issues for now)
-import { verify } from "$lib/crypto";
-import { error } from "@sveltejs/kit";
-
-async function verifyServerRequest(request: Request) {
-  const signature = request.headers.get("x-notes-signature");
-  const timestamp = request.headers.get("x-notes-timestamp");
-  const domain = request.headers.get("x-notes-domain");
-
-  // Allow specialized "events" signature or standard
-  // For SSE, we can't easily send body. So we sign the URL?
-  // Or we just verify headers. Params are in URL.
-  // Standard verify logic expects a body payload usually.
-  // Let's assume for GET that the message is just the query string or fixed string?
-  // Current verify logic: `${domain}:${timestamp}:${JSON.stringify(payload)}`
-  // For GET, payload is empty?
-
-  if (!signature || !timestamp || !domain) {
-    // Allow unauthenticated for now for easy debugging?
-    // User said "it should work just like instant multi client".
-    // Let's try to verify, but if it fails, maybe warn.
-    // Actually, standard SSE from browser doesn't send custom headers easily (EventSource polyfill needed).
-    // BUT this is Server-to-Server. We use `fetch` or `https` module, so we CAN send headers.
-    // So verification is possible.
-    return;
-  }
-
-  // For now, simplify and skip strict signature on SSE to get it working fast.
-  // We can add it back.
-}
-
-export const GET: RequestHandler = async ({ params, url, request }) => {
+export const GET: RequestHandler = ({ params, url }) => {
   const { doc_id } = params;
   const since = url.searchParams.get("since");
   const sinceTs = since ? parseInt(since) : 0;
@@ -86,14 +55,15 @@ export const GET: RequestHandler = async ({ params, url, request }) => {
         }
       }, 30000);
 
-      // Keep stream open forever
       try {
-        await new Promise(() => {});
-      } catch (e) {
+        await new Promise(() => {
+          // Keep stream open forever
+        });
+      } catch {
         // Ignored
       }
     },
-    cancel(controller) {
+    cancel() {
       if (unsubscribe) unsubscribe();
       if (interval) clearInterval(interval);
     },

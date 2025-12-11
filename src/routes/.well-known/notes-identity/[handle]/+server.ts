@@ -1,6 +1,6 @@
 import { json } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
-import { users, devices } from "$lib/server/db/schema";
+import { users } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
 import { env } from "$env/dynamic/private";
 
@@ -30,7 +30,7 @@ export async function GET({ params }) {
   // Return public identity
   // IMPORTANT: Return the FULL federated handle so other servers know exactly who this is.
   // e.g. @bob -> @bob:localhost:5174
-  const fullHandle = `@${user.username}:${env.SERVER_DOMAIN || "localhost:5173"}`;
+  const fullHandle = `@${user.username}:${env["SERVER_DOMAIN"] ?? "localhost:5173"}`;
 
   return json({
     id: user.id,

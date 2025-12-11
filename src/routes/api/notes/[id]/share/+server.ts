@@ -1,10 +1,9 @@
 import { json, error } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
 import { notes, noteShares, members, documents } from "$lib/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { requireLogin } from "$lib/server/auth";
 import { env } from "$env/dynamic/private";
-import { decryptKeyForDevice } from "$lib/crypto";
 import {
   fetchUserIdentity,
   encryptDocumentKeyForUser,
@@ -29,7 +28,7 @@ export interface ShareSettings {
 }
 
 // GET current share settings
-export async function GET({ params, locals }) {
+export async function GET({ params }) {
   const { user } = requireLogin();
   const { id: noteId } = params;
 
@@ -38,11 +37,11 @@ export async function GET({ params, locals }) {
   });
 
   if (!note) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   if (note.ownerId !== user.id) {
-    throw error(403, "Only the owner can view share settings");
+    error(403, "Only the owner can view share settings");
   }
 
   // Get invited users for this note
@@ -58,7 +57,7 @@ export async function GET({ params, locals }) {
 }
 
 // POST update share settings
-export async function POST({ params, request, locals }) {
+export async function POST({ params, request }) {
   const { user } = requireLogin();
   const { id: noteId } = params;
 
@@ -76,7 +75,7 @@ export async function POST({ params, request, locals }) {
       "password_protected",
     ].includes(accessLevel)
   ) {
-    throw error(400, "Invalid access level");
+    error(400, "Invalid access level");
   }
 
   // Find the note
@@ -85,16 +84,16 @@ export async function POST({ params, request, locals }) {
   });
 
   if (!note) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   if (note.ownerId !== user.id) {
-    throw error(403, "Only the owner can update share settings");
+    error(403, "Only the owner can update share settings");
   }
 
   // Get the document key (encrypted for owner)
-  const encryptedDocKey = note.documentKeyEncrypted || note.encryptedKey;
-  const serverDomain = env["SERVER_DOMAIN"] || "localhost:5173";
+  const encryptedDocKey = note.documentKeyEncrypted ?? note.encryptedKey;
+  const serverDomain = env["SERVER_DOMAIN"] ?? "localhost:5173";
 
   // Update note access level
   await db
@@ -207,7 +206,7 @@ export async function POST({ params, request, locals }) {
   return json({
     success: true,
     accessLevel,
-    invitedUsers: invitedUsers || [],
+    invitedUsers: invitedUsers ?? [],
     successfulInvites,
     failedInvites,
   });

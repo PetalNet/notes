@@ -87,7 +87,7 @@ export const login = form(
     const redirectTo = url.searchParams.get("redirectTo") ?? "/";
     // Validate redirectTo to prevent open redirect attacks
     const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/";
-    throw redirect(302, safeRedirect);
+    redirect(302, safeRedirect);
   },
 );
 

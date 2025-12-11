@@ -19,7 +19,7 @@ export interface Member {
 }
 
 // GET members list
-export async function GET({ params, locals }) {
+export async function GET({ params }) {
   const { user } = requireLogin();
   const { id: noteId } = params;
 
@@ -28,7 +28,7 @@ export async function GET({ params, locals }) {
   });
 
   if (!note) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   // Check if user has access (owner or member)
@@ -59,7 +59,7 @@ export async function GET({ params, locals }) {
       result.push({
         userId: share.sharedWithUser,
         role: share.permissions === "write" ? "writer" : "reader",
-        addedAt: share.createdAt?.toISOString(),
+        addedAt: share.createdAt.toISOString(),
       });
     }
   }
@@ -71,7 +71,7 @@ export async function GET({ params, locals }) {
       result.push({
         userId: member.userId,
         role: member.role,
-        addedAt: member.createdAt?.toISOString(),
+        addedAt: member.createdAt.toISOString(),
       });
     }
   }
@@ -85,7 +85,7 @@ export async function GET({ params, locals }) {
 }
 
 // POST add member
-export async function POST({ params, request, locals }) {
+export async function POST({ params, request }) {
   const { user } = requireLogin();
   const { id: noteId } = params;
 
@@ -93,7 +93,7 @@ export async function POST({ params, request, locals }) {
   const { userId, role = "writer" } = body;
 
   if (!userId) {
-    throw error(400, "userId is required");
+    error(400, "userId is required");
   }
 
   // Find the note and verify ownership
@@ -102,11 +102,11 @@ export async function POST({ params, request, locals }) {
   });
 
   if (!note) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   if (note.ownerId !== user.id) {
-    throw error(403, "Only the owner can add members");
+    error(403, "Only the owner can add members");
   }
 
   // Add to noteShares for invite_only mode
@@ -135,7 +135,7 @@ export async function POST({ params, request, locals }) {
 }
 
 // DELETE remove member
-export async function DELETE({ params, request, locals }) {
+export async function DELETE({ params, request }) {
   const { user } = requireLogin();
   const { id: noteId } = params;
 
@@ -143,7 +143,7 @@ export async function DELETE({ params, request, locals }) {
   const userId = url.searchParams.get("userId");
 
   if (!userId) {
-    throw error(400, "userId query parameter is required");
+    error(400, "userId query parameter is required");
   }
 
   // Find the note and verify ownership
@@ -152,15 +152,15 @@ export async function DELETE({ params, request, locals }) {
   });
 
   if (!note) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   if (note.ownerId !== user.id) {
-    throw error(403, "Only the owner can remove members");
+    error(403, "Only the owner can remove members");
   }
 
   if (userId === note.ownerId) {
-    throw error(400, "Cannot remove the owner");
+    error(400, "Cannot remove the owner");
   }
 
   // Remove from noteShares

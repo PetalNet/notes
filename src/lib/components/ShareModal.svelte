@@ -5,8 +5,8 @@
     Lock,
     Globe,
     UserPlus,
-    Loader2,
     Check,
+    LoaderCircle,
   } from "@lucide/svelte";
 
   import { decryptKey, encryptWithPassword } from "$lib/crypto";
@@ -342,7 +342,7 @@
 
             {#if invitedUsers.length > 0}
               <div class="mt-2 space-y-1">
-                {#each invitedUsers as user}
+                {#each invitedUsers as user (user)}
                   <div
                     class="flex items-center justify-between rounded bg-base-200 p-2"
                   >
@@ -412,7 +412,7 @@
           disabled={saving || loading}
         >
           {#if saving}
-            <Loader2 class="h-4 w-4 animate-spin" />
+            <LoaderCircle class="h-4 w-4 animate-spin" />
             Saving...
           {:else if success}
             <Check class="h-4 w-4" />

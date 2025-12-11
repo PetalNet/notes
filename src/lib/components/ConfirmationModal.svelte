@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AlertTriangle, Info } from "@lucide/svelte";
+  import { Info, TriangleAlert } from "@lucide/svelte";
 
   interface Props {
     isOpen: boolean;
@@ -34,7 +34,7 @@
 
 {#if isOpen}
   <div
-    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 focus:outline-none"
+    class="fixed inset-0 z-60 flex items-center justify-center bg-black/50 p-4 focus:outline-none"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
@@ -51,13 +51,13 @@
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-error/10 text-error"
           >
-            <AlertTriangle class="h-5 w-5" />
+            <TriangleAlert class="h-5 w-5" />
           </div>
         {:else if type === "warning"}
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/10 text-warning"
           >
-            <AlertTriangle class="h-5 w-5" />
+            <TriangleAlert class="h-5 w-5" />
           </div>
         {:else}
           <div

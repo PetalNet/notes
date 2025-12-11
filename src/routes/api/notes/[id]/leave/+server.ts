@@ -10,7 +10,7 @@ import { requireLogin } from "$lib/server/auth";
  * POST: Leave a note (remove self as member)
  */
 
-export async function POST({ params, locals }) {
+export async function POST({ params }) {
   const { user } = requireLogin();
   const { id: noteId } = params;
 
@@ -20,12 +20,12 @@ export async function POST({ params, locals }) {
   });
 
   if (!note) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   // Can't leave if you're the owner
   if (note.ownerId === user.id) {
-    throw error(
+    error(
       400,
       "Owner cannot leave their own note. Transfer ownership or delete the note instead.",
     );

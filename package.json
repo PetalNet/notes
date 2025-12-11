@@ -74,7 +74,6 @@
     "@milkdown/preset-gfm": "^7.17.3",
     "@milkdown/theme-nord": "^7.17.3",
     "@milkdown/utils": "^7.17.3",
-    "@modelcontextprotocol/sdk": "^1.24.3",
     "@node-rs/argon2": "^2.0.2",
     "@prosemark/core": "^0.0.4",
     "@prosemark/paste-rich-text": "^0.0.2",

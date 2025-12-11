@@ -98,7 +98,7 @@
     },
   });
 
-  const extensions = [
+  const extensions = $derived([
     coreExtensions,
     wikilinksExtension(notesList),
     // Update listener
@@ -113,7 +113,7 @@
       }
     }),
     editorTheme,
-  ];
+  ]);
 
   // Update content if it changes externally (from Loro)
   $effect(() => {

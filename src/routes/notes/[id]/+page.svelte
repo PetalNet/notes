@@ -12,7 +12,7 @@
 
   const notesListQuery = $derived(getNotes());
   let id = $derived(page.params.id);
-  const userPrivateKey = data.user?.privateKeyEncrypted;
+  const userPrivateKey = $derived(data.user?.privateKeyEncrypted);
 
   let loroManager = $state<LoroNoteManager>();
   // TODO: Use codemirror-server-render to SSR the editor

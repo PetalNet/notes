@@ -17,7 +17,6 @@
     Globe,
     Share as ShareIcon,
   } from "@lucide/svelte";
-  // ... existing imports ...
 
   interface Props {
     manager: LoroNoteManager | undefined;

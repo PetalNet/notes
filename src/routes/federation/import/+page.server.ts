@@ -1,17 +1,13 @@
-import { redirect, error } from "@sveltejs/kit";
+import { redirect, error, isHttpError } from "@sveltejs/kit";
 import { db } from "$lib/server/db";
-import { documents, members, notes, devices } from "$lib/server/db/schema";
+import { documents, members, notes } from "$lib/server/db/schema";
 import { eq } from "drizzle-orm";
 import { getServerIdentity, signServerRequest } from "$lib/server/identity";
-import {
-  generateEncryptionKeyPair,
-  decryptKeyForDevice,
-  encryptKeyForDevice,
-} from "$lib/crypto";
+import type { User } from "$lib/schema.js";
 
 export async function load({ url, locals }) {
   if (!locals.user) {
-    throw redirect(
+    redirect(
       302,
       `/login?redirectTo=${encodeURIComponent(url.pathname + url.search)}`,
     );
@@ -21,11 +17,11 @@ export async function load({ url, locals }) {
   const host = url.searchParams.get("host");
 
   if (!doc_id || !host) {
-    throw error(400, "Missing doc_id or host");
+    error(400, "Missing doc_id or host");
   }
 
   const identity = await getServerIdentity();
-  const user = locals.user;
+  const user: User = locals.user;
 
   // Check if we already have the doc
   const existing = await db.query.documents.findFirst({
@@ -34,7 +30,7 @@ export async function load({ url, locals }) {
 
   if (existing) {
     // Already imported, just redirect
-    throw redirect(302, `/notes/${doc_id}`);
+    redirect(302, `/notes/${doc_id}`);
   }
 
   // Construct the federated handle for the joining user
@@ -51,7 +47,19 @@ export async function load({ url, locals }) {
   const protocol = host.includes("localhost") ? "http" : "https";
   const joinUrl = `${protocol}://${host}/federation/doc/${doc_id}/join`;
 
-  let joinRes;
+  let joinRes: {
+    snapshot: string | undefined;
+    envelopes:
+      | {
+          user_id: string | undefined;
+          device_id: string | undefined;
+          encrypted_key: string | undefined;
+        }[]
+      | undefined;
+    title: string | undefined;
+    accessLevel: string | undefined;
+    ownerId: string | undefined;
+  };
   try {
     const res = await fetch(joinUrl, {
       method: "POST",
@@ -67,36 +75,33 @@ export async function load({ url, locals }) {
     if (!res.ok) {
       const text = await res.text();
       console.error("Join failed:", text);
-      throw error(res.status as any, `Failed to join document: ${text}`);
+      error(res.status, `Failed to join document: ${text}`);
     }
 
     joinRes = await res.json();
-  } catch (e: any) {
+  } catch (e) {
     console.error("Join error:", e);
-    if (e.status) throw e; // Re-throw if it's already an error response
-    throw error(502, "Failed to contact host server");
+    if (isHttpError(e)) throw e; // Re-throw if it's already an error response
+    error(502, "Failed to contact host server");
   }
-
-  // Process Response
-  // { snapshot, envelopes: [{ user_id, device_id, encrypted_key }], title, accessLevel }
 
   // Find the envelope for our user
   const myEnvelope = joinRes.envelopes?.find(
-    (env: any) =>
+    (env) =>
       env.user_id === userHandle ||
       env.user_id === `@${user.username}` ||
       env.user_id === user.username,
   );
 
-  const encryptedKey = myEnvelope?.encrypted_key || "";
+  const encryptedKey = myEnvelope?.encrypted_key ?? "";
 
   // Save Document Metadata
   await db.insert(documents).values({
     id: doc_id,
     hostServer: host,
-    ownerId: joinRes.ownerId || "unknown",
-    title: joinRes.title || "Untitled",
-    accessLevel: joinRes.accessLevel || "authenticated",
+    ownerId: joinRes.ownerId ?? "unknown",
+    title: joinRes.title ?? "Untitled",
+    accessLevel: joinRes.accessLevel ?? "authenticated",
   });
 
   // Save Content (Snapshot) - use empty snapshot if none provided
@@ -105,28 +110,28 @@ export async function load({ url, locals }) {
     .values({
       id: doc_id,
       ownerId: user.id, // Local user becomes local "owner" of this copy
-      title: joinRes.title || "Untitled",
+      title: joinRes.title ?? "Untitled",
       encryptedKey, // The encrypted document key for this user
-      loroSnapshot: joinRes.snapshot || null,
-      accessLevel: joinRes.accessLevel || "authenticated",
+      loroSnapshot: joinRes.snapshot ?? null,
+      accessLevel: joinRes.accessLevel ?? "authenticated",
     })
     .onConflictDoUpdate({
       target: notes.id,
       set: {
-        loroSnapshot: joinRes.snapshot || null,
+        loroSnapshot: joinRes.snapshot ?? null,
         encryptedKey,
         updatedAt: new Date(),
       },
     });
 
   // Save all envelopes to members table
-  for (const env of joinRes.envelopes || []) {
+  for (const env of joinRes.envelopes ?? []) {
     await db
       .insert(members)
       .values({
         docId: doc_id,
         userId: user.id, // Map to local user ID
-        deviceId: env.device_id || "primary",
+        deviceId: env.device_id ?? "primary",
         role: "writer",
         encryptedKeyEnvelope: env.encrypted_key,
         createdAt: new Date(),
@@ -134,5 +139,5 @@ export async function load({ url, locals }) {
       .onConflictDoNothing();
   }
 
-  throw redirect(302, `/notes/${doc_id}`);
+  redirect(302, `/notes/${doc_id}`);
 }

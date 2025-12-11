@@ -145,7 +145,7 @@ export async function POST({ params, request, locals }) {
         {
           ...op,
           payload: op.encrypted_payload, // map for client compatibility
-        } as any,
+        },
       ]);
     }
   } catch (err) {

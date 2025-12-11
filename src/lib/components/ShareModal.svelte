@@ -11,8 +11,6 @@
 
   import { decryptKey, encryptWithPassword } from "$lib/crypto";
 
-  // ...
-
   interface Props {
     isOpen: boolean;
     noteId: string;
@@ -55,8 +53,8 @@
       const res = await fetch(`/api/notes/${noteId}/share`);
       if (res.ok) {
         const data = await res.json();
-        accessLevel = data.accessLevel || "private";
-        invitedUsers = data.invitedUsers || [];
+        accessLevel = data.accessLevel ?? "private";
+        invitedUsers = data.invitedUsers ?? [];
       } else if (res.status !== 404) {
         // 404 is fine - just means no settings yet
         const text = await res.text();
@@ -114,7 +112,7 @@
         let rawNoteKey = noteEncryptedKey;
         if (noteEncryptedKey.length > 44) {
           try {
-            rawNoteKey = await decryptKey(noteEncryptedKey, ownerPrivateKey);
+            rawNoteKey = decryptKey(noteEncryptedKey, ownerPrivateKey);
           } catch (e) {
             console.error("Failed to decrypt note key for re-encryption:", e);
             throw new Error(
@@ -124,10 +122,7 @@
         }
 
         // 3. Encrypt for new Password
-        passwordEncryptedKey = await encryptWithPassword(
-          rawNoteKey,
-          sharePassword,
-        );
+        passwordEncryptedKey = encryptWithPassword(rawNoteKey, sharePassword);
       }
 
       const res = await fetch(`/api/notes/${noteId}/share`, {

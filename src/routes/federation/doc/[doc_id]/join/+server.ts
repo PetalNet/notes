@@ -69,12 +69,12 @@ export async function POST({ params, request }) {
   // Try with decoded doc_id (in case it was URL-encoded)
   const decodedDocId = decodeURIComponent(doc_id);
 
-  let doc = await db.query.documents.findFirst({
+  const doc = await db.query.documents.findFirst({
     where: eq(documents.id, decodedDocId),
   });
   console.log("  documents.findFirst(decoded):", doc?.id || "NOT FOUND");
 
-  let note = await db.query.notes.findFirst({
+  const note = await db.query.notes.findFirst({
     where: eq(notes.id, decodedDocId),
   });
   console.log("  notes.findFirst(decoded):", note?.id || "NOT FOUND");

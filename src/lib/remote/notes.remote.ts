@@ -66,7 +66,7 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
     // We get encryptedKey from the member envelope
     // We get encryptedKey from the member envelope
     if (m.encryptedKeyEnvelope) {
-      let documentKey = m.encryptedKeyEnvelope;
+      const documentKey = m.encryptedKeyEnvelope;
 
       notesList.push({
         id: m.document.id,

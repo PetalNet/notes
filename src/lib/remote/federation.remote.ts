@@ -125,7 +125,7 @@ export const joinFederatedNote = command(
         if (joinData.rawKey) {
           console.log("  [Federation] Note is Open Public. Using Raw Key.");
 
-          if (user && user.publicKey) {
+          if (user?.publicKey) {
             encryptedKeyEnvelope = encryptKeyForUser(
               joinData.rawKey,
               user.publicKey,
@@ -166,7 +166,6 @@ export const joinFederatedNote = command(
         }
 
         // Store document metadata locally
-        // ... (existing db insert logic)
         await db
           .insert(documents)
           .values({

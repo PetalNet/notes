@@ -38,7 +38,7 @@ export async function getServerIdentity(): Promise<ServerIdentity> {
     // Backwards compatibility: Generate encryption keys if missing
     if (loaded.publicKey && !loaded.encryptionPublicKey) {
       console.log("Upgrading server identity with encryption keys...");
-      const encParams = generateEncryptionKeyPair();
+      const encParams = await generateEncryptionKeyPair();
       loaded.encryptionPublicKey = encParams.publicKey;
       loaded.encryptionPrivateKey = encParams.privateKey;
       await fs.writeFile(IDENTITY_FILE, JSON.stringify(loaded, null, 2));
@@ -54,8 +54,8 @@ export async function getServerIdentity(): Promise<ServerIdentity> {
 
   // Generate new
   console.log("Generating new server identity...");
-  const signKeys = generateSigningKeyPair(); // Ed25519
-  const encKeys = generateEncryptionKeyPair(); // X25519
+  const signKeys = await generateSigningKeyPair(); // Ed25519
+  const encKeys = await generateEncryptionKeyPair(); // X25519
 
   identity = {
     publicKey: signKeys.publicKey,
@@ -77,7 +77,7 @@ export async function signServerRequest(
   // Deterministic canonical JSON needed? Or just sign payload string/bytes?
   // Let's sign: domain + timestamp + JSON.stringify(payload)
   const msg = `${id.domain}:${timestamp}:${JSON.stringify(payload)}`;
-  const sig = sign(new TextEncoder().encode(msg), id.privateKey);
+  const sig = await sign(new TextEncoder().encode(msg), id.privateKey);
   return {
     signature: sig,
     timestamp,

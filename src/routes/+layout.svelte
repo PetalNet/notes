@@ -94,11 +94,11 @@
 
     try {
       // 1. Generate Keys
-      const signKeys = generateSigningKeyPair();
-      const encKeys = generateEncryptionKeyPair();
+      const signKeys = await generateSigningKeyPair();
+      const encKeys = await generateEncryptionKeyPair();
 
       // 2. Encrypt
-      const privateKeyEncrypted = encryptWithPassword(
+      const privateKeyEncrypted = await encryptWithPassword(
         encKeys.privateKey,
         setupPassword,
       );

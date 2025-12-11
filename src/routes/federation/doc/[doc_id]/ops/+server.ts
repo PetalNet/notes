@@ -20,7 +20,7 @@ async function verifyServerRequest(request: Request, payload: any) {
     if (!res.ok) throw new Error();
     const data = await res.json();
     const msg = `${domain}:${timestamp}:${JSON.stringify(payload)}`;
-    const valid = verify(
+    const valid = await verify(
       signature,
       new TextEncoder().encode(msg),
       data.publicKey,

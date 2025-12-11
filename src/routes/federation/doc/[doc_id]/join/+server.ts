@@ -32,7 +32,7 @@ async function verifyServerRequest(request: Request, payload: any) {
     if (data.domain !== domain) throw new Error("Domain mismatch");
 
     const msg = `${domain}:${timestamp}:${JSON.stringify(payload)}`;
-    const valid = verify(
+    const valid = await verify(
       signature,
       new TextEncoder().encode(msg),
       data.publicKey,
@@ -144,7 +144,7 @@ export async function POST({ params, request }) {
     );
     if (doc?.serverEncryptedKey) {
       try {
-        rawDocKey = decryptKeyForDevice(
+        rawDocKey = await decryptKeyForDevice(
           doc.serverEncryptedKey,
           serverIdentity.encryptionPrivateKey,
         );
@@ -176,7 +176,7 @@ export async function POST({ params, request }) {
       "[JOIN] Found serverEncryptedKey. Attempting to broker key exchange...",
     );
     try {
-      rawDocKey = decryptKeyForDevice(
+      rawDocKey = await decryptKeyForDevice(
         doc.serverEncryptedKey,
         serverIdentity.encryptionPrivateKey,
       );

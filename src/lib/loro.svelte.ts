@@ -69,25 +69,25 @@ export class LoroNoteManager {
   /**
    * Initialize the manager with an encrypted snapshot
    */
-  static create(
+  static async create(
     this: void,
     noteId: string,
     noteKey: string,
     onUpdate: (snapshot: string) => Promise<void>,
     encryptedSnapshot: string | null,
-  ): LoroNoteManager {
+  ): Promise<LoroNoteManager> {
     const manager = new LoroNoteManager(noteId, noteKey, onUpdate);
 
     if (encryptedSnapshot) {
       const encryptedBytes = decodeBase64(encryptedSnapshot);
-      const decrypted = decryptData(encryptedBytes, manager.#noteKey);
+      const decrypted = await decryptData(encryptedBytes, manager.#noteKey);
       manager.doc.import(decrypted);
     }
     return manager;
   }
 
   async #persist() {
-    const snapshot = this.getEncryptedSnapshot();
+    const snapshot = await this.getEncryptedSnapshot();
     await this.#onUpdate(snapshot);
   }
 
@@ -212,11 +212,11 @@ export class LoroNoteManager {
   /**
    * Get encrypted snapshot for storage
    */
-  getEncryptedSnapshot(): string {
+  async getEncryptedSnapshot(): Promise<string> {
     const snapshot = this.doc.export({
       mode: "snapshot",
     }) as Uint8Array<ArrayBuffer>;
-    const encrypted = encryptData(snapshot, this.#noteKey);
+    const encrypted = await encryptData(snapshot, this.#noteKey);
     return encodeBase64(encrypted);
   }
 

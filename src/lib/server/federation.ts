@@ -72,10 +72,10 @@ export async function fetchUserIdentity(
  * Encrypt a document key for a remote user
  * Uses the user's primary public key (or first device key if no user key)
  */
-export function encryptDocumentKeyForUser(
+export async function encryptDocumentKeyForUser(
   documentKey: string,
   identity: RemoteUserIdentity,
-): string | null {
+): Promise<string | null> {
   // Prefer user's main public key, fallback to first device
   const publicKey = identity.publicKey ?? identity.devices[0]?.public_key;
 
@@ -85,7 +85,7 @@ export function encryptDocumentKeyForUser(
   }
 
   try {
-    return encryptKeyForDevice(documentKey, publicKey);
+    return await encryptKeyForDevice(documentKey, publicKey);
   } catch (err) {
     console.error(`Failed to encrypt key for ${identity.handle}:`, err);
     return null;
@@ -121,7 +121,10 @@ export async function generateKeyEnvelopesForUsers(
 
     // Generate envelope for user's main key
     if (identity.publicKey) {
-      const encryptedKey = encryptDocumentKeyForUser(documentKey, identity);
+      const encryptedKey = await encryptDocumentKeyForUser(
+        documentKey,
+        identity,
+      );
       if (encryptedKey) {
         envelopes.push({
           user_id: identity.handle,
@@ -134,7 +137,7 @@ export async function generateKeyEnvelopesForUsers(
     // Optionally generate envelopes for each device
     for (const device of identity.devices) {
       try {
-        const encryptedKey = encryptKeyForDevice(
+        const encryptedKey = await encryptKeyForDevice(
           documentKey,
           device.public_key,
         );

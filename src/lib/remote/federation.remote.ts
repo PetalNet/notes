@@ -76,7 +76,7 @@ export const joinFederatedNote = command(
       };
 
       const message = `${currentDomain}:${timestamp}:${JSON.stringify(requestBody)}`;
-      const signature = sign(
+      const signature = await sign(
         new TextEncoder().encode(message),
         serverIdentity.privateKey,
       );
@@ -126,7 +126,7 @@ export const joinFederatedNote = command(
           console.log("  [Federation] Note is Open Public. Using Raw Key.");
 
           if (user?.publicKey) {
-            encryptedKeyEnvelope = encryptKeyForUser(
+            encryptedKeyEnvelope = await encryptKeyForUser(
               joinData.rawKey,
               user.publicKey,
             );

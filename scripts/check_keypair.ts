@@ -45,11 +45,14 @@ console.log("\nTest Secret:", secret);
 
 try {
   // Encrypt to Bob's Public Key
-  const envelope = encryptKeyForDevice(secret, bob.publicKey);
+  const envelope = await encryptKeyForDevice(secret, bob.publicKey);
   console.log("Encrypted Envelope:", envelope);
 
   // Decrypt with Bob's Private Key
-  const decrypted = decryptKeyForDevice(envelope, bob.privateKeyEncrypted);
+  const decrypted = await decryptKeyForDevice(
+    envelope,
+    bob.privateKeyEncrypted,
+  );
   console.log("Decrypted Secret:  ", decrypted);
 
   if (decrypted === secret) {

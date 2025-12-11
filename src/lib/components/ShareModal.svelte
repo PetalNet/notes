@@ -112,7 +112,7 @@
         let rawNoteKey = noteEncryptedKey;
         if (noteEncryptedKey.length > 44) {
           try {
-            rawNoteKey = decryptKey(noteEncryptedKey, ownerPrivateKey);
+            rawNoteKey = await decryptKey(noteEncryptedKey, ownerPrivateKey);
           } catch (e) {
             console.error("Failed to decrypt note key for re-encryption:", e);
             throw new Error(
@@ -122,7 +122,10 @@
         }
 
         // 3. Encrypt for new Password
-        passwordEncryptedKey = encryptWithPassword(rawNoteKey, sharePassword);
+        passwordEncryptedKey = await encryptWithPassword(
+          rawNoteKey,
+          sharePassword,
+        );
       }
 
       const res = await fetch(`/api/notes/${noteId}/share`, {

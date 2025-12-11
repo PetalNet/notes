@@ -18,8 +18,8 @@ console.log("Pub:", publicKey.slice(0, 10) + "...");
 
 const secret = generateNoteKey();
 try {
-  const envelope = encryptKeyForDevice(secret, publicKey);
-  const decrypted = decryptKeyForDevice(envelope, privateKey);
+  const envelope = await encryptKeyForDevice(secret, publicKey);
+  const decrypted = await decryptKeyForDevice(envelope, privateKey);
 
   if (decrypted === secret) {
     console.log("✅ SUCCESS: Keys work!");

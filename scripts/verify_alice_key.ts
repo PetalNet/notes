@@ -6,7 +6,7 @@ const noteKeyEnc =
 
 console.log("=== Verifying Alice's Decryption ===");
 try {
-  const raw = decryptKeyForDevice(noteKeyEnc, alicePriv);
+  const raw = await decryptKeyForDevice(noteKeyEnc, alicePriv);
   console.log("✅ SUCCESS!");
   console.log("Raw Key:", raw);
   console.log("Length:", raw.length); // Should be 44

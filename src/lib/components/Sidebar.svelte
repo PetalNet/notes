@@ -193,7 +193,7 @@
     const noteKey = generateNoteKey();
 
     // Encrypt note key with user's public key
-    const encryptedKey = encryptKeyForUser(noteKey, publicKey);
+    const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
 
     // Encrypt note key for Server (Broker Escrow)
     let serverEncryptedKey = "";
@@ -203,7 +203,7 @@
         const identity = await res.json();
         // Use the dedicated Encryption Key (X25519)
         if (identity.encryptionPublicKey) {
-          serverEncryptedKey = encryptKeyForUser(
+          serverEncryptedKey = await encryptKeyForUser(
             noteKey,
             identity.encryptionPublicKey,
           );

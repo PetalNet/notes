@@ -117,6 +117,7 @@
         closestEdge = null;
         isDropTarget = false;
       },
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onDrop: async ({ source }) => {
         const sourceId = source.data["id"] as string;
         const sourceParentId = source.data["parentId"] as string | null;

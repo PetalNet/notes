@@ -28,7 +28,9 @@ export function buildNotesTree(notesList: NoteOrFolder[]): TreeNode[] {
 
   // Second pass: build tree
   for (const note of notesList) {
-    const current = map.get(note.id)!;
+    const current = map.get(note.id);
+
+    if (current === undefined) continue;
 
     if (note.parentId) {
       const parent = map.get(note.parentId);

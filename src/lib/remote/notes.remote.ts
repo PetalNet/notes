@@ -38,7 +38,7 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
         order: n.order,
         createdAt: new Date(n.createdAt),
         updatedAt: new Date(n.updatedAt),
-        serverEncryptedKey: n.document?.serverEncryptedKey || null,
+        serverEncryptedKey: n.document.serverEncryptedKey ?? null,
       }) satisfies NoteOrFolder,
   );
 
@@ -56,21 +56,18 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   // Filter out any that might overlap with owned notes (though normally shouldn't)
   // And map to NoteOrFolder
   for (const m of memberships) {
-    if (!m.document) continue;
-
     // Check if already in list (owned notes might be in members too?)
     if (notesList.some((n) => n.id === m.document.id)) continue;
 
     // Map to NoteOrFolder structure
     // We treat them as root-level notes for now (parentId: null)
     // We get encryptedKey from the member envelope
-    // We get encryptedKey from the member envelope
     if (m.encryptedKeyEnvelope) {
-      let documentKey = m.encryptedKeyEnvelope;
+      const documentKey = m.encryptedKeyEnvelope;
 
       notesList.push({
         id: m.document.id,
-        title: m.document.title || "Shared Note",
+        title: m.document.title ?? "Shared Note",
         ownerId: m.document.ownerId,
         encryptedKey: documentKey,
         isFolder: false, // Default for shared docs
@@ -97,7 +94,7 @@ export interface SharedNote {
 }
 
 export const getSharedNotes = query(async (): Promise<SharedNote[]> => {
-  const { user } = requireLogin();
+  requireLogin();
 
   // Get documents from remote servers (not local)
   const sharedDocs = await db.query.documents.findMany({
@@ -106,7 +103,7 @@ export const getSharedNotes = query(async (): Promise<SharedNote[]> => {
 
   return sharedDocs.map((doc) => ({
     id: doc.id,
-    title: doc.title || "Untitled",
+    title: doc.title ?? "Untitled",
     hostServer: doc.hostServer,
     ownerId: doc.ownerId,
     accessLevel: doc.accessLevel,
@@ -130,7 +127,7 @@ export const createNote = command(
         error(400, "Missing required fields");
       }
 
-      const serverDomain = env["SERVER_DOMAIN"] || "localhost:5173";
+      const serverDomain = env["SERVER_DOMAIN"] ?? "localhost:5173";
       const id = createNoteId(serverDomain);
 
       // Dual-write to documents table to support federatedOps

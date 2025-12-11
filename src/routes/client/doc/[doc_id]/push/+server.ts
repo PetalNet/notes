@@ -30,12 +30,12 @@ export async function POST({ params, request, locals }) {
 
   // Permission Check
   if (!doc) {
-    throw error(404, "Note not found");
+    error(404, "Note not found");
   }
 
   // If private and not logged in, deny
   if (doc.accessLevel === "private" && !locals.user) {
-    throw error(401, "Unauthorized");
+    error(401, "Unauthorized");
   }
   // TODO: fine-grained auth for 'mixed' mode (e.g. public read, private write)
   // For now, if it's 'public' or 'open', we allow anonymous writes.
@@ -72,7 +72,7 @@ export async function POST({ params, request, locals }) {
     console.log(`[CLIENT] Remote response status: ${res.status}`);
     if (!res.ok) {
       // If remote 401s, we 401?
-      throw error(res.status, "Remote push failed");
+      error(res.status, "Remote push failed");
     }
   }
 
@@ -145,7 +145,7 @@ export async function POST({ params, request, locals }) {
         {
           ...op,
           payload: op.encrypted_payload, // map for client compatibility
-        } as any,
+        },
       ]);
     }
   } catch (err) {
@@ -153,7 +153,7 @@ export async function POST({ params, request, locals }) {
     // If we successfully proxied, maybe don't fail the whole request?
     // If local, we must fail.
     if (doc.hostServer === "local") {
-      throw error(500, "Failed to store operation locally");
+      error(500, "Failed to store operation locally");
     }
   }
 

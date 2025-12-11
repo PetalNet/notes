@@ -5,13 +5,11 @@
     Lock,
     Globe,
     UserPlus,
-    Loader2,
     Check,
+    LoaderCircle,
   } from "@lucide/svelte";
 
   import { decryptKey, encryptWithPassword } from "$lib/crypto";
-
-  // ...
 
   interface Props {
     isOpen: boolean;
@@ -55,8 +53,8 @@
       const res = await fetch(`/api/notes/${noteId}/share`);
       if (res.ok) {
         const data = await res.json();
-        accessLevel = data.accessLevel || "private";
-        invitedUsers = data.invitedUsers || [];
+        accessLevel = data.accessLevel ?? "private";
+        invitedUsers = data.invitedUsers ?? [];
       } else if (res.status !== 404) {
         // 404 is fine - just means no settings yet
         const text = await res.text();
@@ -347,7 +345,7 @@
 
             {#if invitedUsers.length > 0}
               <div class="mt-2 space-y-1">
-                {#each invitedUsers as user}
+                {#each invitedUsers as user (user)}
                   <div
                     class="flex items-center justify-between rounded bg-base-200 p-2"
                   >
@@ -417,7 +415,7 @@
           disabled={saving || loading}
         >
           {#if saving}
-            <Loader2 class="h-4 w-4 animate-spin" />
+            <LoaderCircle class="h-4 w-4 animate-spin" />
             Saving...
           {:else if success}
             <Check class="h-4 w-4" />

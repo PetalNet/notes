@@ -1,26 +1,23 @@
 <script lang="ts">
   import { Clock, RotateCcw, User } from "@lucide/svelte";
-  import type { LoroNoteManager } from "$lib/loro.ts";
-  import { onMount } from "svelte";
+  import type { HistoryEntry, LoroNoteManager } from "$lib/loro.svelte.ts";
+  import { formatRelativeTime } from "$lib/utils/time.ts";
+  import ProfilePicture from "./ProfilePicture.svelte";
 
   interface Props {
     manager: LoroNoteManager | undefined;
     isOpen: boolean;
-    onClose: () => void;
   }
 
-  let { manager, isOpen, onClose }: Props = $props();
-
-  interface HistoryEntry {
-    version: number;
-    timestamp: Date;
-    preview: string;
-    author?: string;
-  }
+  let { manager, isOpen = $bindable() }: Props = $props();
 
   let history = $state<HistoryEntry[]>([]);
   let selectedVersion = $state<number | null>(null);
-  let unsubscribe: (() => void) | null = null;
+  let unsubscribe: (() => void) | undefined;
+  let drawerDialog: HTMLDialogElement;
+  let restoreDialog: HTMLDialogElement;
+  let versionToRestore = $state<number | null>(null);
+  let isClosing = $state(false);
 
   // Load history from Loro document
   function loadHistory() {
@@ -44,35 +41,53 @@
     }
 
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-        unsubscribe = null;
-      }
+      unsubscribe?.();
+      unsubscribe = undefined;
     };
   });
 
-  function restoreVersion(version: number) {
-    // TODO: Implement version restoration using Loro's checkout functionality
-    console.log("Restoring version:", version);
+  // Sync isOpen with dialog
+  $effect(() => {
+    if (isOpen) {
+      isClosing = false;
+      if (!drawerDialog.open) drawerDialog.showModal();
+    } else {
+      if (drawerDialog.open) {
+        isClosing = true;
+        setTimeout(() => {
+          drawerDialog.close();
+          isClosing = false;
+        }, 300);
+      }
+    }
+  });
+
+  function promptRestore(version: number) {
+    versionToRestore = version;
+    restoreDialog.showModal();
   }
 
-  function formatTime(date: Date): string {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
+  function confirmRestore() {
+    if (versionToRestore !== null) {
+      // TODO: Implement version restoration using Loro's checkout functionality
+      console.log("Restoring version:", versionToRestore);
+      versionToRestore = null;
+    }
   }
 </script>
 
-{#if isOpen}
+<dialog
+  bind:this={drawerDialog}
+  class="group modal justify-items-end"
+  oncancel={() => {
+    isOpen = false;
+  }}
+>
   <div
-    class="fixed inset-y-0 right-0 z-50 flex w-80 flex-col border-l border-base-content/10 bg-base-100 shadow-xl"
+    class={[
+      "modal-box m-0 flex h-full max-h-screen w-80 translate-x-full scale-100 flex-col flex-nowrap rounded-none bg-base-100 p-0 text-base-content transition-[translate,transform] duration-300 group-open:translate-x-0",
+      isClosing && "translate-x-full!",
+    ]}
   >
     <!-- Header -->
     <div
@@ -83,7 +98,9 @@
         <h2 class="text-lg font-semibold">Version History</h2>
       </div>
       <button
-        onclick={onClose}
+        onclick={() => {
+          isOpen = false;
+        }}
         class="btn btn-circle btn-ghost btn-sm"
         aria-label="Close history"
       >
@@ -110,25 +127,23 @@
                 selectedVersion === entry.version
                   ? "border-primary bg-primary/10"
                   : "border-base-content/10 hover:border-primary/50 hover:bg-base-200",
-              ].join(" ")}
+              ]}
             >
               <!-- Version Header -->
               <div class="mb-2 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  {#if entry.author}
-                    <div
-                      class="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-content"
+                  {#if entry.peerId}
+                    <ProfilePicture name={entry.peerId.slice(0, 2)} />
+                    <span class="font-mono text-sm font-medium"
+                      >{entry.peerId.slice(0, 8)}</span
                     >
-                      {(entry.author ?? "?").charAt(0).toUpperCase()}
-                    </div>
-                    <span class="text-sm font-medium">{entry.author}</span>
                   {:else}
                     <User class="h-4 w-4 text-base-content/50" />
                     <span class="text-sm text-base-content/60">Unknown</span>
                   {/if}
                 </div>
                 <span class="text-xs text-base-content/50">
-                  {formatTime(entry.timestamp)}
+                  {formatRelativeTime(entry.timestamp)}
                 </span>
               </div>
 
@@ -158,9 +173,10 @@
 
     <!-- Actions -->
     {#if selectedVersion !== null && selectedVersion !== history[0]?.version}
+      {@const cachedVersion = selectedVersion}
       <div class="border-t border-base-content/10 p-4">
         <button
-          onclick={() => restoreVersion(selectedVersion as number)}
+          onclick={() => promptRestore(cachedVersion)}
           class="btn w-full btn-primary"
         >
           <RotateCcw class="h-4 w-4" />
@@ -169,11 +185,29 @@
       </div>
     {/if}
   </div>
+  <div class="modal-backdrop">
+    <button type="button" onclick={() => (isOpen = false)}>close</button>
+  </div>
+</dialog>
 
-  <!-- Backdrop -->
-  <button
-    onclick={onClose}
-    class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-    aria-label="Close history panel"
-  ></button>
-{/if}
+<dialog bind:this={restoreDialog} class="modal">
+  <div class="modal-box">
+    <h3 class="text-lg font-bold">Restore Version</h3>
+    <p class="py-4">
+      Are you sure you want to restore version <span class="font-mono font-bold"
+        >v{versionToRestore}</span
+      >? This will create a new version with the contents of the selected
+      version.
+    </p>
+    <div class="modal-action">
+      <form method="dialog">
+        <button class="btn">Cancel</button>
+        <button class="btn btn-primary" onclick={confirmRestore}>Restore</button
+        >
+      </form>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop">
+    <button>close</button>
+  </form>
+</dialog>

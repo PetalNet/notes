@@ -1,34 +1,39 @@
+import { env } from "$env/dynamic/private";
 import {
   generateSigningKeyPair,
   generateEncryptionKeyPair,
   sign,
 } from "$lib/crypto";
-import fs from "node:fs";
-import path from "node:path";
+import { Schema } from "effect";
+import fs from "node:fs/promises";
 
-const IDENTITY_FILE =
-  process.env["SERVER_IDENTITY_FILE"] || "server-identity.json";
+const IDENTITY_FILE = env["SERVER_IDENTITY_FILE"] ?? "server-identity.json";
 
-interface ServerIdentity {
-  publicKey: string; // Ed25519 (Signing)
-  privateKey: string;
-  encryptionPublicKey: string; // X25519 (Broker Encryption)
-  encryptionPrivateKey: string;
-  domain: string;
-}
+const ServerIdentitySchema = Schema.Struct({
+  publicKey: Schema.String, // Ed25519 (Signing)
+  privateKey: Schema.String,
+  encryptionPublicKey: Schema.String, // X25519 (Broker Encryption)
+  encryptionPrivateKey: Schema.String,
+  domain: Schema.String,
+}).pipe(Schema.mutable);
+
+type ServerIdentity = typeof ServerIdentitySchema.Type;
+
+const serverIdentityJson = Schema.parseJson(ServerIdentitySchema);
 
 // Singleton identity
+// Gosh plz no...
+// TODO: remove this abomination.
 let identity: ServerIdentity | null = null;
 
 export async function getServerIdentity(): Promise<ServerIdentity> {
   if (identity) return identity;
 
-  // TODO: Determine domain dynamically or from config
-  const domain = process.env["SERVER_DOMAIN"] || "localhost:5173";
+  const domain = env["SERVER_DOMAIN"] ?? "localhost:5173";
 
-  if (fs.existsSync(IDENTITY_FILE)) {
-    const data = fs.readFileSync(IDENTITY_FILE, "utf-8");
-    const loaded = JSON.parse(data);
+  try {
+    const data = await fs.readFile(IDENTITY_FILE, "utf-8");
+    const loaded = Schema.decodeUnknownSync(serverIdentityJson)(data);
 
     // Backwards compatibility: Generate encryption keys if missing
     if (loaded.publicKey && !loaded.encryptionPublicKey) {
@@ -36,14 +41,15 @@ export async function getServerIdentity(): Promise<ServerIdentity> {
       const encParams = await generateEncryptionKeyPair();
       loaded.encryptionPublicKey = encParams.publicKey;
       loaded.encryptionPrivateKey = encParams.privateKey;
-      fs.writeFileSync(IDENTITY_FILE, JSON.stringify(loaded, null, 2));
+      await fs.writeFile(IDENTITY_FILE, JSON.stringify(loaded, null, 2));
     }
 
     identity = loaded;
-    if (identity) {
-      identity.domain = domain;
-      return identity;
-    }
+    identity.domain = domain;
+
+    return identity;
+  } catch {
+    console.warn("No existing server identity found, generating new one...");
   }
 
   // Generate new
@@ -59,7 +65,7 @@ export async function getServerIdentity(): Promise<ServerIdentity> {
     domain,
   };
 
-  fs.writeFileSync(IDENTITY_FILE, JSON.stringify(identity, null, 2));
+  await fs.writeFile(IDENTITY_FILE, JSON.stringify(identity, null, 2));
   return identity;
 }
 

@@ -3,7 +3,6 @@
 
   import { EditorView } from "@codemirror/view";
   import {
-    type Icon as IconType,
     Bold,
     Code,
     Heading1,
@@ -18,7 +17,6 @@
     Globe,
     Share as ShareIcon,
   } from "@lucide/svelte";
-  // ... existing imports ...
 
   interface Props {
     manager: LoroNoteManager | undefined;
@@ -37,8 +35,6 @@
     noteId,
     noteTitle,
   }: Props = $props();
-
-  // ... (existing code) ...
 
   import { LoroExtensions } from "loro-codemirror";
   import Codemirror from "./Codemirror.svelte";
@@ -60,7 +56,7 @@
   import ShareModal from "$lib/components/ShareModal.svelte";
   import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
   import type { NoteOrFolder, User } from "$lib/schema.ts";
-  import { LoroNoteManager } from "$lib/loro.ts";
+  import { LoroNoteManager } from "$lib/loro.svelte.ts";
   import { EphemeralStore, UndoManager } from "loro-crdt";
   import type { Extension } from "@codemirror/state";
 
@@ -126,7 +122,7 @@
 
   let loroExtensions = $state<Extension>([]);
 
-  $effect(() => {
+  $effect.pre(() => {
     if (manager !== undefined) {
       const ephemeral = new EphemeralStore();
       const undoManager = new UndoManager(manager.doc, {});
@@ -146,11 +142,17 @@
       return () => {
         ephemeral.destroy();
       };
-    } else {
-      loroExtensions = [];
-      return;
     }
+
+    return;
   });
+
+  let extensions = $derived([
+    coreExtensions,
+    wikilinksExtension(notesList),
+    loroExtensions,
+    editorTheme,
+  ]);
 
   const tools = [
     {
@@ -246,13 +248,6 @@
       ],
     },
   ];
-
-  let extensions = $derived([
-    coreExtensions,
-    wikilinksExtension(notesList),
-    loroExtensions,
-    editorTheme,
-  ]);
 </script>
 
 <div class="relative flex h-full flex-col">
@@ -260,16 +255,12 @@
 
   <Codemirror bind:editorView {extensions} class="flex-1 overflow-y-auto" />
 
-  <HistoryPanel
-    {manager}
-    isOpen={isHistoryOpen}
-    onClose={() => (isHistoryOpen = false)}
-  />
+  <HistoryPanel {manager} bind:isOpen={isHistoryOpen} />
 
   <ShareModal
     {noteId}
     {noteTitle}
-    noteEncryptedKey={notesList?.find((n) => n.id === noteId)?.encryptedKey}
+    noteEncryptedKey={notesList.find((n) => n.id === noteId)?.encryptedKey}
     isOpen={isShareOpen}
     onClose={() => (isShareOpen = false)}
   />

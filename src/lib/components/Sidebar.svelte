@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import TreeItem from "./TreeItem.svelte";
   import { SvelteSet } from "svelte/reactivity";
@@ -10,12 +9,10 @@
     Plus,
     Trash2,
     Pencil,
-    ChevronLeft,
-    ChevronRight,
     PanelLeftClose,
     LogOut,
     Globe,
-    Users,
+    ChevronRight,
   } from "@lucide/svelte";
   import type { User } from "$lib/schema.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
@@ -31,7 +28,7 @@
   import { buildNotesTree } from "$lib/utils/tree.ts";
   import { generateNoteKey, encryptKeyForUser } from "$lib/crypto";
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import type { NoteOrFolder } from "$lib/schema.ts";
   import { page } from "$app/state";
 
@@ -43,6 +40,7 @@
   }
 
   import ConfirmationModal from "./ConfirmationModal.svelte";
+  import type { RouteId } from "$app/types";
 
   interface Props {
     user: User | undefined;
@@ -72,23 +70,14 @@
   );
 
   let rootContainer = $state<HTMLElement>();
-  let isRootDropTarget = $state(false);
 
-  // Set up root drop target
   // Set up root drop target
   $effect(() => {
     if (!rootContainer) return;
 
     const cleanup = dropTargetForElements({
       element: rootContainer,
-      onDragEnter: () => {
-        isRootDropTarget = true;
-      },
-      onDragLeave: () => {
-        isRootDropTarget = false;
-      },
       onDrop: ({ source }) => {
-        isRootDropTarget = false;
         // TODO: make this typesafe
         const sourceId = source.data["id"] as string;
         const sourceParentId = source.data["parentId"] as string | null;
@@ -167,7 +156,7 @@
     );
 
     if (page.params.id === id) {
-      goto(`${base}/`);
+      goto(resolve("/"));
     }
   }
 
@@ -201,7 +190,7 @@
     publicKey: string,
   ) {
     // Generate AES key for the note
-    const noteKey = await generateNoteKey();
+    const noteKey = generateNoteKey();
 
     // Encrypt note key with user's public key
     const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
@@ -209,7 +198,7 @@
     // Encrypt note key for Server (Broker Escrow)
     let serverEncryptedKey = "";
     try {
-      const res = await fetch(`${base}/api/server-identity`);
+      const res = await fetch(`/api/server-identity` satisfies RouteId);
       if (res.ok) {
         const identity = await res.json();
         // Use the dedicated Encryption Key (X25519)
@@ -240,70 +229,9 @@
     );
 
     if (!isFolder) {
-      goto(`${base}/notes/${newNote.id}`);
+      goto(resolve("/notes/[id]", { id: newNote.id }));
     }
   }
-
-  // Silent Migration: Escrow keys for legacy notes
-  $effect(() => {
-    if (!user || !user.privateKeyEncrypted || !user.publicKey) return;
-
-    unawaited(
-      (async () => {
-        // Find notes that need migration (owned by us, missing serverEncryptedKey)
-        const notesToMigrate = notesList.filter(
-          (n) =>
-            n.ownerId === user.id && !n.serverEncryptedKey && n.encryptedKey,
-        );
-
-        if (notesToMigrate.length === 0) return;
-
-        console.log(
-          `[Escrow] Found ${notesToMigrate.length} notes needing key escrow migration.`,
-        );
-
-        // Fetch Server Identity Key
-        let serverIdentityKey = "";
-        try {
-          const res = await fetch(`${base}/api/server-identity`);
-          if (res.ok) {
-            const identity = await res.json();
-            serverIdentityKey = identity.encryptionPublicKey;
-          }
-        } catch {
-          /* ignore */
-        }
-
-        if (!serverIdentityKey) return;
-
-        const { decryptKey } = await import("$lib/crypto");
-
-        for (const note of notesToMigrate) {
-          try {
-            // 1. Decrypt Note Key
-            const noteKey = await decryptKey(
-              note.encryptedKey,
-              user.privateKeyEncrypted,
-            );
-            // 2. Encrypt for Server
-            const serverEncryptedKey = await encryptKeyForUser(
-              noteKey,
-              serverIdentityKey,
-            );
-            // 3. Upload (using a unified update endpoint? notes.remote doesn't have one for keys yet)
-            // We need to extend updateNote to support serverEncryptedKey.
-            // For now, let's assume we update the schema first.
-            await updateNote({ noteId: note.id, serverEncryptedKey }).updates(
-              getNotes(),
-            );
-            console.log(`[Escrow] Migrated note ${note.id}`);
-          } catch (e) {
-            console.error(`[Escrow] Failed to migrate note ${note.id}`, e);
-          }
-        }
-      })(),
-    );
-  });
 
   $effect(() => {
     if (renamingId && !renameModal.open) {
@@ -317,8 +245,10 @@
 <svelte:window onclick={onWindowClick} />
 
 <div
-  class="sidebar flex h-full flex-col border-r border-base-content/10 transition-all duration-300 [view-transition-name:sidebar]"
-  style="width: {isCollapsed ? '0' : '16rem'}"
+  class={[
+    "sidebar flex h-full flex-col border-r border-base-content/10 transition-all duration-300 [view-transition-name:sidebar]",
+    isCollapsed ? "w-0" : "w-64",
+  ]}
 >
   {#if !isCollapsed}
     <!-- User Header -->
@@ -329,17 +259,17 @@
         <div
           tabindex="0"
           role="button"
-          class="btn flex items-center gap-2 px-1 font-normal btn-ghost btn-sm"
+          class="btn h-auto min-h-0 gap-3 rounded-lg px-3 py-2 normal-case btn-ghost hover:bg-base-200"
         >
-          <ProfilePicture name={user?.username ?? "A"} />
-          <span class="max-w-[120px] truncate text-sm font-medium">
+          <ProfilePicture name={user?.username[0] ?? "A"} />
+          <span class="max-w-[120px] truncate text-sm font-semibold">
             {user?.username ?? "Anonymous"}
           </span>
         </div>
         <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <ul
           tabindex="0"
-          class="dropdown-content menu z-[1] w-52 rounded-box bg-base-100 p-2 shadow"
+          class="dropdown-content menu z-1 w-52 rounded-box bg-base-100 p-2 shadow"
         >
           <li>
             <form action="/logout" method="POST" class="w-full">
@@ -374,7 +304,7 @@
             "Untitled Note",
             null,
             false,
-            user.publicKey || "",
+            user.publicKey ?? "",
           );
         }}
         class="btn"><FilePlus /> Note</button
@@ -389,7 +319,7 @@
             "New Folder",
             null,
             true,
-            user.publicKey || "",
+            user.publicKey ?? "",
           );
         }}
         class="btn"><FolderPlus /> Folder</button
@@ -416,7 +346,7 @@
           <div class="mt-1 space-y-0.5 pl-4">
             {#each sharedNotes as note (note.id)}
               <a
-                href={`${base}/notes/${note.id}`}
+                href={resolve("/notes/[id]", { id: note.id })}
                 class="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-base-content/70 hover:bg-base-content/5 hover:text-base-content {page
                   .params.id === note.id
                   ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary'
@@ -493,7 +423,7 @@
               "An Untitled Note",
               clickedId,
               false,
-              user.publicKey || "",
+              user.publicKey ?? "",
             ),
           );
           closeContextMenu();

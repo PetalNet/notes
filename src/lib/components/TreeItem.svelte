@@ -25,8 +25,8 @@
     FolderClosed,
   } from "@lucide/svelte";
   import { clsx } from "clsx";
-  import { base } from "$app/paths";
   import { page } from "$app/state";
+  import { resolve } from "$app/paths";
 
   interface Props {
     item: TreeNode;
@@ -209,8 +209,9 @@
     <div class="group relative">
       <button
         tabindex="0"
+        style:view-transition-name={`folder-${item.id}`}
         class={[
-          "flex w-full cursor-pointer items-center gap-2 rounded-md px-2  py-1.5 text-left text-sm font-medium text-base-content transition-all duration-500 select-none [view-transition-name:match-element] hover:bg-primary-content hover:text-primary hover:shadow-sm",
+          "flex w-full cursor-pointer items-center gap-2 rounded-md px-2  py-1.5 text-left text-sm font-medium text-base-content transition-all duration-500 select-none hover:bg-primary-content hover:text-primary hover:shadow-sm",
           "hover:bg-secondary-content hover:text-secondary hover:shadow-sm",
           "aria-[current=page]:bg-primary aria-[current=page]:text-primary-content aria-[current=page]:shadow-sm",
         ]}
@@ -276,10 +277,11 @@
   {:else}
     <!-- Note Item -->
     <a
-      aria-current={page.params.id === item.id ? "page" : undefined}
-      href={`${base}/notes/${item.id}`}
+      aria-current={$state.eager(page.params.id) === item.id ? "page" : false}
+      href={resolve("/notes/[id]", { id: item.id })}
+      style:view-transition-name={`note-${item.id}`}
       class={[
-        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-500 [view-transition-name:match-element]",
+        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-all duration-500",
         "hover:bg-secondary-content hover:text-secondary hover:shadow-sm",
         "aria-[current=page]:bg-primary aria-[current=page]:text-primary-content aria-[current=page]:shadow-sm",
       ]}

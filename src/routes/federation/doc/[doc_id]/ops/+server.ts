@@ -3,7 +3,6 @@ import { verify } from "$lib/crypto";
 import { db } from "$lib/server/db";
 import { federatedOps } from "$lib/server/db/schema";
 import { eq, gt, asc, and } from "drizzle-orm";
-import { signServerRequest } from "$lib/server/identity";
 import { notePubSub } from "$lib/server/pubsub";
 
 // Helper for verification (reuse from Join or export it? Duplicate for now to avoid logic split)
@@ -29,7 +28,7 @@ async function verifyServerRequest(request: Request, payload: any) {
     if (!valid) throw new Error();
     return data;
   } catch {
-    throw error(401, "Verification failed");
+    error(401, "Verification failed");
   }
 }
 
@@ -70,7 +69,7 @@ export async function POST({ params, request }) {
     throw e;
   }
 
-  if (!Array.isArray(ops)) throw error(400);
+  if (!Array.isArray(ops)) error(400);
 
   // Validate that the document exists first?
   // Ideally yes, but maybe we just accept ops for known docs.

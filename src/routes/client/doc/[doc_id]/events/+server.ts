@@ -5,20 +5,22 @@ import type { RequestHandler } from "./$types";
 import { error } from "@sveltejs/kit";
 import { notePubSub } from "$lib/server/pubsub";
 import { parseNoteId } from "$lib/noteId";
-import { env } from "$env/dynamic/private";
+import { unawaited } from "$lib/unawaited.ts";
 
-export const GET: RequestHandler = async ({ params, url }) => {
-  const { doc_id } = params;
+export const GET: RequestHandler = async ({ params: { doc_id }, url }) => {
   console.log("HIT-SSE: Handler invoked for", doc_id);
   const since = url.searchParams.get("since");
   // Default to 0 (beginning of time) to fetch full history if 'since' is not provided.
-  let lastTs = since ? parseInt(since) : 0;
+  const lastTs = since ? parseInt(since) : 0;
 
-  console.log(`[EVENTS] Connection request for ${doc_id}, since=${since}`);
+  console.log(
+    `[EVENTS] Connection request for ${doc_id}, since=${since ?? "0"}`,
+  );
 
-  let doc = await db.query.documents.findFirst({
-    where: eq(documents.id, doc_id),
-  });
+  let doc: { hostServer: string } | undefined =
+    await db.query.documents.findFirst({
+      where: eq(documents.id, doc_id),
+    });
 
   // If not in DB, check if it's a valid remote ID (Ephemeral/Anonymous access)
   if (!doc) {
@@ -29,7 +31,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
         console.log(
           `[EVENTS] Ephemeral note inferred from ID. Origin: ${origin}. Proxying...`,
         );
-        doc = { hostServer: origin } as any;
+        doc = { hostServer: origin };
       }
     } catch (e) {
       console.error("[EVENTS] ERROR parsing note ID:", e);
@@ -39,10 +41,10 @@ export const GET: RequestHandler = async ({ params, url }) => {
 
   if (!doc) {
     console.error(`[EVENTS] Document not found: ${doc_id}`);
-    throw error(404, "Document not found");
+    error(404, "Document not found");
   }
 
-  const isRemote = doc && doc.hostServer !== "local";
+  const isRemote = doc.hostServer !== "local";
 
   let remoteReader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   let abortController: AbortController | null = null;
@@ -56,7 +58,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
           console.log(`[CLIENT-SSE] Proxying to remote ${doc.hostServer}`);
 
           // Connect to remote SSE
-          const remoteUrl = `http://${doc.hostServer}/federation/doc/${encodeURIComponent(doc_id)}/events?since=${lastTs}`;
+          const remoteUrl = `http://${doc.hostServer}/federation/doc/${encodeURIComponent(doc_id)}/events?since=${lastTs.toFixed()}`;
 
           // We need to sign this if we enforce auth, but we relaxed it for now.
           abortController = new AbortController();
@@ -72,7 +74,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
               `[CLIENT-SSE] Remote connection failed:`,
               response.status,
             );
-            throw new Error(`Remote SSE failed: ${response.status}`);
+            throw new Error(`Remote SSE failed: ${response.status.toFixed()}`);
           }
 
           remoteReader = response.body.getReader();
@@ -103,7 +105,7 @@ export const GET: RequestHandler = async ({ params, url }) => {
             controller.error(e);
           } finally {
             // Ensure we unsubscribe from local updates when remote stream ends or errors
-            if (unsubscribe) unsubscribe();
+            unsubscribe();
           }
         } else {
           // Local logic: Monitor DB (Polling or PubSub locally too?)
@@ -144,29 +146,33 @@ export const GET: RequestHandler = async ({ params, url }) => {
           heartbeat = setInterval(() => {
             try {
               controller.enqueue(": keep-alive\n\n");
-            } catch (e) {
+            } catch {
               if (heartbeat) clearInterval(heartbeat);
             }
           }, 30000);
 
           // Never resolve, keep stream open until cancelled
-          await new Promise(() => {});
+          await new Promise(() => {
+            /* empty */
+          });
         }
       } catch (e) {
         console.error("[CLIENT-SSE] Stream error:", e);
         // If error occurs, we should cleanup and close
-        if (remoteReader) remoteReader.cancel();
+        if (remoteReader) unawaited(remoteReader.cancel());
         if (abortController) abortController.abort();
         if (heartbeat) clearInterval(heartbeat);
         if (unsubscribe) unsubscribe();
         try {
           controller.close();
-        } catch {} // ignore if already closed
+        } catch {
+          // ignore if already closed
+        }
       }
     },
     cancel() {
       console.log(`[CLIENT-SSE] Stream cancelled for ${doc_id}`);
-      if (remoteReader) remoteReader.cancel();
+      if (remoteReader) unawaited(remoteReader.cancel());
       if (abortController) abortController.abort();
       if (heartbeat) clearInterval(heartbeat);
       if (unsubscribe) unsubscribe();

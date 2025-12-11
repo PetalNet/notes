@@ -7,11 +7,11 @@ class NotePubSub extends EventEmitter {
     this.setMaxListeners(1000);
   }
 
-  publish(docId: string, data: any) {
+  publish(docId: string, data: unknown) {
     this.emit(`op:${docId}`, data);
   }
 
-  subscribe(docId: string, callback: (data: any) => void) {
+  subscribe(docId: string, callback: (data: unknown) => void) {
     const eventName = `op:${docId}`;
     this.on(eventName, callback);
     return () => this.off(eventName, callback);

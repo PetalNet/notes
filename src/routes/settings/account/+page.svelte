@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { encryptWithPassword, decryptWithPassword } from "$lib/crypto.ts";
+  import { encryptWithPassword } from "$lib/crypto.ts";
   import { changePassword } from "$lib/remote/accounts.remote.ts";
   import { changePasswordSchema } from "$lib/remote/accounts.schema.ts";
 
@@ -14,7 +14,7 @@
   let hiddenKeyInput: HTMLInputElement;
   let formElement: HTMLFormElement;
 
-  async function handleChangePassword() {
+  function handleChangePassword() {
     statusMessage = "";
     if (newPassword !== newPasswordConfirm) {
       statusMessage = "New passwords do not match";
@@ -45,13 +45,13 @@
       }
 
       // 2. Validate Old Password?
-      // We can't really validat eit client side unless we try to decrypt something.
+      // We can't really validate it client side unless we try to decrypt something.
       // But for Change Password, we assume they are logged in.
       // Actually, re-encrypting with new password DOES NOT require old password
       // IF we already have the raw key in memory.
 
-      // 3. Encrypt with New Passowrd
-      const newEncryptedKey = await encryptWithPassword(rawKey, newPassword);
+      // 3. Encrypt with New Password
+      const newEncryptedKey = encryptWithPassword(rawKey, newPassword);
 
       // 4. Submit
       hiddenNewPasswordInput.value = newPassword;

@@ -2,7 +2,6 @@ import type { User } from "$lib/schema.ts";
 import { db } from "$lib/server/db";
 import { eq, ne } from "drizzle-orm";
 import type { SharedNote } from "$lib/remote/notes.remote.ts";
-import { documents } from "$lib/server/db/schema.ts";
 
 export interface Data {
   user: User | undefined;
@@ -28,7 +27,7 @@ export const load = async ({ locals }): Promise<Data> => {
 
   const sharedNotes: SharedNote[] = sharedDocs.map((doc) => ({
     id: doc.id,
-    title: doc.title || "Untitled",
+    title: doc.title ?? "Untitled",
     hostServer: doc.hostServer,
     ownerId: doc.ownerId,
     accessLevel: doc.accessLevel,

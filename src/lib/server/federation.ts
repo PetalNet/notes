@@ -2,16 +2,16 @@
  * Federation utilities for cross-server communication
  */
 
-import { encryptKeyForDevice, decryptKeyForDevice } from "$lib/crypto";
+import { encryptKeyForDevice } from "$lib/crypto";
 
 export interface RemoteUserIdentity {
   id: string;
   handle: string;
   publicKey: string | null;
-  devices: Array<{
+  devices: {
     device_id: string;
     public_key: string;
-  }>;
+  }[];
 }
 
 /**
@@ -32,7 +32,7 @@ export async function fetchUserIdentity(
   if (cleanHandle.includes(":")) {
     // Federated handle: user:domain.com
     const parts = cleanHandle.split(":");
-    username = parts[0] || "";
+    username = parts[0] ?? "";
     domain = parts.slice(1).join(":"); // Handle domain:port
   } else {
     // Local handle or just username
@@ -54,12 +54,14 @@ export async function fetchUserIdentity(
     });
 
     if (!res.ok) {
-      console.error(`Failed to fetch identity for ${handle}: ${res.status}`);
+      console.error(
+        `Failed to fetch identity for ${handle}: ${res.status.toFixed()}`,
+      );
       return null;
     }
 
-    const data = await res.json();
-    return data as RemoteUserIdentity;
+    const data = (await res.json()) as unknown as RemoteUserIdentity;
+    return data;
   } catch (err) {
     console.error(`Error fetching identity for ${handle}:`, err);
     return null;
@@ -70,12 +72,12 @@ export async function fetchUserIdentity(
  * Encrypt a document key for a remote user
  * Uses the user's primary public key (or first device key if no user key)
  */
-export function encryptDocumentKeyForUser(
+export async function encryptDocumentKeyForUser(
   documentKey: string,
   identity: RemoteUserIdentity,
-): string | null {
+): Promise<string | null> {
   // Prefer user's main public key, fallback to first device
-  const publicKey = identity.publicKey || identity.devices[0]?.public_key;
+  const publicKey = identity.publicKey ?? identity.devices[0]?.public_key;
 
   if (!publicKey) {
     console.error(`No public key found for user ${identity.handle}`);
@@ -83,7 +85,7 @@ export function encryptDocumentKeyForUser(
   }
 
   try {
-    return encryptKeyForDevice(documentKey, publicKey);
+    return await encryptKeyForDevice(documentKey, publicKey);
   } catch (err) {
     console.error(`Failed to encrypt key for ${identity.handle}:`, err);
     return null;
@@ -98,17 +100,17 @@ export async function generateKeyEnvelopesForUsers(
   userHandles: string[],
   requestingDomain: string,
 ): Promise<
-  Array<{
+  {
     user_id: string;
     encrypted_key: string;
     device_id: string;
-  }>
+  }[]
 > {
-  const envelopes: Array<{
+  const envelopes: {
     user_id: string;
     encrypted_key: string;
     device_id: string;
-  }> = [];
+  }[] = [];
 
   for (const handle of userHandles) {
     const identity = await fetchUserIdentity(handle, requestingDomain);
@@ -119,7 +121,10 @@ export async function generateKeyEnvelopesForUsers(
 
     // Generate envelope for user's main key
     if (identity.publicKey) {
-      const encryptedKey = encryptDocumentKeyForUser(documentKey, identity);
+      const encryptedKey = await encryptDocumentKeyForUser(
+        documentKey,
+        identity,
+      );
       if (encryptedKey) {
         envelopes.push({
           user_id: identity.handle,
@@ -132,7 +137,7 @@ export async function generateKeyEnvelopesForUsers(
     // Optionally generate envelopes for each device
     for (const device of identity.devices) {
       try {
-        const encryptedKey = encryptKeyForDevice(
+        const encryptedKey = await encryptKeyForDevice(
           documentKey,
           device.public_key,
         );

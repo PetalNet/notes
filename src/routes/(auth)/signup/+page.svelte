@@ -76,19 +76,15 @@
                 if (issues && issues.length > 0) return;
 
                 // 2. Generate Keys
-                const { publicKey, privateKey } = await generateUserKeys(); // privateKey is base64 raw
+                const { publicKey, privateKey } = generateUserKeys(); // privateKey is base64 raw
 
                 // 3. Encrypt
                 // Get password value directly from schema store or input?
                 // The schema store `.value` holds the current value.
-                let password = signup.fields._password.value;
-                if (typeof password === "function") {
-                  // @ts-ignore - Signal getter
-                  password = password();
-                }
+                const password = signup.fields._password.value();
                 if (!password) return; // Should be caught by validation
 
-                const encryptedWithPw = await encryptWithPassword(
+                const encryptedWithPw = encryptWithPassword(
                   privateKey,
                   password as unknown as string,
                 );

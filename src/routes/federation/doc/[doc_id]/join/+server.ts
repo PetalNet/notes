@@ -8,7 +8,6 @@ import {
   fetchUserIdentity,
   generateKeyEnvelopesForUsers,
 } from "$lib/server/federation";
-import { parseNoteId } from "$lib/noteId";
 
 // Helper to verify request signature
 async function verifyServerRequest(request: Request, payload: any) {
@@ -17,7 +16,7 @@ async function verifyServerRequest(request: Request, payload: any) {
   const domain = request.headers.get("x-notes-domain");
 
   if (!signature || !timestamp || !domain) {
-    throw error(401, "Missing signature headers");
+    error(401, "Missing signature headers");
   }
 
   // Fetch remote server key
@@ -39,11 +38,11 @@ async function verifyServerRequest(request: Request, payload: any) {
       data.publicKey,
     );
 
-    if (!valid) throw error(401, "Invalid signature");
+    if (!valid) error(401, "Invalid signature");
     return data; // validated server info
   } catch (e) {
     console.error("Verification failed", e);
-    throw error(401, "Verification failed");
+    error(401, "Verification failed");
   }
 }
 
@@ -69,15 +68,15 @@ export async function POST({ params, request }) {
   // Try with decoded doc_id (in case it was URL-encoded)
   const decodedDocId = decodeURIComponent(doc_id);
 
-  let doc = await db.query.documents.findFirst({
+  const doc = await db.query.documents.findFirst({
     where: eq(documents.id, decodedDocId),
   });
-  console.log("  documents.findFirst(decoded):", doc?.id || "NOT FOUND");
+  console.log("  documents.findFirst(decoded):", doc?.id ?? "NOT FOUND");
 
-  let note = await db.query.notes.findFirst({
+  const note = await db.query.notes.findFirst({
     where: eq(notes.id, decodedDocId),
   });
-  console.log("  notes.findFirst(decoded):", note?.id || "NOT FOUND");
+  console.log("  notes.findFirst(decoded):", note?.id ?? "NOT FOUND");
 
   if (!note && !doc) {
     // List all notes in DB for debugging
@@ -87,13 +86,13 @@ export async function POST({ params, request }) {
       allNotes.map((n) => n.id),
     );
     console.error(`  Document not found: ${doc_id}`);
-    throw error(404, "Document not found");
+    error(404, "Document not found");
   }
 
   console.log("  Found note:", note?.id, "accessLevel:", note?.accessLevel);
 
   // 2. Check permissions based on access_level
-  const accessLevel = note?.accessLevel || doc?.accessLevel || "private";
+  const accessLevel = note?.accessLevel ?? doc?.accessLevel ?? "private";
 
   if (accessLevel === "private" || accessLevel === "invite_only") {
     // Require pre-existing membership for private/invite-only notes
@@ -105,31 +104,28 @@ export async function POST({ params, request }) {
     });
 
     if (memberRows.length === 0) {
-      throw error(
-        403,
-        "This note is private. You must be invited to access it.",
-      );
+      error(403, "This note is private. You must be invited to access it.");
     }
     // Permission granted! Fall through to generate fresh envelopes.
   }
 
   // 3. For authenticated/open notes, generate encrypted keys for joining users
-  const snapshot = note?.loroSnapshot || null;
-  const encryptedDocKey = note?.documentKeyEncrypted || note?.encryptedKey;
+  const snapshot = note?.loroSnapshot ?? undefined;
+  const encryptedDocKey = note?.documentKeyEncrypted ?? note?.encryptedKey;
 
   if (!encryptedDocKey) {
-    throw error(500, "Document key not found");
+    error(500, "Document key not found");
   }
 
   // Get the owner's private key to decrypt the document key
   // Note: In a real E2EE system, the server wouldn't have access to decrypted keys
   // This is a simplified approach where the server can re-encrypt for new users
   const owner = await db.query.users.findFirst({
-    where: eq(users.id, note?.ownerId || ""),
+    where: eq(users.id, note.ownerId),
   });
 
   if (!owner) {
-    throw error(500, "Document owner not found");
+    error(500, "Document owner not found");
   }
 
   // For authenticated/open notes, we'll generate envelopes by:
@@ -154,7 +150,7 @@ export async function POST({ params, request }) {
         );
       } catch (e) {
         console.error("[JOIN] Failed to decrypt public note key:", e);
-        throw error(500, "Failed to unlock public note");
+        error(500, "Failed to unlock public note");
       }
     } else if (encryptedDocKey.length <= 44) {
       rawDocKey = encryptedDocKey; // Legacy public
@@ -167,7 +163,7 @@ export async function POST({ params, request }) {
         snapshot,
         envelopes: [], // No envelopes needed for public Key
         rawKey: rawDocKey, // Send RAW key to anonymous user
-        title: note?.title || "Untitled",
+        title: note?.title ?? "Untitled",
         ownerId: note?.ownerId,
         accessLevel,
       });
@@ -205,7 +201,7 @@ export async function POST({ params, request }) {
       console.warn(
         `[JOIN] Request for E2EE note ${note?.id}. Server cannot fulfill automatically (No Escrow).`,
       );
-      throw error(
+      error(
         424,
         "E2EE_KEY_UNAVAILABLE: Server cannot decrypt note key. The owner must be online to approve or the note must be shared via client-side flow.",
       );
@@ -221,13 +217,13 @@ export async function POST({ params, request }) {
         snapshot,
         envelopes: [],
         passwordEncryptedKey: doc.passwordEncryptedKey,
-        title: note?.title || "Untitled",
+        title: note?.title ?? "Untitled",
         ownerId: note?.ownerId,
         accessLevel,
       });
     } else {
       // If password key is missing, it's an error state for this mode
-      throw error(
+      error(
         424,
         "PASSWORD_KEY_UNAVAILABLE: Note is password protected but no password key was found.",
       );
@@ -236,7 +232,7 @@ export async function POST({ params, request }) {
 
   // Debug Identity Fetching
   for (const handle of joiningUsers) {
-    const id = await fetchUserIdentity(handle, requesting_server);
+    await fetchUserIdentity(handle, requesting_server);
   }
 
   const envelopes = await generateKeyEnvelopesForUsers(
@@ -247,7 +243,7 @@ export async function POST({ params, request }) {
 
   // Ensure documents entry exists (required for members FK constraint)
   // Use the actual note ID (which may be a portable ID)
-  const noteId = note?.id || decodedDocId;
+  const noteId = note?.id ?? decodedDocId;
   const docEntry = await db.query.documents.findFirst({
     where: eq(documents.id, noteId),
   });
@@ -259,8 +255,8 @@ export async function POST({ params, request }) {
       .values({
         id: noteId,
         hostServer: "local",
-        ownerId: note?.ownerId || "",
-        title: note?.title || "Untitled",
+        ownerId: note?.ownerId ?? "",
+        title: note?.title ?? "Untitled",
         accessLevel: accessLevel,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -294,7 +290,7 @@ export async function POST({ params, request }) {
     doc_id: decodedDocId,
     snapshot,
     envelopes,
-    title: note?.title || "Untitled",
+    title: note?.title ?? "Untitled",
     ownerId: note?.ownerId,
     accessLevel,
   });

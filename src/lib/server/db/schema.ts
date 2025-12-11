@@ -2,7 +2,6 @@ import {
   sqliteTable,
   text,
   integer,
-  blob,
   primaryKey,
 } from "drizzle-orm/sqlite-core";
 
@@ -70,9 +69,7 @@ export const members = sqliteTable(
       .notNull()
       .$defaultFn(() => new Date()),
   },
-  (t) => ({
-    pk: primaryKey({ columns: [t.docId, t.userId, t.deviceId] }),
-  }),
+  (t) => [primaryKey({ columns: [t.docId, t.userId, t.deviceId] })],
 );
 
 export const federatedOps = sqliteTable("federated_ops", {

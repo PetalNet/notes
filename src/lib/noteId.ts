@@ -1,7 +1,6 @@
 /**
  * Utilities for creating and parsing domain-prefixed note IDs
  * Format: {base64url(origin)}~{uuid}
- * Example: bG9jYWxob3N0OjUxNzM~2472a017-f681-4fdd-bd46-80207dc3c5fb
  */
 
 /**
@@ -9,10 +8,11 @@
  */
 export function createNoteId(serverDomain: string): string {
   const uuid = crypto.randomUUID();
-  const domainB64 = btoa(serverDomain)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=/g, "");
+
+  const domainB64 = Uint8Array.from(serverDomain, (c) =>
+    c.charCodeAt(0),
+  ).toBase64({ alphabet: "base64url", omitPadding: true });
+
   return `${domainB64}~${uuid}`;
 }
 
@@ -24,20 +24,18 @@ export function parseNoteId(id: string): {
   uuid: string;
   fullId: string;
 } {
-  if (!id.includes("~")) {
-    throw new Error(`Invalid portable ID format: ${id} (missing ~)`);
-  }
+  const sepIndex = id.indexOf("~");
+  if (sepIndex === -1) throw new Error(`Invalid portable ID format: ${id}`);
 
-  const parts = id.split("~");
-  const domainB64 = parts[0];
-  const uuid = parts[1];
+  const domainB64 = id.slice(0, sepIndex);
+  const uuid = id.slice(sepIndex + 1);
 
-  if (!domainB64 || !uuid) {
-    throw new Error(`Malformed portable ID: ${id}`);
-  }
+  if (!domainB64 || !uuid) throw new Error(`Malformed portable ID: ${id}`);
 
-  const padded = domainB64 + "=".repeat((4 - (domainB64.length % 4)) % 4);
-  const origin = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+  // Decode base64url directly to string without intermediate array
+  const origin = new TextDecoder().decode(
+    Uint8Array.fromBase64(domainB64, { alphabet: "base64url" }),
+  );
 
   return { origin, uuid, fullId: id };
 }
@@ -49,9 +47,7 @@ export function isLocalNote(noteId: string, currentDomain: string): boolean {
   try {
     const { origin } = parseNoteId(noteId);
     return !origin || origin === currentDomain;
-  } catch (e) {
-    // If it's malformed, it's definitely not a valid local note??
-    // Or maybe we should assume false.
+  } catch {
     return false;
   }
 }

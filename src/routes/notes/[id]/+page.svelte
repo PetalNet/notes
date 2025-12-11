@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  const loroManagers = new SvelteMap<string, LoroNoteManager>();
+</script>
+
 <script lang="ts">
   import { dev } from "$app/environment";
   import { page } from "$app/state";
@@ -7,6 +11,7 @@
   import { unawaited } from "$lib/unawaited.ts";
   import { decryptKey } from "$lib/crypto";
   import { FilePlus, Folder } from "@lucide/svelte";
+  import { SvelteMap } from "svelte/reactivity";
 
   const { data } = $props();
 
@@ -14,7 +19,9 @@
   let id = $derived(page.params.id);
   const userPrivateKey = data.user?.privateKeyEncrypted;
 
-  let loroManager = $state<LoroNoteManager>();
+  let loroManager = $derived(
+    id !== undefined ? loroManagers.get(id) : undefined,
+  );
   // TODO: Use codemirror-server-render to SSR the editor
   let editorContent = $state("");
 
@@ -45,43 +52,27 @@
 
           if (key) {
             console.debug("[Page] Loading Loro manager for note:", id);
-            try {
-              // TODO: Cache again?
-              const manager = new LoroNoteManager(id, key, async (snapshot) => {
+
+            const manager = await LoroNoteManager.create(
+              id,
+              key,
+              async (snapshot) => {
                 await updateNote({ noteId: id, loroSnapshot: snapshot });
-              });
+              },
+              note.loroSnapshot,
+            );
 
-              if (note.loroSnapshot) {
-                await manager.init(note.loroSnapshot);
-              }
-
-              if (signal.aborted as boolean) {
-                manager.destroy();
-                return;
-              }
-
-              manager.startSync();
-              loroManager = manager;
-
-              // Sync content from server
-              editorContent = manager.getContent();
-
-              // Subscribe to content changes
-              unsubscribeContent = manager.subscribeToContent((content) => {
-                console.debug(
-                  "[Page] Content update received. Preview:",
-                  content.slice(0, 20),
-                );
-                editorContent = content;
-              });
+            if (signal.aborted as boolean) {
+              manager.stopSync();
               return;
-            } catch (error) {
-              console.error("Failed to load note:", error);
             }
-          }
-        }
 
-        if (!note || note.isFolder) {
+            manager.startSync();
+            loroManagers.set(id, manager);
+
+            return;
+          }
+        } else if (!note || note.isFolder) {
           console.debug("[Page] No valid note selected or is folder");
         }
         editorContent = "";
@@ -91,8 +82,7 @@
     return () => {
       console.debug("[Page] Cleaning up previous subscription");
       abortController.abort();
-      loroManager?.destroy();
-      loroManager = undefined;
+      loroManager?.stopSync();
       unsubscribeContent?.();
     };
   });
@@ -100,14 +90,7 @@
 
 <div class="relative h-full flex-1 overflow-hidden">
   {#if !(note?.isFolder ?? true)}
-    <Editor
-      content={editorContent}
-      {notesList}
-      onchange={(newContent: string) => {
-        // Hook in Loro
-        loroManager?.updateContent(newContent);
-      }}
-    />
+    <Editor manager={loroManager} {notesList} user={data.user} />
   {:else if note?.isFolder}
     <div class="flex h-full items-center justify-center text-slate-400">
       <div class="text-center">

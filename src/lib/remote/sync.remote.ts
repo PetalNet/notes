@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { Schema } from "effect";
 import { syncSchema, syncSchemaJson } from "./notes.schemas.ts";
 
-export const sync = command(syncSchema, async ({ noteId, updates }) => {
+export const sync = command(syncSchema, async ({ noteId, update }) => {
   const { locals } = getRequestEvent();
   const user = locals.user;
 
@@ -21,11 +21,11 @@ export const sync = command(syncSchema, async ({ noteId, updates }) => {
 
     if (!note || note.ownerId !== user.id) error(404, "Not found");
 
-    console.debug("Syncing", noteId);
+    console.log("Syncing", noteId);
 
     // Broadcast update to all connected clients
     // The update is expected to be a base64 string of the binary update
-    broadcast(noteId, Schema.encodeSync(syncSchemaJson)({ noteId, updates }));
+    broadcast(noteId, Schema.encodeSync(syncSchemaJson)({ noteId, update }));
   } catch (err) {
     console.error("Sync update error:", err);
     error(500, "Failed to process update");

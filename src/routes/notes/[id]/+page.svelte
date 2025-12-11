@@ -32,7 +32,7 @@
     unawaited(
       (async (signal) => {
         if (id && note && !note.isFolder) {
-          let key: string | undefined;
+          let key: Uint8Array<ArrayBuffer> | undefined;
           if (userPrivateKey) {
             try {
               key = await decryptKey(note.encryptedKey, userPrivateKey);

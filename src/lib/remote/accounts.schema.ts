@@ -1,3 +1,4 @@
+import { Uint8ArrayFromBase64Schema } from "$lib/schema.ts";
 import { Schema } from "effect";
 
 const UsernameSchema = Schema.String.pipe(
@@ -51,8 +52,8 @@ export const SignupSchema = Schema.Struct({
     title: "Password",
     description: "account password",
   }),
-  publicKey: Schema.String,
-  privateKeyEncrypted: Schema.String,
+  publicKey: Uint8ArrayFromBase64Schema,
+  privateKeyEncrypted: Uint8ArrayFromBase64Schema,
 });
 
 export const signupSchema = SignupSchema.pipe(Schema.standardSchemaV1);

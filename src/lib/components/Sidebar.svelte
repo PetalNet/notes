@@ -170,7 +170,7 @@
     title: string,
     parentId: string | null,
     isFolder: boolean,
-    publicKey: string,
+    publicKey: Uint8Array<ArrayBuffer>,
   ) {
     // Generate AES key for the note
     const noteKey = await generateNoteKey();

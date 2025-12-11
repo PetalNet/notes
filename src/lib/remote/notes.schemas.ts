@@ -1,10 +1,11 @@
+import { Uint8ArrayFromSelfSchema } from "$lib/schema.ts";
 import { Schema } from "effect";
 
 export const CreateNoteSchema = Schema.Struct({
   title: Schema.String,
   parentId: Schema.String.pipe(Schema.NullOr),
   isFolder: Schema.Boolean,
-  encryptedKey: Schema.String,
+  encryptedKey: Uint8ArrayFromSelfSchema,
 });
 export const createNoteSchema = CreateNoteSchema.pipe(Schema.standardSchemaV1);
 
@@ -14,9 +15,10 @@ export const deleteNoteSchema = DeleteNoteSchema.pipe(Schema.standardSchemaV1);
 export const UpdateNoteSchema = Schema.Struct({
   noteId: Schema.String,
   title: Schema.optional(Schema.String),
-  loroSnapshot: Schema.optional(Schema.String),
+  loroSnapshot: Schema.optional(Uint8ArrayFromSelfSchema),
   parentId: Schema.optional(Schema.String.pipe(Schema.NullOr)),
 });
+
 export const updateNoteSchema = UpdateNoteSchema.pipe(Schema.standardSchemaV1);
 
 export const ReorderNotesSchema = Schema.Struct({

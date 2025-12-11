@@ -3,7 +3,7 @@ import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { sync } from "$lib/remote/sync.remote.ts";
 import { Chunk, Effect, Fiber, Function, PubSub, Schema, Stream } from "effect";
 import diff from "fast-diff";
-import { LoroDoc, LoroText, type Frontiers } from "loro-crdt";
+import { LoroDoc, type LoroText, type Frontiers } from "loro-crdt";
 
 export type Doc = LoroDoc<{
   content: LoroText;
@@ -11,14 +11,14 @@ export type Doc = LoroDoc<{
 
 export class LoroNoteManager {
   #noteId: string;
-  #noteKey: string;
+  #noteKey: Uint8Array<ArrayBuffer>;
   #doc: Doc;
   #text: LoroText;
-  #onUpdate: (snapshot: string) => void | Promise<void>;
+  #onUpdate: (snapshot: Uint8Array<ArrayBuffer>) => void | Promise<void>;
   #eventSource: EventSource | null = null;
   #isSyncing = false;
 
-  #outgoingHub: PubSub.PubSub<Uint8Array>;
+  #outgoingHub: PubSub.PubSub<Uint8Array<ArrayBuffer>>;
   #persistenceHub: PubSub.PubSub<null>;
 
   #persistenceFiber: Fiber.RuntimeFiber<void, void>;
@@ -27,8 +27,8 @@ export class LoroNoteManager {
 
   constructor(
     noteId: string,
-    noteKey: string,
-    onUpdate?: (snapshot: string) => void | Promise<void>,
+    noteKey: Uint8Array<ArrayBuffer>,
+    onUpdate?: (snapshot: Uint8Array<ArrayBuffer>) => void | Promise<void>,
   ) {
     this.#noteId = noteId;
     this.#noteKey = noteKey;
@@ -40,7 +40,9 @@ export class LoroNoteManager {
     this.#lastFrontiers = this.#doc.frontiers();
 
     // 1. Init Hubs
-    this.#outgoingHub = Effect.runSync(PubSub.unbounded<Uint8Array>());
+    this.#outgoingHub = Effect.runSync(
+      PubSub.unbounded<Uint8Array<ArrayBuffer>>(),
+    );
     this.#persistenceHub = Effect.runSync(PubSub.unbounded<null>());
 
     // 2. Persistence Loop (Debounced Snapshot)
@@ -48,7 +50,7 @@ export class LoroNoteManager {
       Stream.debounce("500 millis"),
       Stream.runForEach(() =>
         Effect.promise(async () => {
-          const snapshot = await this.getEncryptedSnapshot();
+          const snapshot = await getEncryptedSnapshot(this.#doc, this.#noteKey);
           await this.#onUpdate(snapshot);
         }),
       ),
@@ -73,7 +75,7 @@ export class LoroNoteManager {
           const update = this.#doc.export({
             mode: "shallow-snapshot",
             frontiers: this.#lastFrontiers,
-          });
+          }) as Uint8Array<ArrayBuffer>;
           this.#lastFrontiers = frontiers;
           if (update.length > 0) {
             Effect.runSync(this.#outgoingHub.publish(update));
@@ -108,9 +110,9 @@ export class LoroNoteManager {
   /**
    * Initialize the manager with an encrypted snapshot
    */
-  async init(encryptedSnapshot?: string) {
+  async init(encryptedSnapshot?: Uint8Array<ArrayBuffer>) {
     if (encryptedSnapshot) {
-      await this.loadEncryptedSnapshot(encryptedSnapshot);
+      await loadEncryptedSnapshot(encryptedSnapshot, this.#doc, this.#noteKey);
       this.#lastFrontiers = this.#doc.frontiers();
     }
   }
@@ -127,7 +129,7 @@ export class LoroNoteManager {
     this.#eventSource = new EventSource(`/api/sync/${this.#noteId}`);
 
     // 3. Incoming Loop (Remote -> Loro)
-    const incomingStream = Stream.async<Uint8Array>((emit) => {
+    const incomingStream = Stream.async<Uint8Array<ArrayBuffer>>((emit) => {
       if (this.#eventSource) {
         this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
           try {
@@ -248,29 +250,34 @@ export class LoroNoteManager {
 
     this.#doc.commit();
   }
+}
 
-  /**
-   * Get encrypted snapshot for storage
-   */
-  async getEncryptedSnapshot(): Promise<string> {
-    const snapshot = this.#doc.export({
-      mode: "snapshot",
-    }) as Uint8Array<ArrayBuffer>;
-    const encrypted = await encryptData(snapshot, this.#noteKey);
-    return encrypted.toBase64();
-  }
+/**
+ * Get encrypted snapshot for storage
+ */
+export async function getEncryptedSnapshot(
+  doc: Doc,
+  noteKey: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
+  const snapshot = doc.export({
+    mode: "snapshot",
+  }) as Uint8Array<ArrayBuffer>;
+  return await encryptData(snapshot, noteKey);
+}
 
-  /**
-   * Load from encrypted snapshot
-   */
-  async loadEncryptedSnapshot(encryptedSnapshot: string) {
-    try {
-      const encryptedBytes = Uint8Array.fromBase64(encryptedSnapshot);
-      const decrypted = await decryptData(encryptedBytes, this.#noteKey);
-      this.#doc.import(decrypted);
-    } catch (error) {
-      console.error("Failed to load encrypted snapshot:", error);
-      throw error;
-    }
+/**
+ * Load from encrypted snapshot
+ */
+async function loadEncryptedSnapshot(
+  encryptedSnapshot: Uint8Array<ArrayBuffer>,
+  doc: Doc,
+  noteKey: Uint8Array<ArrayBuffer>,
+) {
+  try {
+    const decrypted = await decryptData(encryptedSnapshot, noteKey);
+    doc.import(decrypted);
+  } catch (error) {
+    console.error("Failed to load encrypted snapshot:", error);
+    throw error;
   }
 }

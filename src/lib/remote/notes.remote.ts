@@ -11,6 +11,8 @@ import {
   reorderNotesSchema,
   updateNoteSchema,
 } from "./notes.schemas.ts";
+import { LoroDoc } from "loro-crdt";
+import { getEncryptedSnapshot } from "$lib/loro.ts";
 
 export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   const { user } = requireLogin();
@@ -45,23 +47,24 @@ export const createNote = command(
     const { user } = requireLogin();
 
     try {
-      if (!title || !encryptedKey) {
-        error(400, "Missing required fields");
-      }
-
       const id = crypto.randomUUID();
+
+      const loroSnapshot = await getEncryptedSnapshot(
+        new LoroDoc(),
+        encryptedKey,
+      );
 
       await db.insert(notes).values({
         id,
         title,
         ownerId: user.id,
         encryptedKey,
-        loroSnapshot: null,
+        loroSnapshot,
         parentId,
         isFolder,
         createdAt: new Date(),
         updatedAt: new Date(),
-      });
+      } satisfies typeof notes.$inferInsert);
 
       const note = await db.query.notes.findFirst({
         where: {

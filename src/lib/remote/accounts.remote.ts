@@ -67,7 +67,7 @@ export const signup = form(
         publicKey,
         privateKeyEncrypted,
         createdAt: new Date(),
-      });
+      } satisfies table.User);
 
       const sessionToken = auth.generateSessionToken();
       const session = await auth.createSession(sessionToken, id);

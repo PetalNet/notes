@@ -3,8 +3,8 @@
  */
 
 interface KeyPair {
-  publicKey: string;
-  privateKey: string;
+  publicKey: Uint8Array<ArrayBuffer>;
+  privateKey: Uint8Array<ArrayBuffer>;
 }
 
 export async function generateUserKeys(): Promise<KeyPair> {
@@ -29,16 +29,16 @@ export async function generateUserKeys(): Promise<KeyPair> {
   );
 
   return {
-    publicKey: new Uint8Array(publicKeyData).toBase64(),
+    publicKey: new Uint8Array(publicKeyData),
 
     // TODO: Proper encryption
     // For now, encode private key to base64
     // In production, use PBKDF2 to derive encryption key
-    privateKey: new Uint8Array(privateKeyData).toBase64(),
+    privateKey: new Uint8Array(privateKeyData),
   };
 }
 
-export async function generateNoteKey(): Promise<string> {
+export async function generateNoteKey(): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.generateKey(
     {
       name: "AES-GCM",
@@ -49,19 +49,16 @@ export async function generateNoteKey(): Promise<string> {
   );
 
   const keyData = await crypto.subtle.exportKey("raw", key);
-  return new Uint8Array(keyData).toBase64();
+  return new Uint8Array(keyData);
 }
 
 export async function encryptKeyForUser(
-  noteKey: string,
-  recipientPublicKey: string,
-): Promise<string> {
-  const keyBuffer = Uint8Array.fromBase64(noteKey);
-  const publicKeyBuffer = Uint8Array.fromBase64(recipientPublicKey);
-
+  noteKey: Uint8Array<ArrayBuffer>,
+  recipientPublicKey: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
   const publicKey = await crypto.subtle.importKey(
     "spki",
-    publicKeyBuffer,
+    recipientPublicKey,
     {
       name: "RSA-OAEP",
       hash: "SHA-256",
@@ -75,22 +72,19 @@ export async function encryptKeyForUser(
       name: "RSA-OAEP",
     },
     publicKey,
-    keyBuffer,
+    noteKey,
   );
 
-  return new Uint8Array(encrypted).toBase64();
+  return new Uint8Array(encrypted);
 }
 
 export async function decryptKey(
-  encryptedKey: string,
-  privateKey: string,
-): Promise<string> {
-  const encryptedBuffer = Uint8Array.fromBase64(encryptedKey);
-  const privateKeyBuffer = Uint8Array.fromBase64(privateKey);
-
+  encryptedKey: Uint8Array<ArrayBuffer>,
+  privateKey: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey(
     "pkcs8",
-    privateKeyBuffer,
+    privateKey,
     {
       name: "RSA-OAEP",
       hash: "SHA-256",
@@ -104,20 +98,19 @@ export async function decryptKey(
       name: "RSA-OAEP",
     },
     key,
-    encryptedBuffer,
+    encryptedKey,
   );
 
-  return new Uint8Array(decrypted).toBase64();
+  return new Uint8Array(decrypted);
 }
 
 export async function encryptData(
   data: Uint8Array<ArrayBuffer>,
-  noteKey: string,
-): Promise<Uint8Array> {
-  const keyBuffer = Uint8Array.fromBase64(noteKey);
+  noteKey: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey(
     "raw",
-    keyBuffer,
+    noteKey,
     {
       name: "AES-GCM",
     },
@@ -144,13 +137,12 @@ export async function encryptData(
 }
 
 export async function decryptData(
-  encrypted: Uint8Array,
-  noteKey: string,
-): Promise<Uint8Array> {
-  const keyBuffer = Uint8Array.fromBase64(noteKey);
+  encrypted: Uint8Array<ArrayBuffer>,
+  noteKey: Uint8Array<ArrayBuffer>,
+): Promise<Uint8Array<ArrayBuffer>> {
   const key = await crypto.subtle.importKey(
     "raw",
-    keyBuffer,
+    noteKey,
     {
       name: "AES-GCM",
     },

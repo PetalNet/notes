@@ -65,8 +65,8 @@
                 // Generate encryption keys
                 const { publicKey, privateKey } = await generateUserKeys();
 
-                publicKeyInput.value = publicKey;
-                privateKeyInput.value = privateKey;
+                publicKeyInput.value = publicKey.toBase64();
+                privateKeyInput.value = privateKey.toBase64();
 
                 await signup.validate({
                   includeUntouched: true,

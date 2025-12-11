@@ -1,12 +1,12 @@
-import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
 import { addClient, removeClient } from "$lib/server/real-time";
 import { json } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
-import { Schema } from "effect";
 
 export const GET = async ({ params, locals }) => {
+  console.log("SSE connection request for note:", params.noteId);
+
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -28,19 +28,28 @@ export const GET = async ({ params, locals }) => {
 
   // Create a stream for SSE
   let controller: ReadableStreamDefaultController<Uint8Array<ArrayBuffer>>;
+  let keepAliveInterval: NodeJS.Timeout;
+
   const stream = new ReadableStream<Uint8Array<ArrayBuffer>>({
     start(c) {
       controller = c;
       addClient(noteId, controller);
+
       // Send initial connection message
       const encoder = new TextEncoder();
-      c.enqueue(
-        encoder.encode(
-          `event: connected\ndata: ${Schema.encodeSync(syncSchemaJson)({ noteId, updates: [] })}\n\n`,
-        ),
-      );
+      c.enqueue(encoder.encode(`event: connected\n`));
+
+      // Send keep-alive comment every 15 seconds to prevent timeout
+      keepAliveInterval = setInterval(() => {
+        try {
+          c.enqueue(encoder.encode(`: keep-alive\n\n`));
+        } catch {
+          clearInterval(keepAliveInterval);
+        }
+      }, 15000);
     },
     cancel() {
+      clearInterval(keepAliveInterval);
       removeClient(noteId, controller);
     },
   });

@@ -16,7 +16,19 @@
         </div>
       {/each}
 
-      <form {...login.preflight(loginSchema)}>
+      <form
+        {...login
+          .preflight(loginSchema)
+          .enhance(async ({ data: { _password }, submit }) => {
+            // Cache password for the layout to use for decryption
+            if (_password) {
+              sessionStorage.setItem("notes_temp_password", _password);
+            }
+
+            // TODO: do we even need this?
+            await submit();
+          })}
+      >
         <fieldset disabled={login.pending !== 0}>
           <div class="form-control">
             <label>
@@ -37,7 +49,11 @@
           </div>
 
           <div class="form-control mt-6">
-            <button type="submit" class="btn btn-primary">
+            <button
+              type="submit"
+              class="btn btn-primary"
+              disabled={login.pending !== 0}
+            >
               {login.pending !== 0 ? "Logging in..." : "Log In"}
             </button>
           </div>

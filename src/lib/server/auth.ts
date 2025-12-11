@@ -51,20 +51,32 @@ export type AuthData = NoAuthData | SomeAuthData;
 
 export async function validateSessionToken(token: string): Promise<AuthData> {
   const sessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
-  const [result] = await db
-    .select({
-      // Adjust user table here to tweak returned data
-      user: {
-        id: table.users.id,
-        username: table.users.username,
-        publicKey: table.users.publicKey,
-        privateKeyEncrypted: table.users.privateKeyEncrypted,
-      },
-      session: table.sessions,
-    })
-    .from(table.sessions)
-    .innerJoin(table.users, eq(table.sessions.userId, table.users.id))
-    .where(eq(table.sessions.token, sessionId));
+
+  let result;
+  try {
+    const rows = await db
+      .select({
+        // Adjust user table here to tweak returned data
+        user: {
+          id: table.users.id,
+          username: table.users.username,
+          publicKey: table.users.publicKey,
+          privateKeyEncrypted: table.users.privateKeyEncrypted,
+        },
+        session: table.sessions,
+      })
+      .from(table.sessions)
+      .innerJoin(table.users, eq(table.sessions.userId, table.users.id))
+      .where(eq(table.sessions.token, sessionId));
+    result = rows[0];
+  } catch (e) {
+    console.error(
+      "Session validation DB error (DB might be missing/cleared):",
+      e,
+    );
+    // Treat DB errors as no session -> force logout/login
+    return { session: undefined, user: undefined };
+  }
 
   if (result === undefined) {
     return { session: undefined, user: undefined };
@@ -95,6 +107,10 @@ export async function validateSessionToken(token: string): Promise<AuthData> {
 
 export async function invalidateSession(sessionId: string) {
   await db.delete(table.sessions).where(eq(table.sessions.token, sessionId));
+}
+
+export async function invalidateUserSessions(userId: string) {
+  await db.delete(table.sessions).where(eq(table.sessions.userId, userId));
 }
 
 export function setSessionTokenCookie(

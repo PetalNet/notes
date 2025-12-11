@@ -1,11 +1,13 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-  import { generateUserKeys } from "$lib/crypto.ts";
+  import { generateUserKeys, encryptWithPassword } from "$lib/crypto.ts";
   import { signup } from "$lib/remote/accounts.remote.ts";
   import { signupSchema } from "$lib/remote/accounts.schema.ts";
 
   let publicKeyInput: HTMLInputElement;
   let privateKeyInput: HTMLInputElement;
+  let formElement: HTMLFormElement;
+  let submitButton: HTMLButtonElement;
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
@@ -19,13 +21,14 @@
         </div>
       {/each}
 
-      <form {...signup.preflight(signupSchema)}>
+      <form {...signup.preflight(signupSchema)} bind:this={formElement}>
         <input type="hidden" name="publicKey" bind:this={publicKeyInput} />
         <input
           type="hidden"
           name="privateKeyEncrypted"
           bind:this={privateKeyInput}
         />
+
         <fieldset disabled={signup.pending !== 0}>
           <div class="form-control">
             <label>
@@ -50,36 +53,54 @@
 
           <div class="form-control mt-6">
             <button
-              type="submit"
+              type="button"
               class="btn btn-primary"
               disabled={signup.pending !== 0}
-              onclick={async (e) => {
-                // We require client-side JS to generate the key.
-                // SvelteKit enforces that enhance is purely for enhancement.
-                // Therefore, we have to submit the form from in here to make it explicit
-                // that there is no fallback.
-
-                e.preventDefault();
-                const submitter = e.currentTarget;
-
-                // Generate encryption keys
-                const { publicKey, privateKey } = await generateUserKeys();
-
-                publicKeyInput.value = publicKey;
-                privateKeyInput.value = privateKey;
-
+              bind:this={submitButton}
+              onclick={async () => {
+                // 1. Basic validation check (by forcing validation on the schema wrapper)
                 await signup.validate({
                   includeUntouched: true,
                   preflightOnly: true,
                 });
-                console.debug(signup.fields.allIssues());
 
-                if ((signup.fields.allIssues()?.length ?? 0) !== 0) return;
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- It is indeed a child of a form.
-                submitter.form!.requestSubmit(submitter);
+                // If there are issues (username/password), stop here.
+                // We ignore the missing keys for now as they aren't generated yet.
+                const issues = signup.fields
+                  .allIssues()
+                  ?.filter(
+                    (i) =>
+                      i.path.includes("username") ||
+                      i.path.includes("_password"),
+                  );
+                if (issues && issues.length > 0) return;
+
+                // 2. Generate Keys
+                const { publicKey, privateKey } = generateUserKeys(); // privateKey is base64 raw
+
+                // 3. Encrypt
+                // Get password value directly from schema store or input?
+                // The schema store `.value` holds the current value.
+                const password = signup.fields._password.value();
+                if (!password) return; // Should be caught by validation
+
+                const encryptedWithPw = encryptWithPassword(
+                  privateKey,
+                  password as unknown as string,
+                );
+
+                // 4. Populate hidden fields
+                publicKeyInput.value = publicKey;
+                privateKeyInput.value = encryptedWithPw;
+
+                // 5. Cache Key for Auto-Unlock
+                sessionStorage.setItem("notes_raw_private_key", privateKey);
+
+                // 6. Submit Form Directly
+                formElement.requestSubmit();
               }}
             >
-              {signup.pending !== 0 ? "Logging in..." : "Log In"}
+              {signup.pending !== 0 ? "Creating Account..." : "Next"}
             </button>
           </div>
         </fieldset>

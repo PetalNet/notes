@@ -56,3 +56,26 @@ export const SignupSchema = Schema.Struct({
 });
 
 export const signupSchema = SignupSchema.pipe(Schema.standardSchemaV1);
+
+export const ChangePasswordSchema = Schema.Struct({
+  _password: PasswordSchema.annotations({
+    title: "New Password",
+  }),
+  privateKeyEncrypted: Schema.String,
+});
+
+export const changePasswordSchema = ChangePasswordSchema.pipe(
+  Schema.standardSchemaV1,
+);
+
+export const SetupEncryptionSchema = Schema.Struct({
+  _password: PasswordSchema.annotations({
+    title: "Current Password",
+  }),
+  publicKey: Schema.String,
+  privateKeyEncrypted: Schema.String,
+});
+
+export const setupEncryptionSchema = SetupEncryptionSchema.pipe(
+  Schema.standardSchemaV1,
+);

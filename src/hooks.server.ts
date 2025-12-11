@@ -9,7 +9,14 @@ const handleAuth: Handle = async ({ event, resolve }) => {
     event.locals.session = undefined;
 
     // Redirect to login if accessing protected routes
-    if (!event.route.id?.startsWith("/(auth)")) {
+    if (
+      !event.route.id?.startsWith("/(auth)") &&
+      !event.route.id?.startsWith("/federation") &&
+      !event.route.id?.startsWith("/.well-known") &&
+      !event.route.id?.startsWith("/notes") &&
+      !event.route.id?.startsWith("/client") &&
+      !event.route.id?.startsWith("/api")
+    ) {
       return new Response("Redirect", {
         status: 303,
         headers: { Location: "/login" },

@@ -13,8 +13,32 @@
     List,
     ListOrdered,
     Strikethrough,
+    Clock,
+    Globe,
+    Share as ShareIcon,
   } from "@lucide/svelte";
+
+  interface Props {
+    manager: LoroNoteManager | undefined;
+    notesList?: NoteOrFolder[];
+    user: User | undefined;
+    handleOpenInHomeserver: (input: string | null) => void;
+    noteId: string;
+    noteTitle: string;
+  }
+
+  let {
+    manager,
+    notesList = [],
+    user,
+    handleOpenInHomeserver,
+    noteId,
+    noteTitle,
+  }: Props = $props();
+
+  import { LoroExtensions } from "loro-codemirror";
   import Codemirror from "./Codemirror.svelte";
+  import HistoryPanel from "$lib/components/HistoryPanel.svelte";
   import {
     coreExtensions,
     boldCommand,
@@ -29,19 +53,17 @@
     orderedListCommand,
   } from "./Editor.ts";
   import Toolbar from "./Toolbar.svelte";
+  import ShareModal from "$lib/components/ShareModal.svelte";
   import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
-  import type { NoteOrFolder } from "$lib/schema.ts";
-
-  interface Props {
-    content: string;
-    onchange: (newContent: string) => void;
-    notesList?: NoteOrFolder[];
-  }
-
-  let { content, onchange, notesList = [] }: Props = $props();
+  import type { NoteOrFolder, User } from "$lib/schema.ts";
+  import { LoroNoteManager } from "$lib/loro.svelte.ts";
+  import { EphemeralStore, UndoManager } from "loro-crdt";
+  import type { Extension } from "@codemirror/state";
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
+  let isHistoryOpen = $state(false);
+  let isShareOpen = $state(false);
 
   /** Custom theme */
   const editorTheme = EditorView.theme({
@@ -98,108 +120,148 @@
     },
   });
 
-  const extensions = [
-    coreExtensions,
-    wikilinksExtension(notesList),
-    // Update listener
-    EditorView.updateListener.of((update) => {
-      if (update.docChanged) {
-        const newContent = update.state.doc.toString();
-        console.debug(
-          "[Prosemark] Content updated. Preview:",
-          newContent.slice(0, 50),
-        );
-        onchange(newContent);
-      }
-    }),
-    editorTheme,
-  ];
+  let loroExtensions = $state<Extension>([]);
 
-  // Update content if it changes externally (from Loro)
-  $effect(() => {
-    if (content !== editorView.state.doc.toString()) {
-      console.debug("[Prosemark] External content update");
-      editorView.dispatch({
-        changes: {
-          from: 0,
-          to: editorView.state.doc.length,
-          insert: content,
+  $effect.pre(() => {
+    if (manager !== undefined) {
+      const ephemeral = new EphemeralStore();
+      const undoManager = new UndoManager(manager.doc, {});
+
+      loroExtensions = LoroExtensions(
+        manager.doc,
+        {
+          ephemeral,
+          user: user
+            ? { name: user.username, colorClassName: "bg-primary" }
+            : { name: "Anonymous", colorClassName: "bg-base-content" },
         },
-      });
+        undoManager,
+        LoroNoteManager.getTextFromDoc,
+      );
+
+      return () => {
+        ephemeral.destroy();
+      };
     }
+
+    return;
   });
 
+  let extensions = $derived([
+    coreExtensions,
+    wikilinksExtension(notesList),
+    loroExtensions,
+    editorTheme,
+  ]);
+
   const tools = [
-    [
-      {
-        title: "Bold (⌘+B)",
-        onclick: () => boldCommand(editorView),
-        icon: Bold,
-      },
-      {
-        title: "Italic (⌘+I)",
-        onclick: () => italicCommand(editorView),
-        icon: Italic,
-      },
-      {
-        title: "Strikethrough (⌘+Shift+X)",
-        onclick: () => strikethroughCommand(editorView),
-        icon: Strikethrough,
-      },
-      {
-        title: "Code (⌘+E)",
-        onclick: () => codeCommand(editorView),
-        icon: Code,
-      },
-    ],
-    [
-      {
-        title: "Link (⌘+K)",
-        onclick: () => linkCommand(editorView),
-        icon: Link,
-      },
-    ],
-    [
-      {
-        title: "Heading 1",
-        onclick: () => heading1Command(editorView),
-        icon: Heading1,
-      },
-      {
-        title: "Heading 2",
-        onclick: () => heading2Command(editorView),
-        icon: Heading2,
-      },
-      {
-        title: "Heading 3",
-        onclick: () => heading3Command(editorView),
-        icon: Heading3,
-      },
-    ],
-    [
-      {
-        onclick: () => bulletListCommand(editorView),
-        title: "Bullet List",
-
-        icon: List,
-      },
-      {
-        onclick: () => orderedListCommand(editorView),
-        title: "Numbered List",
-
-        icon: ListOrdered,
-      },
-    ],
+    {
+      priority: 1,
+      tools: [
+        {
+          title: "Bold (⌘+B)",
+          onclick: () => boldCommand(editorView),
+          icon: Bold,
+        },
+        {
+          title: "Italic (⌘+I)",
+          onclick: () => italicCommand(editorView),
+          icon: Italic,
+        },
+        {
+          title: "Strikethrough (⌘+Shift+X)",
+          onclick: () => strikethroughCommand(editorView),
+          icon: Strikethrough,
+        },
+        {
+          title: "Code (⌘+E)",
+          onclick: () => codeCommand(editorView),
+          icon: Code,
+        },
+      ],
+    },
+    {
+      priority: 2,
+      tools: [
+        {
+          title: "Link (⌘+K)",
+          onclick: () => linkCommand(editorView),
+          icon: Link,
+        },
+      ],
+    },
+    {
+      priority: 10,
+      label: "Headings",
+      tools: [
+        {
+          title: "Heading 1",
+          onclick: () => heading1Command(editorView),
+          icon: Heading1,
+        },
+        {
+          title: "Heading 2",
+          onclick: () => heading2Command(editorView),
+          icon: Heading2,
+        },
+        {
+          title: "Heading 3",
+          onclick: () => heading3Command(editorView),
+          icon: Heading3,
+        },
+      ],
+    },
+    {
+      priority: 5,
+      label: "Lists",
+      tools: [
+        {
+          onclick: () => bulletListCommand(editorView),
+          title: "Bullet List",
+          icon: List,
+        },
+        {
+          onclick: () => orderedListCommand(editorView),
+          title: "Numbered List",
+          icon: ListOrdered,
+        },
+      ],
+    },
+    {
+      priority: 100,
+      tools: [
+        {
+          onclick: () => (isHistoryOpen = !isHistoryOpen),
+          title: "Version History",
+          icon: Clock,
+        },
+        {
+          onclick: () => handleOpenInHomeserver(null),
+          title: "Open in Homeserver",
+          icon: Globe,
+        },
+        {
+          onclick: () => (isShareOpen = true),
+          title: "Share",
+          icon: ShareIcon,
+        },
+      ],
+    },
   ];
 </script>
 
-<div class="flex h-full flex-col">
-  <Toolbar {tools} />
+<div class="relative flex h-full flex-col">
+  <Toolbar toolGroups={tools} />
 
-  <Codemirror
-    bind:editorView
-    doc={content}
-    {extensions}
-    class="flex-1 overflow-y-auto"
+  <Codemirror bind:editorView {extensions} class="flex-1 overflow-y-auto" />
+
+  <HistoryPanel {manager} bind:isOpen={isHistoryOpen} />
+
+  <ShareModal
+    {noteId}
+    {noteTitle}
+    noteEncryptedKey={notesList.find((n) => n.id === noteId)?.encryptedKey}
+    isOpen={isShareOpen}
+    onClose={() => (isShareOpen = false)}
   />
 </div>

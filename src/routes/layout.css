@@ -1,6 +1,9 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
-@plugin "daisyui";
+@plugin "daisyui" {
+  exclude: properties;
+  logs: false;
+}
 
 :root {
   font-family: "Inter", sans-serif;

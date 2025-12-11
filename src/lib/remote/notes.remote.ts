@@ -16,7 +16,9 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   const { user } = requireLogin();
 
   const userNotes = await db.query.notes.findMany({
-    where: (notes) => eq(notes.ownerId, user.id),
+    where: {
+      ownerId: user.id,
+    },
   });
 
   return userNotes.map(
@@ -62,7 +64,9 @@ export const createNote = command(
       });
 
       const note = await db.query.notes.findFirst({
-        where: (notes) => eq(notes.id, id),
+        where: {
+          id: id,
+        },
       });
 
       if (!note) throw new Error("Failed to find newly created note!");
@@ -84,7 +88,9 @@ export const deleteNote = command(
     try {
       // Verify ownership
       const note = await db.query.notes.findFirst({
-        where: eq(notes.id, noteId),
+        where: {
+          id: noteId,
+        },
       });
 
       if (!note || note.ownerId !== user.id) error(404, "Not found");
@@ -110,7 +116,9 @@ export const updateNote = command(
     try {
       // Verify ownership
       const existingNote = await db.query.notes.findFirst({
-        where: eq(notes.id, noteId),
+        where: {
+          id: noteId,
+        },
       });
 
       if (!existingNote || existingNote.ownerId !== user.id) {
@@ -129,7 +137,9 @@ export const updateNote = command(
         .where(eq(notes.id, noteId));
 
       const updated = await db.query.notes.findFirst({
-        where: eq(notes.id, noteId),
+        where: {
+          id: noteId,
+        },
       });
 
       if (!updated) throw new Error("Failed to find newly created note!");

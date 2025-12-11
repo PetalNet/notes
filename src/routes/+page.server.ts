@@ -1,6 +1,6 @@
 import { db } from "$lib/server/db";
 import { notes } from "$lib/server/db/schema";
-import { count, sql } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 // TODO: Make this a remote function instead.
 interface Data {
@@ -29,7 +29,7 @@ export const load = async ({ locals }): Promise<Data> => {
   const totalNotesResult = await db
     .select({ count: count() })
     .from(notes)
-    .where(sql`${notes.ownerId} = ${user.id} AND ${notes.isFolder} = 0`);
+    .where(and(eq(notes.ownerId, user.id), eq(notes.isFolder, false)));
 
   const totalNotes = totalNotesResult[0]?.count ?? 0;
 
@@ -37,8 +37,10 @@ export const load = async ({ locals }): Promise<Data> => {
   let randomNote = null;
   if (totalNotes > 0) {
     const userNotes = await db.query.notes.findMany({
-      where: (notes) =>
-        sql`${notes.ownerId} = ${user.id} AND ${notes.isFolder} = 0`,
+      where: {
+        ownerId: user.id,
+        isFolder: false,
+      },
       columns: {
         id: true,
         title: true,

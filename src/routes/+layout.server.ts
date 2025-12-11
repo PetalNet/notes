@@ -1,6 +1,5 @@
 import type { User } from "$lib/schema.ts";
 import { db } from "$lib/server/db";
-import { eq } from "drizzle-orm";
 
 export interface Data {
   user: User | undefined;
@@ -15,7 +14,9 @@ export const load = async ({ locals }): Promise<Data> => {
 
   // Get user with private key from database
   const user = await db.query.users.findFirst({
-    where: (users) => eq(users.id, localUser.id),
+    where: {
+      id: localUser.id,
+    },
   });
 
   return {

@@ -1,9 +1,7 @@
 import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { db } from "$lib/server/db";
-import { notes } from "$lib/server/db/schema";
 import { addClient, removeClient } from "$lib/server/real-time";
 import { json } from "@sveltejs/kit";
-import { eq } from "drizzle-orm";
 import { Schema } from "effect";
 
 export const GET = async ({ params, locals }) => {
@@ -18,7 +16,9 @@ export const GET = async ({ params, locals }) => {
 
   // Verify access
   const note = await db.query.notes.findFirst({
-    where: eq(notes.id, noteId),
+    where: {
+      id: noteId,
+    },
   });
 
   if (!note || note.ownerId !== locals.user.id) {

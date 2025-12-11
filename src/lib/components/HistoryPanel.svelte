@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Clock, RotateCcw, User } from "@lucide/svelte";
-  import type { HistoryEntry, LoroNoteManager } from "$lib/loro.ts";
+  import type { HistoryEntry, LoroNoteManager } from "$lib/loro.svelte.ts";
   import { formatRelativeTime } from "$lib/utils/time.ts";
   import ProfilePicture from "./ProfilePicture.svelte";
 

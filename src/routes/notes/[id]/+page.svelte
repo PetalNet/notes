@@ -11,7 +11,7 @@
   import { dev } from "$app/environment";
   import { page } from "$app/state";
   import Editor from "$lib/components/codemirror/Editor.svelte";
-  import { LoroNoteManager, type ConnectionState } from "$lib/loro.ts";
+  import { LoroNoteManager, type ConnectionState } from "$lib/loro.svelte.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { joinFederatedNote } from "$lib/remote/federation.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
@@ -123,10 +123,7 @@
       // 1. Decrypt the blob using the password
       let rawKey = "";
       try {
-        rawKey = await decryptWithPassword(
-          passwordEncryptedBlob,
-          passwordInput,
-        );
+        rawKey = decryptWithPassword(passwordEncryptedBlob, passwordInput);
       } catch (e) {
         console.error("Password decryption failed:", e);
         passwordError = "Incorrect password";
@@ -162,55 +159,48 @@
 
     if (!loroManagers.has(id)) {
       console.log(`Initializing Loro manager for ${id}`);
-      unawaited(
-        (async () => {
-          try {
-            // Decrypt the note key if it's an envelope (long)
-            // If it's short (raw key), use it directly.
-            let noteKey = currentNote.encryptedKey;
-            if (currentNote.encryptedKey.length > 60) {
-              const rawPrivKey = sessionStorage.getItem(
-                "notes_raw_private_key",
-              );
-              if (!rawPrivKey) {
-                console.warn(
-                  "No raw private key found, cannot decrypt note key",
-                );
-                return;
-              }
-              noteKey = decryptKey(currentNote.encryptedKey, rawPrivKey);
-            }
 
-            // Create manager
-            const manager = await LoroNoteManager.create(
-              id,
-              noteKey,
-              async (snapshot) => {
-                // onUpdate: save snapshot (optional, mostly for backup since Ops are source of truth)
-                // But we do update 'updatedAt' and maybe 'loroSnapshot' column?
-                // The updateNote command handles updating the snapshot column.
-                // Re-check data.user here as it might have changed or TS doesn't know
-                if (data.user && currentNote.ownerId === data.user.id) {
-                  await updateNote({ noteId: id, loroSnapshot: snapshot });
-                } else {
-                  // Federated/Shared notes: We don't save snapshots to 'notes' table (as we don't own it).
-                  // In the future, we might save to 'members' table or local storage,
-                  // but for now, rely on Replay from Ops.
-                  // console.debug("[Loro] Skipping snapshot save for non-owned note");
-                }
-              },
-              currentNote.loroSnapshot,
-            );
-
-            // Start sync
-            manager.startSync();
-
-            loroManagers.set(id, manager);
-          } catch (e) {
-            console.error("Failed to init Loro manager:", e);
+      try {
+        // Decrypt the note key if it's an envelope (long)
+        // If it's short (raw key), use it directly.
+        let noteKey = currentNote.encryptedKey;
+        if (currentNote.encryptedKey.length > 60) {
+          const rawPrivKey = sessionStorage.getItem("notes_raw_private_key");
+          if (!rawPrivKey) {
+            console.warn("No raw private key found, cannot decrypt note key");
+            return;
           }
-        })(),
-      );
+          noteKey = decryptKey(currentNote.encryptedKey, rawPrivKey);
+        }
+
+        // Create manager
+        const manager = LoroNoteManager.create(
+          id,
+          noteKey,
+          async (snapshot) => {
+            // onUpdate: save snapshot (optional, mostly for backup since Ops are source of truth)
+            // But we do update 'updatedAt' and maybe 'loroSnapshot' column?
+            // The updateNote command handles updating the snapshot column.
+            // Re-check data.user here as it might have changed or TS doesn't know
+            if (data.user && currentNote.ownerId === data.user.id) {
+              await updateNote({ noteId: id, loroSnapshot: snapshot });
+            } else {
+              // Federated/Shared notes: We don't save snapshots to 'notes' table (as we don't own it).
+              // In the future, we might save to 'members' table or local storage,
+              // but for now, rely on Replay from Ops.
+              // console.debug("[Loro] Skipping snapshot save for non-owned note");
+            }
+          },
+          currentNote.loroSnapshot,
+        );
+
+        // Start sync
+        manager.startSync();
+
+        loroManagers.set(id, manager);
+      } catch (e) {
+        console.error("Failed to init Loro manager:", e);
+      }
     } else {
       // Ensure sync is running if we switch back to it
       const m = loroManagers.get(id);
@@ -249,7 +239,7 @@
         }
       }
 
-      if (domain) {
+      if (domain && id) {
         localStorage.setItem("notes_homeserver_handle", input);
         // Redirect to their homeserver with the same note ID
         window.location.href = `${window.location.protocol}//${domain.trim()}/notes/${id}`;
@@ -286,7 +276,7 @@
                 Disconnected.
                 <button
                   class="btn ml-2 btn-outline btn-xs"
-                  onclick={() => loroManager?.startSync()}>Reconnect</button
+                  onclick={() => loroManager.startSync()}>Reconnect</button
                 >
               {:else if connectionStatus === "reconnecting"}
                 Reconnecting...

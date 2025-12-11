@@ -1,27 +1,22 @@
 import "dotenv/config";
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
-import { sessions } from "../src/lib/server/db/schema.js";
+import * as schema from "../src/lib/server/db/schema.ts";
 
-async function main() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    console.error("DATABASE_URL is not set in .env");
-    process.exit(1);
-  }
+if (!process.env["DATABASE_URL"]) throw new Error("DATABASE_URL is not set");
 
-  const client = createClient({ url });
-  const db = drizzle(client);
+const client = createClient({
+  url: process.env["DATABASE_URL"],
+});
 
-  console.log("Clearing all sessions...");
-  try {
-    const result = await db.delete(sessions);
-    console.log("Successfully deleted all sessions.");
-  } catch (error) {
-    console.error("Error clearing sessions:", error);
-    process.exit(1);
-  }
-  process.exit(0);
+const db = drizzle(client, { schema });
+
+console.log("Clearing all sessions...");
+try {
+  await db.delete(schema.sessions);
+  console.log("Successfully deleted all sessions.");
+} catch (error) {
+  console.error("Error clearing sessions:", error);
+  process.exit(1);
 }
-
-main();
+process.exit(0);

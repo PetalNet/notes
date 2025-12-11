@@ -3,7 +3,6 @@
 
   import { EditorView } from "@codemirror/view";
   import {
-    type Icon as IconType,
     Bold,
     Code,
     Heading1,
@@ -58,7 +57,7 @@
   import ShareModal from "$lib/components/ShareModal.svelte";
   import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
   import type { NoteOrFolder, User } from "$lib/schema.ts";
-  import { LoroNoteManager } from "$lib/loro.ts";
+  import { LoroNoteManager } from "$lib/loro.svelte.ts";
   import { EphemeralStore, UndoManager } from "loro-crdt";
   import type { Extension } from "@codemirror/state";
 
@@ -262,7 +261,7 @@
   <ShareModal
     {noteId}
     {noteTitle}
-    noteEncryptedKey={notesList?.find((n) => n.id === noteId)?.encryptedKey}
+    noteEncryptedKey={notesList.find((n) => n.id === noteId)?.encryptedKey}
     isOpen={isShareOpen}
     onClose={() => (isShareOpen = false)}
   />

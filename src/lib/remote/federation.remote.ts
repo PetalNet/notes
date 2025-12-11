@@ -1,12 +1,11 @@
 import { command, getRequestEvent } from "$app/server";
 import { db } from "$lib/server/db/index.ts";
 import { documents, members } from "$lib/server/db/schema.ts";
-import { requireLogin } from "$lib/server/auth.ts";
 import { error } from "@sveltejs/kit";
 import { env } from "$env/dynamic/private";
 import { parseNoteId } from "$lib/noteId.ts";
 import { getServerIdentity } from "$lib/server/identity.ts";
-import { sign } from "$lib/crypto.ts";
+import { encryptKeyForUser, sign } from "$lib/crypto.ts";
 import { eq } from "drizzle-orm";
 import { Schema } from "effect";
 
@@ -25,11 +24,11 @@ export const joinFederatedNote = command(
     console.log("  originServer:", originServer);
 
     const event = getRequestEvent();
-    const user = event?.locals.user;
+    const user = event.locals.user;
 
     try {
-      const currentDomain = env["SERVER_DOMAIN"] || "localhost:5173";
-      const { uuid, origin } = parseNoteId(noteId);
+      const currentDomain = env["SERVER_DOMAIN"] ?? "localhost:5173";
+      const { uuid } = parseNoteId(noteId);
 
       // Skip DB check if no user
       if (user) {
@@ -39,17 +38,15 @@ export const joinFederatedNote = command(
             where: eq(documents.id, noteId),
             with: {
               members: {
-                where: (members) => eq(members.userId, user!.id),
+                where: (members) => eq(members.userId, user.id),
               },
             },
           });
 
-          if (!existingDoc) {
-            existingDoc = await db.query.documents.findFirst({
-              where: eq(documents.id, uuid),
-              with: { members: { where: (m) => eq(m.userId, user!.id) } },
-            });
-          }
+          existingDoc ??= await db.query.documents.findFirst({
+            where: eq(documents.id, uuid),
+            with: { members: { where: (m) => eq(m.userId, user.id) } },
+          });
 
           const memberEntry = existingDoc?.members[0];
           const hasKey = !!memberEntry?.encryptedKeyEnvelope;
@@ -79,7 +76,7 @@ export const joinFederatedNote = command(
       };
 
       const message = `${currentDomain}:${timestamp}:${JSON.stringify(requestBody)}`;
-      const signature = await sign(
+      const signature = sign(
         new TextEncoder().encode(message),
         serverIdentity.privateKey,
       );
@@ -129,8 +126,7 @@ export const joinFederatedNote = command(
           console.log("  [Federation] Note is Open Public. Using Raw Key.");
 
           if (user && user.publicKey) {
-            const { encryptKeyForUser } = await import("$lib/crypto");
-            encryptedKeyEnvelope = await encryptKeyForUser(
+            encryptedKeyEnvelope = encryptKeyForUser(
               joinData.rawKey,
               user.publicKey,
             );
@@ -145,9 +141,9 @@ export const joinFederatedNote = command(
           // Normal E2EE Envelope Logic
           let myEnvelope = joinData.envelopes?.find(
             (e: any) =>
-              (user && e.user_id === userHandle) ||
-              (user && e.user_id === user.id) ||
-              (user && e.user_id === `@${user.username}`) ||
+              (user && e.user_id === userHandle) ??
+              (user && e.user_id === user.id) ??
+              (user && e.user_id === `@${user.username}`) ??
               (user && e.user_id === user.username),
           );
 
@@ -176,17 +172,17 @@ export const joinFederatedNote = command(
           .values({
             id: noteId,
             hostServer: originServer,
-            ownerId: joinData.ownerId || user.id,
-            title: joinData.title || "Federated Note",
-            accessLevel: joinData.accessLevel || "private",
+            ownerId: joinData.ownerId ?? user.id,
+            title: joinData.title ?? "Federated Note",
+            accessLevel: joinData.accessLevel ?? "private",
             createdAt: new Date(),
             updatedAt: new Date(),
           })
           .onConflictDoUpdate({
             target: documents.id,
             set: {
-              title: joinData.title || "Federated Note",
-              accessLevel: joinData.accessLevel || "private",
+              title: joinData.title ?? "Federated Note",
+              accessLevel: joinData.accessLevel ?? "private",
               updatedAt: new Date(),
             },
           });
@@ -198,7 +194,7 @@ export const joinFederatedNote = command(
             docId: noteId,
             userId: user.id,
             deviceId: "default",
-            role: joinData.role || "writer",
+            role: joinData.role ?? "writer",
             encryptedKeyEnvelope: encryptedKeyEnvelope,
             createdAt: new Date(),
           })
@@ -206,7 +202,7 @@ export const joinFederatedNote = command(
             target: [members.docId, members.userId, members.deviceId],
             set: {
               encryptedKeyEnvelope: encryptedKeyEnvelope,
-              role: joinData.role || "writer",
+              role: joinData.role ?? "writer",
             },
           });
       }

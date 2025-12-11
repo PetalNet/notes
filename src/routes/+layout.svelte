@@ -4,18 +4,17 @@
   import { onNavigate } from "$app/navigation";
   import favicon from "$lib/assets/favicon.svg";
   import Sidebar from "$lib/components/Sidebar.svelte";
-  import { setSidebarContext } from "$lib/components/sidebar-context.js";
-  import { setupEncryption } from "$lib/remote/accounts.remote.ts";
-  import { getNotes } from "$lib/remote/notes.remote.ts";
+  import { setSidebarContext } from "$lib/components/sidebar-context.ts";
   import {
     decryptWithPassword,
     encryptWithPassword,
     generateSigningKeyPair,
     generateEncryptionKeyPair,
   } from "$lib/crypto.ts";
+  import { setupEncryption } from "$lib/remote/accounts.remote.ts";
+  import { getNotes } from "$lib/remote/notes.remote.ts";
   import { PersistedState } from "runed";
   import { onMount } from "svelte";
-  import { unawaited } from "$lib/unawaited.js";
 
   let { children, data } = $props();
 
@@ -95,11 +94,11 @@
 
     try {
       // 1. Generate Keys
-      const signKeys = await generateSigningKeyPair();
-      const encKeys = await generateEncryptionKeyPair();
+      const signKeys = generateSigningKeyPair();
+      const encKeys = generateEncryptionKeyPair();
 
       // 2. Encrypt
-      const privateKeyEncrypted = await encryptWithPassword(
+      const privateKeyEncrypted = encryptWithPassword(
         encKeys.privateKey,
         setupPassword,
       );
@@ -128,10 +127,10 @@
   // Global Private Key State (exposed via Context?)
   // For now, we rely on sessionStorage "notes_raw_private_key" being present.
 
-  async function unlockVault() {
+  function unlockVault() {
     if (!unlockPassword || !data.user) return;
     try {
-      const rawKey = await decryptWithPassword(
+      const rawKey = decryptWithPassword(
         data.user.privateKeyEncrypted,
         unlockPassword,
       );
@@ -147,25 +146,21 @@
 
   // Initialize from localStorage and handle responsive behavior
   onMount(() => {
-    unawaited(
-      (async () => {
-        if (data.user) {
-          // Try to auto-unlock if key is already in session
-          const existingKey = sessionStorage.getItem("notes_raw_private_key");
-          if (existingKey) {
-            isVaultUnlocked = true;
-          } else {
-            // Try temporary password from login redirect
-            const tempPw = sessionStorage.getItem("notes_temp_password");
-            if (tempPw) {
-              unlockPassword = tempPw;
-              await unlockVault();
-              sessionStorage.removeItem("notes_temp_password");
-            }
-          }
+    if (data.user) {
+      // Try to auto-unlock if key is already in session
+      const existingKey = sessionStorage.getItem("notes_raw_private_key");
+      if (existingKey) {
+        isVaultUnlocked = true;
+      } else {
+        // Try temporary password from login redirect
+        const tempPw = sessionStorage.getItem("notes_temp_password");
+        if (tempPw) {
+          unlockPassword = tempPw;
+          unlockVault();
+          sessionStorage.removeItem("notes_temp_password");
         }
-      })(),
-    );
+      }
+    }
   });
 
   onNavigate((navigation) => {

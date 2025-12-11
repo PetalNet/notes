@@ -1,7 +1,6 @@
 import { decryptData, encryptData } from "$lib/crypto";
 import { encodeBase64, decodeBase64 } from "@oslojs/encoding";
 import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
-import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
 import { LoroDoc, LoroText } from "loro-crdt";
 import { unawaited } from "./unawaited.ts";
@@ -70,25 +69,25 @@ export class LoroNoteManager {
   /**
    * Initialize the manager with an encrypted snapshot
    */
-  static async create(
+  static create(
     this: void,
     noteId: string,
     noteKey: string,
     onUpdate: (snapshot: string) => Promise<void>,
     encryptedSnapshot: string | null,
-  ): Promise<LoroNoteManager> {
+  ): LoroNoteManager {
     const manager = new LoroNoteManager(noteId, noteKey, onUpdate);
 
     if (encryptedSnapshot) {
       const encryptedBytes = decodeBase64(encryptedSnapshot);
-      const decrypted = await decryptData(encryptedBytes, manager.#noteKey);
+      const decrypted = decryptData(encryptedBytes, manager.#noteKey);
       manager.doc.import(decrypted);
     }
     return manager;
   }
 
   async #persist() {
-    const snapshot = await this.getEncryptedSnapshot();
+    const snapshot = this.getEncryptedSnapshot();
     await this.#onUpdate(snapshot);
   }
 
@@ -133,19 +132,13 @@ export class LoroNoteManager {
     };
 
     this.#eventSource.onmessage = (event: MessageEvent<string>): void => {
-      // console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
+      console.debug("[Loro] Received SSE message:", event.data.slice(0, 100));
       try {
-        const ops = JSON.parse(event.data);
+        const ops = Schema.decodeUnknownSync(syncSchemaJson)(event.data);
         if (!Array.isArray(ops)) return;
 
         for (const op of ops) {
-          // op.payload is encrypted blob (base64)
-          // Loro import expects Uint8Array?
-          // Wait, op.payload is base64 string provided by server.
-          // Loro import expects Uint8Array.
-          // Loro import expects Uint8Array.
-          // Support both 'payload' (DB/PubSub normalized) and 'encrypted_payload' (Raw API)
-          const base64 = op.payload || op.encrypted_payload;
+          const base64 = op.payload ?? op.encrypted_payload;
           if (!base64) {
             console.warn("[Loro] Received op without payload:", op);
             continue;
@@ -161,7 +154,7 @@ export class LoroNoteManager {
 
     this.#eventSource.onopen = () => {
       console.log("[Loro] SSE connected");
-      this.connectionState.set("connected");
+      this.connectionState = "connected";
     };
 
     this.#eventSource.onerror = (error) => {
@@ -194,20 +187,8 @@ export class LoroNoteManager {
    */
   async #sendUpdate(update: Uint8Array) {
     try {
-      const opId = this.doc.peerId; // Wait, op ID needs to be unique?
-      // Loro update is a blob. We wrap it in an Op structure?
-      // Server expects: { op: { op_id, actor_id, lamport_ts, encrypted_payload, signature } }
-      // Client generates these?
-      // Loro `update` is a patch. We treat it as one "Op"?
-      // We need `actor_id` (peerId).
-      // `lamport_ts`: does Loro expose generic lamport? `doc.oplog.vv`?
-      // Or we just use client timestamp/counter?
-      // Loro updates are CRDT blobs.
-      // For federation Op Log, we wrap the blob.
-
       const payload = encodeBase64(update);
-      const actorId = this.doc.peerIdStr; // string?
-      // Loro API check: `doc.peerIdStr` exists.
+      const actorId = this.doc.peerIdStr;
 
       // Mock Op structure
       const op = {
@@ -231,11 +212,11 @@ export class LoroNoteManager {
   /**
    * Get encrypted snapshot for storage
    */
-  async getEncryptedSnapshot(): Promise<string> {
+  getEncryptedSnapshot(): string {
     const snapshot = this.doc.export({
       mode: "snapshot",
     }) as Uint8Array<ArrayBuffer>;
-    const encrypted = await encryptData(snapshot, this.#noteKey);
+    const encrypted = encryptData(snapshot, this.#noteKey);
     return encodeBase64(encrypted);
   }
 

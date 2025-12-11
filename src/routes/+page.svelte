@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-  import { getSidebarContext } from "$lib/components/sidebar-context.js";
-  import { formatRelativeTime } from "$lib/utils/time.js";
+  import { getSidebarContext } from "$lib/components/sidebar-context.ts";
+  import { formatRelativeTime } from "$lib/utils/time.ts";
   import { PanelLeftOpen } from "@lucide/svelte";
   import { Temporal } from "temporal-polyfill";
 

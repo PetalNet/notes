@@ -11,14 +11,9 @@
     editorView: EditorView;
   }
 
-  import { Compartment } from "@codemirror/state";
-
-  // ...
-
   let { extensions = [], editorView = $bindable(), ...props }: Props = $props();
 
   let editorElement: HTMLElement;
-  let extensionCompartment = new Compartment();
   let extensionCompartment = new Compartment();
 
   onMount(() => {

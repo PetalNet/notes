@@ -25,8 +25,8 @@
     FolderClosed,
   } from "@lucide/svelte";
   import { clsx } from "clsx";
-  import { base } from "$app/paths";
   import { page } from "$app/state";
+  import { resolve } from "$app/paths";
 
   interface Props {
     item: TreeNode;
@@ -277,7 +277,7 @@
   {:else}
     <!-- Note Item -->
     <a
-      aria-current={page.params.id === item.id ? "page" : undefined}
+      aria-current={$state.eager(page.params.id) === item.id ? "page" : false}
       href={resolve("/notes/[id]", { id: item.id })}
       style:view-transition-name={`note-${item.id}`}
       class={[

@@ -1,6 +1,5 @@
 import { ed25519, x25519 } from "@noble/curves/ed25519.js";
 import { xchacha20poly1305 } from "@noble/ciphers/chacha.js";
-import { encodeBase64, decodeBase64 } from "@oslojs/encoding";
 import { hkdf } from "@noble/hashes/hkdf.js";
 import { sha256 } from "@noble/hashes/sha2.js";
 
@@ -30,31 +29,28 @@ export interface DeviceKeys {
 // Identity / Signing (Ed25519)
 // ----------------------------------------------------------------------------
 
-export async function generateSigningKeyPair(): Promise<KeyPair> {
+export function generateSigningKeyPair(): KeyPair {
   const priv = ed25519.utils.randomSecretKey();
-  const pub = await ed25519.getPublicKey(priv);
+  const pub = ed25519.getPublicKey(priv);
   return {
-    publicKey: encodeBase64(pub),
-    privateKey: encodeBase64(priv),
+    publicKey: pub.toBase64(),
+    privateKey: priv.toBase64(),
   };
 }
 
-export async function sign(
-  message: Uint8Array,
-  privateKeyBase64: string,
-): Promise<string> {
-  const priv = decodeBase64(privateKeyBase64);
-  const signature = await ed25519.sign(message, priv);
-  return encodeBase64(signature);
+export function sign(message: Uint8Array, privateKeyBase64: string): string {
+  const priv = Uint8Array.fromBase64(privateKeyBase64);
+  const signature = ed25519.sign(message, priv);
+  return signature.toBase64();
 }
 
-export async function verify(
+export function verify(
   signatureBase64: string,
   message: Uint8Array,
   publicKeyBase64: string,
-): Promise<boolean> {
-  const sig = decodeBase64(signatureBase64);
-  const pub = decodeBase64(publicKeyBase64);
+): boolean {
+  const sig = Uint8Array.fromBase64(signatureBase64);
+  const pub = Uint8Array.fromBase64(publicKeyBase64);
   return ed25519.verify(sig, message, pub);
 }
 
@@ -62,19 +58,19 @@ export async function verify(
 // Key Exchange / Encryption (X25519 + XChaCha20Poly1305)
 // ----------------------------------------------------------------------------
 
-export async function generateEncryptionKeyPair(): Promise<KeyPair> {
+export function generateEncryptionKeyPair(): KeyPair {
   const priv = x25519.utils.randomSecretKey();
   const pub = x25519.getPublicKey(priv);
   return {
-    publicKey: encodeBase64(pub),
-    privateKey: encodeBase64(priv),
+    publicKey: pub.toBase64(),
+    privateKey: priv.toBase64(),
   };
 }
 
 // Generate a random 32-byte key for the document
 export function generateNoteKey(): string {
   const key = getRandomBytes(32);
-  return encodeBase64(key);
+  return key.toBase64();
 }
 
 /**
@@ -86,8 +82,8 @@ export function encryptKeyForDevice(
   noteKeyBase64: string,
   recipientPublicKeyBase64: string,
 ): string {
-  const noteKey = decodeBase64(noteKeyBase64);
-  const recipientPub = decodeBase64(recipientPublicKeyBase64);
+  const noteKey = Uint8Array.fromBase64(noteKeyBase64);
+  const recipientPub = Uint8Array.fromBase64(recipientPublicKeyBase64);
 
   // 1. Generate ephemeral sender key
   const ephemeralPriv = x25519.utils.randomSecretKey();
@@ -111,7 +107,7 @@ export function encryptKeyForDevice(
   result.set(nonce, 32);
   result.set(ciphertext, 56);
 
-  const encoded = encodeBase64(result);
+  const encoded = result.toBase64();
   return encoded;
 }
 
@@ -119,8 +115,8 @@ export function decryptKeyForDevice(
   encryptedEnvelopeBase64: string,
   devicePrivateKeyBase64: string,
 ): string {
-  const envelope = decodeBase64(encryptedEnvelopeBase64);
-  const devicePriv = decodeBase64(devicePrivateKeyBase64);
+  const envelope = Uint8Array.fromBase64(encryptedEnvelopeBase64);
+  const devicePriv = Uint8Array.fromBase64(devicePrivateKeyBase64);
 
   if (envelope.length < 56) throw new Error("Envelope too short");
 
@@ -135,7 +131,7 @@ export function decryptKeyForDevice(
   const chacha = xchacha20poly1305(derivedKey, nonce);
   const noteKey = chacha.decrypt(ciphertext);
 
-  return encodeBase64(noteKey);
+  return noteKey.toBase64();
 }
 
 // ----------------------------------------------------------------------------
@@ -146,7 +142,7 @@ export function encryptData(
   data: Uint8Array,
   noteKeyBase64: string,
 ): Uint8Array {
-  const key = decodeBase64(noteKeyBase64);
+  const key = Uint8Array.fromBase64(noteKeyBase64);
 
   // Per message nonce
   const nonce = getRandomBytes(24);
@@ -164,7 +160,7 @@ export function decryptData(
   encrypted: Uint8Array,
   noteKeyBase64: string,
 ): Uint8Array {
-  const key = decodeBase64(noteKeyBase64);
+  const key = Uint8Array.fromBase64(noteKeyBase64);
 
   // Extract IV from first 24 bytes
   const nonce = encrypted.slice(0, 24);
@@ -184,11 +180,11 @@ export const generateUserKeys = generateEncryptionKeyPair;
 
 import { pbkdf2 } from "@noble/hashes/pbkdf2.js";
 
-export async function encryptWithPassword(
+export function encryptWithPassword(
   dataBase64: string,
   password: string,
-): Promise<string> {
-  const data = decodeBase64(dataBase64);
+): string {
+  const data = Uint8Array.fromBase64(dataBase64);
   const salt = getRandomBytes(16);
   // Derive key from password
   const kek = pbkdf2(sha256, password, salt, { c: 600000, dkLen: 32 });
@@ -204,14 +200,14 @@ export async function encryptWithPassword(
   result.set(nonce, 16);
   result.set(ciphertext, 40);
 
-  return encodeBase64(result);
+  return result.toBase64();
 }
 
-export async function decryptWithPassword(
+export function decryptWithPassword(
   encryptedBase64: string,
   password: string,
-): Promise<string> {
-  const encrypted = decodeBase64(encryptedBase64);
+): string {
+  const encrypted = Uint8Array.fromBase64(encryptedBase64);
 
   if (encrypted.length < 40) throw new Error("Encrypted data too short");
 
@@ -224,8 +220,8 @@ export async function decryptWithPassword(
 
   try {
     const data = chacha.decrypt(ciphertext);
-    return encodeBase64(data);
-  } catch (e) {
+    return data.toBase64();
+  } catch {
     throw new Error("Incorrect password or corrupted data");
   }
 }

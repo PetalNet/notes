@@ -1,11 +1,12 @@
-import { error, redirect, type Cookies } from "@sveltejs/kit";
-import { eq } from "drizzle-orm";
-import { sha256 } from "@oslojs/crypto/sha2";
-import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
+import { resolve } from "$app/paths";
+import { getRequestEvent } from "$app/server";
+import type { User } from "$lib/schema.ts";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
-import type { User } from "$lib/schema.ts";
-import { getRequestEvent } from "$app/server";
+import { sha256 } from "@oslojs/crypto/sha2";
+import { encodeBase64url, encodeHexLowerCase } from "@oslojs/encoding";
+import { error, redirect, type Cookies } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -120,7 +121,7 @@ export function guardLogin(): SomeAuthData {
   } = getRequestEvent();
 
   if (!user || !session) {
-    redirect(302, "/login");
+    redirect(302, resolve("/login"));
   }
 
   return { user, session };

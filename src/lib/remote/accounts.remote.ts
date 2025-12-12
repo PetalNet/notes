@@ -1,3 +1,4 @@
+import { resolve } from "$app/paths";
 import { form, getRequestEvent } from "$app/server";
 import * as auth from "$lib/server/auth.ts";
 import { db } from "$lib/server/db/index.ts";
@@ -41,7 +42,7 @@ export const login = form(
     const session = await auth.createSession(sessionToken, existingUser.id);
     auth.setSessionTokenCookie(cookies, sessionToken, session.expiresAt);
 
-    return redirect(302, "/");
+    return redirect(302, resolve("/"));
   },
 );
 
@@ -75,7 +76,7 @@ export const signup = form(
     } catch {
       return fail(500, { message: "An error has occurred" });
     }
-    redirect(302, "/");
+    redirect(302, resolve("/"));
   },
 );
 
@@ -87,6 +88,6 @@ export const logout = form(
     await auth.invalidateSession(authData.session.userId);
     auth.deleteSessionTokenCookie(cookies);
 
-    redirect(302, "/login");
+    redirect(302, resolve("/login"));
   },
 );

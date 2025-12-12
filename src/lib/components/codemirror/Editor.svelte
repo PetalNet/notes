@@ -100,7 +100,7 @@
 
   const extensions = $derived([
     coreExtensions,
-    wikilinksExtension(notesList),
+    wikilinksExtension.of({ notesList }),
     // Update listener
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {

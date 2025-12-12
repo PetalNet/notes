@@ -44,35 +44,46 @@ class WikilinkWidget extends WidgetType {
   }
 }
 
-export function wikilinksExtension(notesList: NoteOrFolder[]) {
-  const wikilinkMatcher = new MatchDecorator({
-    regexp: /\[\[([^\]]+)\]\]/g,
-    decoration: (match) =>
-      Decoration.replace({
-        widget: new WikilinkWidget(
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- There is a capture group in the regex.
-          match[1]!,
-          notesList,
-        ),
-      }),
-  });
+export interface WikilinkPluginArgs {
+  notesList: NoteOrFolder[];
+}
 
-  return ViewPlugin.fromClass(
-    class {
-      bookmarks: RangeSet<Decoration>;
-      constructor(view: EditorView) {
-        this.bookmarks = wikilinkMatcher.createDeco(view);
-      }
-      update(update: ViewUpdate) {
-        this.bookmarks = wikilinkMatcher.updateDeco(update, this.bookmarks);
-      }
-    },
-    {
-      decorations: (instance) => instance.bookmarks,
-      provide: (plugin) =>
-        EditorView.atomicRanges.of((view) => {
-          return view.plugin(plugin)?.bookmarks ?? Decoration.none;
+export const wikilinksExtension: ViewPlugin<
+  WikilinkPlugin,
+  WikilinkPluginArgs
+> = ViewPlugin.define(
+  (v, { notesList }) => {
+    const wikilinkMatcher = new MatchDecorator({
+      regexp: /\[\[([^\]]+)\]\]/g,
+      decoration: (match) =>
+        Decoration.replace({
+          widget: new WikilinkWidget(
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- There is a capture group in the regex.
+            match[1]!,
+            notesList,
+          ),
         }),
-    },
-  );
+    });
+
+    return new WikilinkPlugin(v, wikilinkMatcher);
+  },
+  {
+    decorations: (instance) => instance.bookmarks,
+    provide: (plugin) =>
+      EditorView.atomicRanges.of((view) => {
+        return view.plugin(plugin)?.bookmarks ?? Decoration.none;
+      }),
+  },
+);
+
+class WikilinkPlugin {
+  bookmarks: RangeSet<Decoration>;
+  wikilinkMatcher: MatchDecorator;
+  constructor(view: EditorView, wikilinkMatcher: MatchDecorator) {
+    this.bookmarks = wikilinkMatcher.createDeco(view);
+    this.wikilinkMatcher = wikilinkMatcher;
+  }
+  update(update: ViewUpdate): void {
+    this.bookmarks = this.wikilinkMatcher.updateDeco(update, this.bookmarks);
+  }
 }

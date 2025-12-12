@@ -4,19 +4,22 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
+    "check-deduped-deps": "pnpm dedupe --check --prefer-offline",
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-    "format": "prettier --write .",
-    "lint": "prettier --check . && eslint .",
+    "format": "prettier . --write --experimental-cli",
+    "format:check": "prettier . --check --experimental-cli",
+    "lint": "eslint . --max-warnings=0",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
-    "knip": "knip"
+    "knip": "knip",
+    "merge-checks": "pnpm run check && pnpm run lint && pnpm run format:check && pnpm run knip && pnpm run check-deduped-deps"
   },
   "devDependencies": {
     "@effect/language-service": "^0.62.1",

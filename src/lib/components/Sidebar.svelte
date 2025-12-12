@@ -46,10 +46,10 @@
   let contextMenu = $state<ContextState>();
   let renameModal: HTMLDialogElement;
 
-  let notesListQuery = $derived(getNotes());
-
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
+
+  let notesListQuery = $derived(getNotes());
 
   // Set up root drop target
   onMount(() => {

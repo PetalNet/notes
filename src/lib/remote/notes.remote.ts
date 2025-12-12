@@ -25,9 +25,6 @@ export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
       ({
         ...n,
         content: "", // Will be decrypted when selected
-        order: n.order,
-        createdAt: new Date(n.createdAt),
-        updatedAt: new Date(n.updatedAt),
       }) satisfies NoteOrFolder,
   );
 });

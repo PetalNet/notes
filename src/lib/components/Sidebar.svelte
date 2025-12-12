@@ -1,33 +1,36 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-  import TreeItem from "./TreeItem.svelte";
-  import { SvelteSet } from "svelte/reactivity";
-  import {
-    FolderPlus,
-    FilePlus,
-    File,
-    Plus,
-    Trash2,
-    Pencil,
-  } from "@lucide/svelte";
-  import type { User } from "$lib/schema.ts";
-  import ProfilePicture from "./ProfilePicture.svelte";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
+  import { page } from "$app/state";
+  import { encryptKeyForUser, generateNoteKey } from "$lib/crypto.ts";
   import { logout } from "$lib/remote/accounts.remote.ts";
-  import { unawaited } from "$lib/unawaited.ts";
   import {
     createNote,
     deleteNote,
-    updateNote,
-    reorderNotes,
     getNotes,
+    reorderNotes,
+    updateNote,
   } from "$lib/remote/notes.remote.ts";
+  import type { User } from "$lib/schema.ts";
+  import { unawaited } from "$lib/unawaited.ts";
   import { buildNotesTree } from "$lib/utils/tree.ts";
-  import { generateNoteKey, encryptKeyForUser } from "$lib/crypto";
-  import { goto } from "$app/navigation";
-  import { resolve } from "$app/paths";
-  import type { NoteOrFolder } from "$lib/schema.ts";
-  import { page } from "$app/state";
+  import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+  import {
+    File,
+    FilePlus,
+    FolderPlus,
+    LogOut,
+    PanelLeftClose,
+    Pencil,
+    Plus,
+    Trash2,
+  } from "@lucide/svelte";
+  import { onMount } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
+  import ProfilePicture from "./ProfilePicture.svelte";
+  import { LoroDoc } from "loro-crdt";
+  import { getEncryptedSnapshot } from "$lib/loro.ts";
+  import TreeItem from "./TreeItem.svelte";
 
   interface ContextState {
     x: number;
@@ -38,20 +41,22 @@
 
   interface Props {
     user: User | undefined;
-    notesList: NoteOrFolder[];
+    isCollapsed: boolean;
+    toggleSidebar: () => void;
   }
 
-  let { user, notesList }: Props = $props();
+  let { user, isCollapsed, toggleSidebar }: Props = $props();
+
   let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<ContextState>();
   let renameModal: HTMLDialogElement;
 
-  let notesTree = $derived(buildNotesTree(notesList));
-
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
+
+  let notesListQuery = $derived(getNotes());
 
   // Set up root drop target
   onMount(() => {
@@ -176,13 +181,17 @@
     const noteKey = await generateNoteKey();
 
     // Encrypt note key with user's public key
-    const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
+    const [encryptedKey, encryptedSnapshot] = await Promise.all([
+      encryptKeyForUser(noteKey, publicKey),
+      getEncryptedSnapshot(new LoroDoc(), noteKey),
+    ]);
 
     const newNote = await createNote({
       title,
       encryptedKey,
       parentId,
       isFolder,
+      encryptedSnapshot,
     }).updates(
       // TODO: add optimistic update.
       getNotes(),
@@ -200,31 +209,60 @@
       renameModal.close();
     }
   });
+
+  let notesList = $derived(await notesListQuery);
+  let notesTree = $derived(buildNotesTree(notesList));
 </script>
 
 <svelte:window onclick={onWindowClick} />
 
 <div
-  class="sidebar flex h-full w-64 flex-col border-r border-base-content/10 [view-transition-name:sidebar]"
+  class={[
+    "sidebar flex h-full w-64 flex-col border-base-content/10 transition-all duration-300 [view-transition-name:sidebar]",
+    isCollapsed ? "-ml-64" : "ml-0 border-r",
+  ]}
 >
   <!-- User Header -->
   <div
     class="flex items-center justify-between border-b border-base-content/10 p-4"
   >
-    <div class="flex items-center gap-2">
-      <ProfilePicture name={user?.username ?? "A"} />
-      <span class="max-w-28 truncate text-sm font-medium"
-        >{user?.username ?? "Anonymous"}</span
+    <div class="dropdown dropdown-bottom">
+      <div
+        tabindex="0"
+        role="button"
+        class="btn h-auto min-h-0 gap-3 rounded-lg px-3 py-2 normal-case btn-ghost hover:bg-base-200"
       >
+        <ProfilePicture name={user?.username[0] ?? "A"} />
+        <span class="max-w-30 truncate text-sm font-semibold">
+          {user?.username ?? "Anonymous"}
+        </span>
+      </div>
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <ul
+        tabindex="0"
+        class="dropdown-content menu z-1 w-52 rounded-box bg-base-100 p-2 shadow"
+      >
+        <li>
+          <form {...logout}>
+            <button
+              type="submit"
+              class="flex w-full items-center gap-2 text-xs text-base-content/40 transition-colors hover:text-base-content/60"
+            >
+              <LogOut size={16} />
+              Log out
+            </button>
+          </form>
+        </li>
+      </ul>
     </div>
-    <form {...logout}>
-      <button
-        type="submit"
-        class="text-xs text-base-content/40 transition-colors hover:text-base-content/60"
-      >
-        Log out
-      </button>
-    </form>
+
+    <button
+      onclick={toggleSidebar}
+      class="btn btn-square btn-ghost btn-sm"
+      title="Collapse sidebar (Ctrl+B)"
+    >
+      <PanelLeftClose size={20} />
+    </button>
   </div>
 
   <!-- Actions -->
@@ -258,6 +296,7 @@
       "flex-1 space-y-1 overflow-y-auto px-2 py-2 transition-all",
       isRootDropTarget && "bg-indigo-50 ring-2 ring-primary ring-inset",
     ]}
+    role="tree"
   >
     {#each notesTree as item, idx (item.id)}
       <TreeItem
@@ -295,19 +334,18 @@
     {#if contextMenu.isFolder}
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-base-content hover:bg-primary hover:text-primary-content"
-        onclick={() => {
+        onclick={async () => {
           if (user === undefined) {
             throw new Error("Cannot create note whilst logged out.");
           }
 
-          unawaited(
-            handleCreateNote(
-              "An Untitled Note",
-              clickedId,
-              false,
-              user.publicKey,
-            ),
+          await handleCreateNote(
+            "An Untitled Note",
+            clickedId,
+            false,
+            user.publicKey,
           );
+
           closeContextMenu();
         }}><Plus /> New Note Inside</button
       >

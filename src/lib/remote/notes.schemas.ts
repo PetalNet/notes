@@ -6,6 +6,7 @@ export const CreateNoteSchema = Schema.Struct({
   parentId: Schema.String.pipe(Schema.NullOr),
   isFolder: Schema.Boolean,
   encryptedKey: Uint8ArrayFromSelfSchema,
+  encryptedSnapshot: Uint8ArrayFromSelfSchema,
 });
 export const createNoteSchema = CreateNoteSchema.pipe(Schema.standardSchemaV1);
 

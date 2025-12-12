@@ -5,7 +5,7 @@
   import { LoroNoteManager } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { decryptKey } from "$lib/crypto";
+  import { decryptKey } from "$lib/crypto.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
 
   const { data } = $props();
@@ -38,6 +38,11 @@
               key = await decryptKey(note.encryptedKey, userPrivateKey);
             } catch (e) {
               console.error("Failed to decrypt key:", e);
+              console.debug("Debug info:", {
+                encryptedKeyLen: note.encryptedKey.byteLength,
+                userPrivateKeyLen: userPrivateKey?.byteLength,
+                noteId: note.id,
+              });
             }
           }
 

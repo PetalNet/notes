@@ -11,17 +11,14 @@ import {
   reorderNotesSchema,
   updateNoteSchema,
 } from "./notes.schemas.ts";
-import { LoroDoc } from "loro-crdt";
-import { getEncryptedSnapshot } from "$lib/loro.ts";
 
 export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   const { user } = requireLogin();
 
-  const userNotes = await db.query.notes.findMany({
-    where: {
-      ownerId: user.id,
-    },
-  });
+  const userNotes = await db
+    .select()
+    .from(notes)
+    .where(eq(notes.ownerId, user.id));
 
   return userNotes.map(
     (n) =>
@@ -43,34 +40,26 @@ export const createNote = command(
     encryptedKey,
     parentId,
     isFolder,
+    encryptedSnapshot,
   }): Promise<Omit<NoteOrFolder, "content">> => {
     const { user } = requireLogin();
 
     try {
       const id = crypto.randomUUID();
 
-      const loroSnapshot = await getEncryptedSnapshot(
-        new LoroDoc(),
-        encryptedKey,
-      );
-
       await db.insert(notes).values({
         id,
         title,
         ownerId: user.id,
         encryptedKey,
-        loroSnapshot,
+        loroSnapshot: encryptedSnapshot,
         parentId,
         isFolder,
         createdAt: new Date(),
         updatedAt: new Date(),
       } satisfies typeof notes.$inferInsert);
 
-      const note = await db.query.notes.findFirst({
-        where: {
-          id: id,
-        },
-      });
+      const [note] = await db.select().from(notes).where(eq(notes.id, id));
 
       if (!note) throw new Error("Failed to find newly created note!");
 
@@ -90,11 +79,7 @@ export const deleteNote = command(
 
     try {
       // Verify ownership
-      const note = await db.query.notes.findFirst({
-        where: {
-          id: noteId,
-        },
-      });
+      const [note] = await db.select().from(notes).where(eq(notes.id, noteId));
 
       if (!note || note.ownerId !== user.id) error(404, "Not found");
 
@@ -118,11 +103,10 @@ export const updateNote = command(
 
     try {
       // Verify ownership
-      const existingNote = await db.query.notes.findFirst({
-        where: {
-          id: noteId,
-        },
-      });
+      const [existingNote] = await db
+        .select()
+        .from(notes)
+        .where(eq(notes.id, noteId));
 
       if (!existingNote || existingNote.ownerId !== user.id) {
         error(404, "Not found");
@@ -139,11 +123,10 @@ export const updateNote = command(
         })
         .where(eq(notes.id, noteId));
 
-      const updated = await db.query.notes.findFirst({
-        where: {
-          id: noteId,
-        },
-      });
+      const [updated] = await db
+        .select()
+        .from(notes)
+        .where(eq(notes.id, noteId));
 
       if (!updated) throw new Error("Failed to find newly created note!");
 

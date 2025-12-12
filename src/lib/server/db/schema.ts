@@ -1,18 +1,13 @@
-import { sqliteTable, text, integer, blob } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { instant, uint8array } from "./columns.ts";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  publicKey: blob("public_key", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
-  privateKeyEncrypted: blob("private_key_encrypted", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
+  publicKey: uint8array("public_key").notNull(),
+  privateKeyEncrypted: uint8array("private_key_encrypted").notNull(),
+  createdAt: instant("created_at").notNull(),
 });
 
 export const sessions = sqliteTable("sessions", {
@@ -29,12 +24,8 @@ export const notes = sqliteTable("notes", {
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),
-  encryptedKey: blob("encrypted_key", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
-  loroSnapshot: blob("loro_snapshot", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
+  encryptedKey: uint8array("encrypted_key").notNull(),
+  loroSnapshot: uint8array("loro_snapshot").notNull(),
   parentId: text("parent_id"),
   isFolder: integer("is_folder", { mode: "boolean" }).notNull().default(false),
   order: integer("order").notNull().default(0),
@@ -46,20 +37,6 @@ export const notes = sqliteTable("notes", {
     .$defaultFn(() => new Date()),
 });
 
-export const noteShares = sqliteTable("note_shares", {
-  id: text("id").primaryKey(),
-  noteId: text("note_id")
-    .notNull()
-    .references(() => notes.id),
-  sharedWithUser: text("shared_with_user").notNull(),
-  encryptedKey: text("encrypted_key").notNull(),
-  permissions: text("permissions").notNull().default("read"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Note = typeof notes.$inferSelect;
-export type NoteShare = typeof noteShares.$inferSelect;

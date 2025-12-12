@@ -16,6 +16,12 @@ export default defineConfig(
   ...ts.configs.stylisticTypeChecked,
   ...svelte.configs.recommended,
   {
+    linterOptions: {
+      reportUnusedDisableDirectives: "error",
+      reportUnusedInlineConfigs: "error",
+    },
+  },
+  {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
       parserOptions: {
@@ -49,6 +55,8 @@ export default defineConfig(
       ],
       // Too many false positives, due for a rework. See: typescript-eslint/typescript-eslint#8113.
       "@typescript-eslint/no-invalid-void-type": "off",
+      // Breaks $env imports
+      "@typescript-eslint/dot-notation": "off",
     },
   },
   {

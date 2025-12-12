@@ -81,7 +81,7 @@
                 submitter.form!.requestSubmit(submitter);
               }}
             >
-              {isSubmutting ? "Logging in..." : "Log In"}
+              {isSubmutting ? "Signing up..." : "Sign Up"}
             </button>
           </div>
         </fieldset>

@@ -1,10 +1,15 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { getSidebarContext } from "$lib/components/sidebar-context.ts";
+  import { formatRelativeTime } from "$lib/utils/time.ts";
+  import { PanelLeftOpen } from "@lucide/svelte";
+  import { Temporal } from "temporal-polyfill";
 
-  let { data } = $props();
+  const { data } = $props();
+  const sidebar = getSidebarContext();
 </script>
 
-<div class="min-h-screen bg-base-100 p-8">
+<div class="h-full bg-base-100 p-8">
   <div class="mx-auto max-w-6xl">
     <h1 class="mb-8 text-4xl font-bold">Dashboard</h1>
 
@@ -31,9 +36,11 @@
                 {data.randomNote.title}
               </h3>
               <p class="text-sm text-base-content/60">
-                Last updated: {new Date(
-                  data.randomNote.updatedAt,
-                ).toLocaleDateString()}
+                Last updated: {formatRelativeTime(
+                  Temporal.Instant.fromEpochMilliseconds(
+                    data.randomNote.updatedAt.getTime(),
+                  ),
+                )}
               </p>
             </div>
             <div class="card-actions justify-end">
@@ -57,9 +64,16 @@
               </p>
             </div>
             <div class="card-actions justify-end">
-              <a href={resolve("/notes")} class="btn btn-accent"
-                >Create New Note</a
-              >
+              {#if sidebar.isCollapsed}
+                <button class="btn btn-sm btn-primary" onclick={sidebar.toggle}>
+                  <PanelLeftOpen size={16} />
+                  Open Sidebar
+                </button>
+              {:else}
+                <p class="text-sm text-base-content/60">
+                  Use the sidebar to create your first note
+                </p>
+              {/if}
             </div>
           </div>
         </div>

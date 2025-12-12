@@ -23,7 +23,7 @@ import { Either } from "effect";
 /**
  * Wrap current editor selection with markdown syntax.
  */
-export function wrapSelection(
+function wrapSelection(
   view: EditorView,
   before: string,
   after: string = before,
@@ -52,7 +52,7 @@ export function wrapSelection(
 /**
  * {@linkcode wrapSelection}, but it unwraps if already wrapped.
  */
-export function toggleWrapper(
+function toggleWrapper(
   view: EditorView,
   before: string,
   after: string = before,
@@ -87,7 +87,7 @@ export function toggleWrapper(
 /**
  * Insert text at the start of the current line.
  */
-export function insertAtLineStart(view: EditorView, text: string): void {
+function insertAtLineStart(view: EditorView, text: string): void {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
 
@@ -209,7 +209,7 @@ export const orderedListCommand = (view: EditorView) => {
 };
 
 /** Custom keyboard shortcuts for markdown formatting. */
-export const markdownKeymap: KeyBinding[] = [
+const markdownKeymap: KeyBinding[] = [
   {
     // Bold
     key: "Mod-b",

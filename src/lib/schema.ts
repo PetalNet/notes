@@ -9,37 +9,25 @@ export const Uint8ArrayFromSelfSchema =
 export const Uint8ArrayFromBase64Schema =
   Schema.Uint8ArrayFromBase64 as Schema.Schema<Uint8Array<ArrayBuffer>, string>;
 
-const NoteBaseSchema = Schema.Struct({
-  id: Schema.String,
-  title: Schema.String,
-  content: Schema.String,
-  ownerId: Schema.String,
-  encryptedKey: Uint8ArrayFromSelfSchema,
-  loroSnapshot: Schema.NullOr(Uint8ArrayFromSelfSchema),
-  parentId: Schema.NullOr(Schema.String),
-  order: Schema.Number,
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-});
+interface NoteBase {
+  id: string;
+  title: string;
+  content: string;
+  ownerId: string;
+  encryptedKey: Uint8Array<ArrayBuffer>;
+  parentId: string | null;
+  order: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-export const NoteSchema = Schema.extend(
-  NoteBaseSchema,
-  Schema.Struct({
-    isFolder: Schema.tag(false),
-  }),
-).pipe(Schema.mutable);
-
-export const FolderSchema = Schema.extend(
-  NoteBaseSchema,
-  Schema.Struct({
-    isFolder: Schema.tag(true),
-  }),
-).pipe(Schema.mutable);
-
-export const NoteOrFolderSchema = Schema.Union(NoteSchema, FolderSchema);
-
-export type Note = typeof NoteSchema.Type;
-export type Folder = typeof FolderSchema.Type;
+export interface Note extends NoteBase {
+  loroSnapshot: Uint8Array<ArrayBuffer>;
+  isFolder: false;
+}
+export interface Folder extends NoteBase {
+  isFolder: true;
+}
 // TODO: Add in Drawing support via Excalidraw
 export type NoteOrFolder = Note | Folder;
 

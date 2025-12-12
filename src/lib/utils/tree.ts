@@ -9,7 +9,7 @@ const byOrder = Order.mapInput<number, TreeNode>(
 );
 
 /** Recursive function to sort children at all levels. */
-export function treeToSorted(tree: readonly TreeNode[]): TreeNode[] {
+function treeToSorted(tree: readonly TreeNode[]): TreeNode[] {
   return tree
     .toSorted(byOrder)
     .map((node) =>

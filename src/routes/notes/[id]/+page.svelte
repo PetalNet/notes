@@ -51,9 +51,7 @@
                 await updateNote({ noteId: id, loroSnapshot: snapshot });
               });
 
-              if (note.loroSnapshot) {
-                await manager.init(note.loroSnapshot);
-              }
+              await manager.init(note.loroSnapshot);
 
               if (signal.aborted as boolean) {
                 manager.destroy();

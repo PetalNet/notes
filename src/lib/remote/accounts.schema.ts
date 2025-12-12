@@ -36,7 +36,7 @@ const PasswordSchema = Schema.String.pipe(
   Schema.Redacted,
 );
 
-export const LoginSchema = Schema.Struct({
+const LoginSchema = Schema.Struct({
   username: UsernameSchema,
   _password: PasswordSchema.annotations({
     title: "Password",
@@ -46,7 +46,7 @@ export const LoginSchema = Schema.Struct({
 
 export const loginSchema = LoginSchema.pipe(Schema.standardSchemaV1);
 
-export const SignupSchema = Schema.Struct({
+const SignupSchema = Schema.Struct({
   username: UsernameSchema,
   _password: PasswordSchema.annotations({
     title: "Password",

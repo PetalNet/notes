@@ -18,7 +18,7 @@
 - **Follow DaisyUI** (semantic classes like `btn-primary`).
 - **Validate with ESLint**.
 - **Check DB schema** (`src/lib/server/db/schema.ts`).
-- **Use Drizzle ORM syntax** (prefer `db.query` over raw `sql` templates).
+- **Use Drizzle ORM syntax** (always prefer `db.select()` over `db.query` or raw `sql` templates).
 - **Mark todos complete** immediately.
 
 ### Don'ts

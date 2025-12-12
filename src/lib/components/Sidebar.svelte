@@ -11,7 +11,7 @@
     reorderNotes,
     updateNote,
   } from "$lib/remote/notes.remote.ts";
-  import type { NoteOrFolder, User } from "$lib/schema.ts";
+  import type { User } from "$lib/schema.ts";
   import { unawaited } from "$lib/unawaited.ts";
   import { buildNotesTree } from "$lib/utils/tree.ts";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
@@ -37,17 +37,16 @@
 
   interface Props {
     user: User | undefined;
-    notesList: NoteOrFolder[];
   }
 
-  let { user, notesList }: Props = $props();
+  let { user }: Props = $props();
   let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<ContextState>();
   let renameModal: HTMLDialogElement;
 
-  let notesTree = $derived(buildNotesTree(notesList));
+  let notesListQuery = $derived(getNotes());
 
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
@@ -206,6 +205,9 @@
       renameModal.close();
     }
   });
+
+  let notesList = $derived(await notesListQuery);
+  let notesTree = $derived(buildNotesTree(notesList));
 </script>
 
 <svelte:window onclick={onWindowClick} />

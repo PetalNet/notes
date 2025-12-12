@@ -64,6 +64,7 @@ export default defineConfig(
           message: "Use #private instead",
         },
       ],
+      "no-void": "error", // Use `unawaited((async () => {})())` instead.
       "@typescript-eslint/no-floating-promises": [
         "error",
         {

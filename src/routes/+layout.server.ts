@@ -13,6 +13,8 @@ export const load = async ({ locals }): Promise<Data> => {
   if (!localUser) {
     return { user: undefined };
   }
+
+  // Get user with private key from database
   const [user] = await db
     .select({
       id: table.users.id,

@@ -17,7 +17,6 @@ export const relations = defineRelations(schema, (r) => ({
       from: r.notes.ownerId,
       to: r.users.id,
     }),
-    shares: r.many.noteShares(),
     parent: r.one.notes({
       from: r.notes.parentId,
       to: r.notes.id,
@@ -27,12 +26,6 @@ export const relations = defineRelations(schema, (r) => ({
       alias: "children",
       from: r.notes.id,
       to: r.notes.parentId,
-    }),
-  },
-  noteShares: {
-    note: r.one.notes({
-      from: r.noteShares.noteId,
-      to: r.notes.id,
     }),
   },
 }));

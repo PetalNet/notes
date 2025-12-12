@@ -46,20 +46,6 @@ export const notes = sqliteTable("notes", {
     .$defaultFn(() => new Date()),
 });
 
-export const noteShares = sqliteTable("note_shares", {
-  id: text("id").primaryKey(),
-  noteId: text("note_id")
-    .notNull()
-    .references(() => notes.id),
-  sharedWithUser: text("shared_with_user").notNull(),
-  encryptedKey: text("encrypted_key").notNull(),
-  permissions: text("permissions").notNull().default("read"),
-  createdAt: integer("created_at", { mode: "timestamp" })
-    .notNull()
-    .$defaultFn(() => new Date()),
-});
-
 export type User = typeof users.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type Note = typeof notes.$inferSelect;
-export type NoteShare = typeof noteShares.$inferSelect;

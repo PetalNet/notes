@@ -6,6 +6,8 @@
 
   let publicKeyInput: HTMLInputElement;
   let privateKeyInput: HTMLInputElement;
+
+  let isSubmutting = $derived(signup.pending !== 0);
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
@@ -26,7 +28,7 @@
           name="privateKeyEncrypted"
           bind:this={privateKeyInput}
         />
-        <fieldset disabled={signup.pending !== 0}>
+        <fieldset disabled={isSubmutting}>
           <div class="form-control">
             <label>
               <div class="label">
@@ -52,7 +54,7 @@
             <button
               type="submit"
               class="btn btn-primary"
-              disabled={signup.pending !== 0}
+              disabled={isSubmutting}
               onclick={async (e) => {
                 // We require client-side JS to generate the key.
                 // SvelteKit enforces that enhance is purely for enhancement.
@@ -79,7 +81,7 @@
                 submitter.form!.requestSubmit(submitter);
               }}
             >
-              {signup.pending !== 0 ? "Logging in..." : "Log In"}
+              {isSubmutting ? "Logging in..." : "Log In"}
             </button>
           </div>
         </fieldset>

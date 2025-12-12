@@ -2,6 +2,8 @@
   import { resolve } from "$app/paths";
   import { login } from "$lib/remote/accounts.remote.ts";
   import { loginSchema } from "$lib/remote/accounts.schema.ts";
+
+  const isSubmutting = $derived(login.pending !== 0);
 </script>
 
 <div class="flex min-h-screen items-center justify-center bg-base-200">
@@ -17,7 +19,7 @@
       {/each}
 
       <form {...login.preflight(loginSchema)}>
-        <fieldset disabled={login.pending !== 0}>
+        <fieldset disabled={isSubmutting}>
           <div class="form-control">
             <label>
               <div class="label">
@@ -37,8 +39,12 @@
           </div>
 
           <div class="form-control mt-6">
-            <button type="submit" class="btn btn-primary">
-              {login.pending !== 0 ? "Logging in..." : "Log In"}
+            <button
+              type="submit"
+              class="btn btn-primary"
+              disabled={isSubmutting}
+            >
+              {isSubmutting ? "Logging in..." : "Log In"}
             </button>
           </div>
         </fieldset>

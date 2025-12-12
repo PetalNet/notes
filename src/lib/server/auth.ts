@@ -6,6 +6,7 @@ import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
 import type { User } from "$lib/schema.ts";
 import { getRequestEvent } from "$app/server";
+import { resolve } from "$app/paths";
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
@@ -120,7 +121,7 @@ export function guardLogin(): SomeAuthData {
   } = getRequestEvent();
 
   if (!user || !session) {
-    redirect(302, "/login");
+    redirect(302, resolve("/login"));
   }
 
   return { user, session };

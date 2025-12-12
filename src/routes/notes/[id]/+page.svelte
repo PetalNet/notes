@@ -38,6 +38,11 @@
               key = await decryptKey(note.encryptedKey, userPrivateKey);
             } catch (e) {
               console.error("Failed to decrypt key:", e);
+              console.debug("Debug info:", {
+                encryptedKeyLen: note.encryptedKey.byteLength,
+                userPrivateKeyLen: userPrivateKey?.byteLength,
+                noteId: note.id,
+              });
             }
           }
 

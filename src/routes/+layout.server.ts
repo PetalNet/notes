@@ -24,8 +24,8 @@ export const load = async ({ locals }): Promise<Data> => {
       ? {
           id: user.id,
           username: user.username,
-          publicKey: user.publicKey,
-          privateKeyEncrypted: user.privateKeyEncrypted,
+          publicKey: new Uint8Array(user.publicKey),
+          privateKeyEncrypted: new Uint8Array(user.privateKeyEncrypted),
         }
       : undefined,
   };

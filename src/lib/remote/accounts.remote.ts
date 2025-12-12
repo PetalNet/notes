@@ -7,6 +7,8 @@ import { fail, invalid, redirect } from "@sveltejs/kit";
 import { eq } from "drizzle-orm";
 import { Redacted, Schema } from "effect";
 import { loginSchema, signupSchema } from "./accounts.schema.ts";
+import { resolve } from "$app/paths";
+import { Temporal } from "temporal-polyfill";
 
 export const login = form(
   loginSchema,
@@ -41,7 +43,7 @@ export const login = form(
     const session = await auth.createSession(sessionToken, existingUser.id);
     auth.setSessionTokenCookie(cookies, sessionToken, session.expiresAt);
 
-    return redirect(302, "/");
+    return redirect(302, resolve("/notes/"));
   },
 );
 
@@ -66,7 +68,7 @@ export const signup = form(
         passwordHash,
         publicKey,
         privateKeyEncrypted,
-        createdAt: new Date(),
+        createdAt: Temporal.Now.instant(),
       } satisfies table.User);
 
       const sessionToken = auth.generateSessionToken();
@@ -75,7 +77,7 @@ export const signup = form(
     } catch {
       return fail(500, { message: "An error has occurred" });
     }
-    redirect(302, "/");
+    redirect(302, resolve("/notes"));
   },
 );
 
@@ -87,6 +89,6 @@ export const logout = form(
     await auth.invalidateSession(authData.session.userId);
     auth.deleteSessionTokenCookie(cookies);
 
-    redirect(302, "/login");
+    redirect(302, resolve("/login"));
   },
 );

@@ -4,6 +4,7 @@ import { sync } from "$lib/remote/sync.remote.ts";
 import { Chunk, Effect, Fiber, Function, PubSub, Schema, Stream } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, type LoroText, type Frontiers } from "loro-crdt";
+import { unawaited } from "./unawaited.ts";
 
 export type Doc = LoroDoc<{
   content: LoroText;
@@ -137,7 +138,7 @@ export class LoroNoteManager {
 
             for (const update of data.updates) {
               const updateBytes = Uint8Array.fromBase64(update);
-              void emit(Effect.succeed(Chunk.make(updateBytes)));
+              unawaited(emit(Effect.succeed(Chunk.make(updateBytes))));
             }
           } catch (error) {
             console.error("Failed to process sync message:", error);

@@ -28,6 +28,8 @@
   import { onMount } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import ProfilePicture from "./ProfilePicture.svelte";
+  import { LoroDoc } from "loro-crdt";
+  import { getEncryptedSnapshot } from "$lib/loro.ts";
   import TreeItem from "./TreeItem.svelte";
 
   interface ContextState {
@@ -181,11 +183,17 @@
     // Encrypt note key with user's public key
     const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
 
+    const encryptedSnapshot = await getEncryptedSnapshot(
+      new LoroDoc(),
+      noteKey,
+    );
+
     const newNote = await createNote({
       title,
       encryptedKey,
       parentId,
       isFolder,
+      encryptedSnapshot,
     }).updates(
       // TODO: add optimistic update.
       getNotes(),
@@ -325,19 +333,18 @@
     {#if contextMenu.isFolder}
       <button
         class="flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm text-base-content hover:bg-primary hover:text-primary-content"
-        onclick={() => {
+        onclick={async () => {
           if (user === undefined) {
             throw new Error("Cannot create note whilst logged out.");
           }
 
-          unawaited(
-            handleCreateNote(
-              "An Untitled Note",
-              clickedId,
-              false,
-              user.publicKey,
-            ),
+          await handleCreateNote(
+            "An Untitled Note",
+            clickedId,
+            false,
+            user.publicKey,
           );
+
           closeContextMenu();
         }}><Plus /> New Note Inside</button
       >

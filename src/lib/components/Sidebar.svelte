@@ -2,7 +2,7 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
-  import { encryptKeyForUser, generateNoteKey } from "$lib/crypto";
+  import { encryptKeyForUser, generateNoteKey } from "$lib/crypto.ts";
   import { logout } from "$lib/remote/accounts.remote.ts";
   import {
     createNote,
@@ -11,7 +11,7 @@
     reorderNotes,
     updateNote,
   } from "$lib/remote/notes.remote.ts";
-  import type { NoteOrFolder, User } from "$lib/schema.ts";
+  import type { User } from "$lib/schema.ts";
   import { unawaited } from "$lib/unawaited.ts";
   import { buildNotesTree } from "$lib/utils/tree.ts";
   import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
@@ -41,22 +41,22 @@
 
   interface Props {
     user: User | undefined;
-    notesList: NoteOrFolder[];
     isCollapsed: boolean;
     toggleSidebar: () => void;
   }
 
-  let { user, notesList, isCollapsed, toggleSidebar }: Props = $props();
+  let { user, isCollapsed, toggleSidebar }: Props = $props();
+
   let expandedFolders = new SvelteSet<string>();
   let renamingId = $state<string | null>(null);
   let renameTitle = $state("");
   let contextMenu = $state<ContextState>();
   let renameModal: HTMLDialogElement;
 
-  let notesTree = $derived(buildNotesTree(notesList));
-
   let rootContainer: HTMLElement;
   let isRootDropTarget = $state(false);
+
+  let notesListQuery = $derived(getNotes());
 
   // Set up root drop target
   onMount(() => {
@@ -181,12 +181,10 @@
     const noteKey = await generateNoteKey();
 
     // Encrypt note key with user's public key
-    const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
-
-    const encryptedSnapshot = await getEncryptedSnapshot(
-      new LoroDoc(),
-      noteKey,
-    );
+    const [encryptedKey, encryptedSnapshot] = await Promise.all([
+      encryptKeyForUser(noteKey, publicKey),
+      getEncryptedSnapshot(new LoroDoc(), noteKey),
+    ]);
 
     const newNote = await createNote({
       title,
@@ -211,6 +209,9 @@
       renameModal.close();
     }
   });
+
+  let notesList = $derived(await notesListQuery);
+  let notesTree = $derived(buildNotesTree(notesList));
 </script>
 
 <svelte:window onclick={onWindowClick} />

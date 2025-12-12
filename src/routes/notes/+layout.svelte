@@ -1,12 +1,9 @@
 <script lang="ts">
   import { setSidebarContext } from "$lib/components/sidebar-context.ts";
   import Sidebar from "$lib/components/Sidebar.svelte";
-  import { getNotes } from "$lib/remote/notes.remote.ts";
   import { PersistedState } from "runed";
 
   let { children, data } = $props();
-
-  const notesListQuery = $derived(getNotes());
 
   // User's explicit preference (persisted to localStorage)
   const collapsedDesktop = new PersistedState("sidebarCollapsed", false);
@@ -67,15 +64,13 @@
     },
     toggle: toggleSidebar,
   });
-
-  const notesList = $derived(await notesListQuery);
 </script>
 
 <svelte:window bind:innerWidth onkeydown={handleKeydown} />
 
 <div class="flex h-screen overflow-hidden">
   {#if data.user}
-    <Sidebar user={data.user} {notesList} {isCollapsed} {toggleSidebar} />
+    <Sidebar user={data.user} {isCollapsed} {toggleSidebar} />
   {/if}
 
   {@render children()}

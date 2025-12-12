@@ -79,7 +79,7 @@
                 submitter.form!.requestSubmit(submitter);
               }}
             >
-              {signup.pending !== 0 ? "Logging in..." : "Log In"}
+              {signup.pending !== 0 ? "Signing up..." : "Sign up"}
             </button>
           </div>
         </fieldset>

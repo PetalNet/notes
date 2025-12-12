@@ -1,10 +1,6 @@
 import type { Handle } from "@sveltejs/kit";
 import * as auth from "$lib/server/auth";
 
-process.on("unhandledRejection", (reason, promise) => {
-  console.log("err", reason, "\nprom:", promise);
-});
-
 const handleAuth: Handle = async ({ event, resolve }) => {
   const sessionToken = event.cookies.get(auth.sessionCookieName);
 
@@ -35,7 +31,7 @@ const handleAuth: Handle = async ({ event, resolve }) => {
     auth.deleteSessionTokenCookie(event.cookies);
 
     // Redirect to login if session invalid
-    if (event.url.pathname === "/") {
+    if (!event.route.id?.startsWith("/(auth)")) {
       return new Response("Redirect", {
         status: 303,
         headers: { Location: "/login" },

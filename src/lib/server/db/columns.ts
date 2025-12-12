@@ -30,7 +30,9 @@ export const uint8array = customType<{
     return "blob";
   },
   fromDriver: (value) => {
-    return new Uint8Array(value);
+    // Buffer.buffer can be a shared ArrayBuffer larger than the actual data.
+    // Copy to a new Uint8Array with its own ArrayBuffer to avoid SharedArrayBuffer issues.
+    return Uint8Array.from(value);
   },
   toDriver: (value: Uint8Array | SQL) => {
     if (value instanceof SQL) {

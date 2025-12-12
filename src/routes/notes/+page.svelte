@@ -9,11 +9,11 @@
   const sidebar = getSidebarContext();
 </script>
 
-<div class="h-full bg-base-100 p-8">
+<div class="@container size-full bg-base-100 p-8">
   <div class="mx-auto max-w-6xl">
     <h1 class="mb-8 text-4xl font-bold">Dashboard</h1>
 
-    <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div class="grid grid-cols-1 gap-6 @md:grid-cols-2">
       <!-- Total Notes Card -->
       <div class="card bg-base-200 shadow-xl">
         <div class="card-body">

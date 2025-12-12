@@ -1,4 +1,4 @@
-import { decryptData, encryptData } from "$lib/crypto";
+import { decryptData, encryptData } from "$lib/crypto.ts";
 import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { sync } from "$lib/remote/sync.remote.ts";
 import { Chunk, Effect, Fiber, Function, PubSub, Schema, Stream } from "effect";

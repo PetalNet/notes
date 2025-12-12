@@ -1,7 +1,9 @@
 import { syncSchemaJson } from "$lib/remote/notes.schemas.ts";
 import { db } from "$lib/server/db";
+import * as table from "$lib/server/db/schema.ts";
 import { addClient, removeClient } from "$lib/server/real-time";
 import { json } from "@sveltejs/kit";
+import { eq } from "drizzle-orm";
 import { Schema } from "effect";
 
 export const GET = async ({ params, locals }) => {
@@ -15,12 +17,11 @@ export const GET = async ({ params, locals }) => {
   }
 
   // Verify access
-  const note = await db.query.notes.findFirst({
-    where: {
-      id: noteId,
-    },
-  });
-
+  const note = await db
+    .select()
+    .from(table.notes)
+    .where(eq(table.notes.id, noteId))
+    .get();
   if (!note || note.ownerId !== locals.user.id) {
     // TODO: Add check for shared notes when federation via ATProto is implemented
     return json({ error: "Not found or unauthorized" }, { status: 404 });

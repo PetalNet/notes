@@ -266,6 +266,7 @@
       "flex-1 space-y-1 overflow-y-auto px-2 py-2 transition-all",
       isRootDropTarget && "bg-indigo-50 ring-2 ring-primary ring-inset",
     ]}
+    role="tree"
   >
     {#each notesTree as item, idx (item.id)}
       <TreeItem

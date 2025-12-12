@@ -89,7 +89,7 @@
     return cleanup;
   });
 
-  function toggleFolder(folderId: string) {
+  function toggleFolder(folderId: string): void {
     if (expandedFolders.has(folderId)) {
       expandedFolders.delete(folderId);
     } else {
@@ -97,16 +97,20 @@
     }
   }
 
-  function handleContextMenu(e: MouseEvent, noteId: string, isFolder: boolean) {
+  function handleContextMenu(
+    e: MouseEvent,
+    noteId: string,
+    isFolder: boolean,
+  ): void {
     e.preventDefault();
     contextMenu = { x: e.clientX, y: e.clientY, noteId, isFolder };
   }
 
-  function closeContextMenu() {
+  function closeContextMenu(): void {
     contextMenu = undefined;
   }
 
-  async function handleRename() {
+  async function handleRename(): Promise<void> {
     if (!renamingId) return;
     await updateNote({ noteId: renamingId, title: renameTitle }).updates(
       getNotes().withOverride((notes) =>
@@ -119,13 +123,13 @@
     closeContextMenu();
   }
 
-  function startRename(noteId: string, currentTitle: string) {
+  function startRename(noteId: string, currentTitle: string): void {
     renamingId = noteId;
     renameTitle = currentTitle;
     closeContextMenu();
   }
 
-  async function handleDelete(noteId: string) {
+  async function handleDelete(noteId: string): Promise<void> {
     if (
       // TODO: confirm sucks, use a <dialog>
       confirm("Are you sure you want to delete this note?")
@@ -144,12 +148,15 @@
   }
 
   // Close context menu on click outside
-  function onWindowClick() {
+  function onWindowClick(): void {
     closeContextMenu();
   }
 
   // Handle reordering at root level
-  async function handleRootReorder(sourceId: string, targetIndex: number) {
+  async function handleRootReorder(
+    sourceId: string,
+    targetIndex: number,
+  ): Promise<void> {
     const rootItems = notesTree;
     const itemToMove = notesList.find((n) => n.id === sourceId);
 
@@ -171,7 +178,7 @@
     parentId: string | null,
     isFolder: boolean,
     publicKey: Uint8Array<ArrayBuffer>,
-  ) {
+  ): Promise<void> {
     // Generate AES key for the note
     const noteKey = await generateNoteKey();
 

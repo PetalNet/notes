@@ -5,7 +5,7 @@ const clients = new Map<string, Set<ReadableStreamDefaultController>>();
 export function addClient(
   noteId: string,
   controller: ReadableStreamDefaultController,
-) {
+): void {
   if (!clients.has(noteId)) {
     clients.set(noteId, new Set());
   }
@@ -19,7 +19,7 @@ export function addClient(
 export function removeClient(
   noteId: string,
   controller: ReadableStreamDefaultController,
-) {
+): void {
   const set = clients.get(noteId);
   if (set) {
     set.delete(controller);
@@ -36,7 +36,7 @@ export function broadcast(
   noteId: string,
   data: string,
   senderController?: ReadableStreamDefaultController,
-) {
+): void {
   const set = clients.get(noteId);
   if (!set) return;
 

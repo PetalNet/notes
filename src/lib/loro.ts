@@ -87,7 +87,7 @@ export class LoroNoteManager {
     });
   }
 
-  destroy() {
+  destroy(): void {
     this.stopSync();
     Effect.runFork(Fiber.interrupt(this.#persistenceFiber));
   }
@@ -97,7 +97,7 @@ export class LoroNoteManager {
   /**
    * Subscribe to content changes
    */
-  subscribeToContent(listener: (content: string) => void) {
+  subscribeToContent(listener: (content: string) => void): () => void {
     this.#contentListeners.push(listener);
     // Return unsubscribe function
     return () => {
@@ -110,7 +110,7 @@ export class LoroNoteManager {
   /**
    * Initialize the manager with an encrypted snapshot
    */
-  async init(encryptedSnapshot?: Uint8Array<ArrayBuffer>) {
+  async init(encryptedSnapshot?: Uint8Array<ArrayBuffer>): Promise<void> {
     if (encryptedSnapshot) {
       await loadEncryptedSnapshot(encryptedSnapshot, this.#doc, this.#noteKey);
       this.#lastFrontiers = this.#doc.frontiers();
@@ -175,7 +175,7 @@ export class LoroNoteManager {
   /**
    * Stop real-time sync
    */
-  stopSync() {
+  stopSync(): void {
     if (this.#eventSource) {
       this.#eventSource.close();
       this.#eventSource = null;
@@ -194,7 +194,7 @@ export class LoroNoteManager {
   /**
    * Send update to server
    */
-  async #sendUpdates(updates: readonly Uint8Array[]) {
+  async #sendUpdates(updates: readonly Uint8Array[]): Promise<void> {
     try {
       await sync({
         noteId: this.#noteId,
@@ -215,7 +215,7 @@ export class LoroNoteManager {
   /**
    * Update text content using diffs
    */
-  updateContent(newContent: string) {
+  updateContent(newContent: string): void {
     const currentContent = this.#text.toString();
     if (currentContent === newContent) return;
 
@@ -272,7 +272,7 @@ async function loadEncryptedSnapshot(
   encryptedSnapshot: Uint8Array<ArrayBuffer>,
   doc: Doc,
   noteKey: Uint8Array<ArrayBuffer>,
-) {
+): Promise<void> {
   try {
     const decrypted = await decryptData(encryptedSnapshot, noteKey);
     doc.import(decrypted);

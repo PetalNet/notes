@@ -11,7 +11,7 @@ const DAY_IN_MS = 1000 * 60 * 60 * 24;
 
 export const sessionCookieName = "auth-session";
 
-export function generateSessionToken() {
+export function generateSessionToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(18));
   const token = encodeBase64url(bytes);
   return token;
@@ -93,7 +93,7 @@ export async function validateSessionToken(token: string): Promise<AuthData> {
   return { session, user };
 }
 
-export async function invalidateSession(sessionId: string) {
+export async function invalidateSession(sessionId: string): Promise<void> {
   await db.delete(table.sessions).where(eq(table.sessions.token, sessionId));
 }
 
@@ -101,14 +101,14 @@ export function setSessionTokenCookie(
   cookies: Cookies,
   token: string,
   expiresAt: Date,
-) {
+): void {
   cookies.set(sessionCookieName, token, {
     expires: expiresAt,
     path: "/",
   });
 }
 
-export function deleteSessionTokenCookie(cookies: Cookies) {
+export function deleteSessionTokenCookie(cookies: Cookies): void {
   cookies.delete(sessionCookieName, {
     path: "/",
   });

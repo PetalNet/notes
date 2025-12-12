@@ -104,23 +104,23 @@ function commandToKeyRun(command: (target: EditorView) => void): Command {
   };
 }
 
-export const boldCommand = (view: EditorView) => {
+export const boldCommand = (view: EditorView): void => {
   toggleWrapper(view, "**");
 };
 
-export const italicCommand = (view: EditorView) => {
+export const italicCommand = (view: EditorView): void => {
   toggleWrapper(view, "*");
 };
 
-export const codeCommand = (view: EditorView) => {
+export const codeCommand = (view: EditorView): void => {
   toggleWrapper(view, "`");
 };
 
-export const strikethroughCommand = (view: EditorView) => {
+export const strikethroughCommand = (view: EditorView): void => {
   toggleWrapper(view, "~~");
 };
 
-export const linkCommand = (view: EditorView) => {
+export const linkCommand = (view: EditorView): void => {
   const { from, to } = view.state.selection.main;
   const selectedText = view.state.doc.sliceString(from, to);
 
@@ -136,7 +136,7 @@ export const linkCommand = (view: EditorView) => {
   );
 };
 
-function headingCommandFactory(count: number) {
+function headingCommandFactory(count: number): (view: EditorView) => void {
   return (view: EditorView) => {
     const { from } = view.state.selection.main;
     const line = view.state.doc.lineAt(from);
@@ -172,7 +172,7 @@ export const heading1Command = headingCommandFactory(1);
 export const heading2Command = headingCommandFactory(2);
 export const heading3Command = headingCommandFactory(3);
 
-export const bulletListCommand = (view: EditorView) => {
+export const bulletListCommand = (view: EditorView): void => {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
 
@@ -190,7 +190,7 @@ export const bulletListCommand = (view: EditorView) => {
   }
 };
 
-export const orderedListCommand = (view: EditorView) => {
+export const orderedListCommand = (view: EditorView): void => {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
 

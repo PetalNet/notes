@@ -22,7 +22,7 @@ class WikilinkWidget extends WidgetType {
     this.notesList = notesList;
   }
 
-  toDOM() {
+  override toDOM(): HTMLAnchorElement {
     const a = document.createElement("a");
     a.className = "cursor-pointer text-primary underline";
     a.textContent = `[[${this.title}]]`;
@@ -39,7 +39,7 @@ class WikilinkWidget extends WidgetType {
     return a;
   }
 
-  override ignoreEvent() {
+  override ignoreEvent(): boolean {
     return false;
   }
 }

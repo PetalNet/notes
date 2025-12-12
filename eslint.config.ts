@@ -35,10 +35,29 @@ export default defineConfig(
       // typescript-eslint strongly recommend that you do not use the no-undef lint rule on TypeScript projects.
       // see: https://typescript-eslint.io/troubleshooting/faqs/eslint/#i-get-errors-from-the-no-undef-rule-about-global-variables-not-being-defined-even-though-there-are-no-typescript-errors
       "no-undef": "off",
-
-      "@typescript-eslint/parameter-properties": "error",
-      "no-restricted-syntax": [
+      "@typescript-eslint/no-unused-vars": [
         "error",
+        {
+          args: "all",
+          argsIgnorePattern: "^_",
+          caughtErrors: "all",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
+      "@typescript-eslint/explicit-function-return-type": [
+        "error",
+        {
+          allowExpressions: true,
+          allowHigherOrderFunctions: false,
+          allowedNames: ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"],
+        },
+      ],
+      "@typescript-eslint/parameter-properties": "warn",
+      "no-restricted-syntax": [
+        "warn",
         {
           selector:
             ':matches(PropertyDefinition, MethodDefinition)[accessibility="private"]:not([kind="constructor"])',
@@ -57,6 +76,7 @@ export default defineConfig(
       "@typescript-eslint/no-invalid-void-type": "off",
       // Breaks $env imports
       "@typescript-eslint/dot-notation": "off",
+      "@typescript-eslint/no-import-type-side-effects": "warn",
     },
   },
   {

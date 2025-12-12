@@ -1,33 +1,32 @@
 <script lang="ts">
-  import { onMount } from "svelte";
-  import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
-  import TreeItem from "./TreeItem.svelte";
-  import { SvelteSet } from "svelte/reactivity";
-  import {
-    FolderPlus,
-    FilePlus,
-    File,
-    Plus,
-    Trash2,
-    Pencil,
-  } from "@lucide/svelte";
-  import type { User } from "$lib/schema.ts";
-  import ProfilePicture from "./ProfilePicture.svelte";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
+  import { page } from "$app/state";
+  import { encryptKeyForUser, generateNoteKey } from "$lib/crypto.ts";
   import { logout } from "$lib/remote/accounts.remote.ts";
-  import { unawaited } from "$lib/unawaited.ts";
   import {
     createNote,
     deleteNote,
-    updateNote,
-    reorderNotes,
     getNotes,
+    reorderNotes,
+    updateNote,
   } from "$lib/remote/notes.remote.ts";
+  import type { NoteOrFolder, User } from "$lib/schema.ts";
+  import { unawaited } from "$lib/unawaited.ts";
   import { buildNotesTree } from "$lib/utils/tree.ts";
-  import { generateNoteKey, encryptKeyForUser } from "$lib/crypto";
-  import { goto } from "$app/navigation";
-  import { resolve } from "$app/paths";
-  import type { NoteOrFolder } from "$lib/schema.ts";
-  import { page } from "$app/state";
+  import { dropTargetForElements } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+  import {
+    File,
+    FilePlus,
+    FolderPlus,
+    Pencil,
+    Plus,
+    Trash2,
+  } from "@lucide/svelte";
+  import { onMount } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
+  import ProfilePicture from "./ProfilePicture.svelte";
+  import TreeItem from "./TreeItem.svelte";
 
   interface ContextState {
     x: number;

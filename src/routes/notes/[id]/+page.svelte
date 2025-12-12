@@ -5,7 +5,7 @@
   import { LoroNoteManager } from "$lib/loro.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { decryptKey } from "$lib/crypto";
+  import { decryptKey } from "$lib/crypto.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
 
   const { data } = $props();

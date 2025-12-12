@@ -35,6 +35,9 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: "file:/tmp/notes.db"
+
     steps:
       - name: 📚 Git checkout
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0

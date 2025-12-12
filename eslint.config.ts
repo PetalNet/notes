@@ -94,4 +94,10 @@ export default defineConfig(
       "@typescript-eslint/no-unsafe-member-access": "off",
     },
   },
+  {
+    files: ["**/*.svelte"],
+    rules: {
+      "svelte/block-lang": ["error", { script: ["ts"] }],
+    },
+  },
 );

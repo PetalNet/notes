@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import Sidebar from "$lib/components/Sidebar.svelte";
   import { getNotes } from "$lib/remote/notes.remote.ts";
 

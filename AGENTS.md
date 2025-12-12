@@ -154,7 +154,7 @@ export const [getLinkContext, setLinkContext] = createContext<LinkContext>();
 Wrap in `$derived` for reactivity.
 
 ```svelte
-<script>
+<script lang="ts">
   import { getNote } from "$lib/remote/notes.remote";
   let { noteId } = $props();
   let noteQuery = $derived(getNote(noteId));
@@ -193,7 +193,7 @@ In SSR, module state is shared across requests.
 Use `$derived` overrides or `$state.eager`.
 
 ```svelte
-<script>
+<script lang="ts">
   let { post, like } = $props();
   let likes = $derived(post.likes);
   async function onclick() {

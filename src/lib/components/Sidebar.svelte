@@ -3,7 +3,7 @@
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import { encryptKeyForUser, generateNoteKey } from "$lib/crypto.ts";
-  import { getEncryptedSnapshot } from "$lib/loro.ts";
+  import { getEncryptedSnapshot } from "$lib/loro.svelte.ts";
   import { logout } from "$lib/remote/accounts.remote.ts";
   import {
     createNote,

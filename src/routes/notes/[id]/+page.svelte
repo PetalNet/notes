@@ -1,97 +1,105 @@
+<script lang="ts" module>
+  import { LoroNoteManager } from "$lib/loro.svelte.ts";
+  import { SvelteMap } from "svelte/reactivity";
+
+  // Persist managers across navigations for background sync
+  const loroManagers = new SvelteMap<string, LoroNoteManager>();
+</script>
+
 <script lang="ts">
   import { dev } from "$app/environment";
-  import { page } from "$app/state";
   import Editor from "$lib/components/codemirror/Editor.svelte";
-  import { LoroNoteManager } from "$lib/loro.ts";
+  import { decryptKey } from "$lib/crypto.ts";
   import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { decryptKey } from "$lib/crypto.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
 
-  const { data } = $props();
+  const { data, params } = $props();
 
   const notesListQuery = $derived(getNotes());
-  let id = $derived(page.params.id);
+  const id = $derived(params.id);
   const userPrivateKey = $derived(data.user?.privateKeyEncrypted);
 
-  let loroManager = $state<LoroNoteManager>();
-  // TODO: Use codemirror-server-render to SSR the editor
-  let editorContent = $state("");
+  // Derive current manager from the map - reactive to map changes
+  const currentManager = $derived(loroManagers.get(id));
 
   const notesList = $derived(await notesListQuery);
   const note = $derived(notesList.find((n) => n.id === id));
 
-  // Load Loro manager when note is selected
-  $effect.pre(() => {
-    console.debug("[Page] Effect triggered. SelectedNoteId:", id);
+  // Derive editor content directly from manager's reactive state
+  const editorContent = $derived(currentManager?.content ?? "");
 
-    let unsubscribeContent: (() => void) | undefined;
+  // Single effect: Create manager if needed (async side effect)
+  $effect(() => {
+    // Only create if: we have a note, it's not a folder, and no manager exists
+    if (!note || note.isFolder || currentManager) return;
+
+    // Capture values for async work
+    const noteId = id;
+    const noteTitle = note.title;
+    const snapshot = note.loroSnapshot;
+    const encryptedKey = note.encryptedKey;
+
+    console.debug("[Page] Creating manager for:", noteId, noteTitle);
+
     const abortController = new AbortController();
     const signal = abortController.signal;
 
     unawaited(
-      (async (signal) => {
-        if (id && note && !note.isFolder) {
-          let key: Uint8Array<ArrayBuffer> | undefined;
-          if (userPrivateKey) {
-            try {
-              key = await decryptKey(note.encryptedKey, userPrivateKey);
-            } catch (e) {
-              console.error("Failed to decrypt key:", e);
-            }
-          }
-
-          if (signal.aborted) return;
-
-          if (key) {
-            console.debug("[Page] Loading Loro manager for note:", id);
-            try {
-              // TODO: Cache again?
-              const manager = new LoroNoteManager(id, key, async (snapshot) => {
-                await updateNote({ noteId: id, loroSnapshot: snapshot });
-              });
-
-              await manager.init(note.loroSnapshot);
-
-              if (signal.aborted as boolean) {
-                manager.destroy();
-                return;
-              }
-
-              manager.startSync();
-              loroManager = manager;
-
-              // Sync content from server
-              editorContent = manager.getContent();
-
-              // Subscribe to content changes
-              unsubscribeContent = manager.subscribeToContent((content) => {
-                console.debug(
-                  "[Page] Content update received. Preview:",
-                  content.slice(0, 20),
-                );
-                editorContent = content;
-              });
-              return;
-            } catch (error) {
-              console.error("Failed to load note:", error);
-            }
+      (async () => {
+        let key: Uint8Array<ArrayBuffer> | undefined;
+        if (userPrivateKey) {
+          try {
+            key = await decryptKey(encryptedKey, userPrivateKey);
+          } catch (e) {
+            console.error(
+              "Failed to decrypt key for note",
+              noteId,
+              noteTitle,
+              e,
+            );
           }
         }
 
-        if (!note || note.isFolder) {
-          console.debug("[Page] No valid note selected or is folder");
+        if (signal.aborted || !key) return;
+
+        try {
+          const manager = await LoroNoteManager.create(
+            noteId,
+            key,
+            async (snapshot) => {
+              await updateNote({ noteId, loroSnapshot: snapshot });
+            },
+            snapshot,
+          );
+
+          if (signal.aborted as boolean) {
+            manager.destroy();
+            return;
+          }
+
+          manager.startSync();
+
+          // Final check before caching
+          if (signal.aborted as boolean) {
+            manager.destroy();
+            return;
+          }
+
+          loroManagers.set(noteId, manager);
+        } catch (error) {
+          console.error(
+            "Failed to create manager for note",
+            id,
+            note.title,
+            error,
+          );
         }
-        editorContent = "";
-      })(signal),
+      })(),
     );
 
     return () => {
-      console.debug("[Page] Cleaning up previous subscription");
       abortController.abort();
-      loroManager?.destroy();
-      loroManager = undefined;
-      unsubscribeContent?.();
     };
   });
 </script>
@@ -103,7 +111,7 @@
       {notesList}
       onchange={(newContent: string) => {
         // Hook in Loro
-        loroManager?.updateContent(newContent);
+        currentManager?.updateContent(newContent);
       }}
     />
   {:else if note?.isFolder}
@@ -139,7 +147,8 @@
     class="pointer-events-none absolute right-4 bottom-4 z-50 max-w-sm rounded bg-black/80 p-4 font-mono text-xs text-white"
   >
     <p>Selected Note: {id}</p>
-    <p>Loro Manager: {loroManager ? "Loaded" : "Null"}</p>
+    <p>Current Manager: {currentManager ? "Loaded" : "Null"}</p>
+    <p>Cached Managers: {loroManagers.size}</p>
     <p>Content Length: {editorContent.length}</p>
     <p>Content Preview: {editorContent.slice(0, 50)}</p>
     <p>~Word Count: {editorContent.split(/\s+/).length}</p>

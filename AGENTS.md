@@ -84,7 +84,7 @@ src/
 │   ├── types/              # TypeScript types
 │   ├── utils/              # Shared utilities
 │   ├── crypto.ts           # Crypto utils
-│   ├── loro.ts             # Loro CRDT
+│   ├── loro.svelte.ts             # Loro CRDT
 │   ├── schema.ts           # Shared Effect Schema
 │   └── unawaited.ts        # Unawaited promise handler
 ├── routes/

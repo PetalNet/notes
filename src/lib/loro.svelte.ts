@@ -4,15 +4,14 @@ import { sync } from "$lib/remote/sync.remote.ts";
 import { Schema } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, type LoroText } from "loro-crdt";
-import { useDebounce } from "runed";
+import { useThrottle } from "runed";
 import { unawaited } from "./unawaited.ts";
 
-type UseDebounceReturn<Args extends unknown[], Return> = ((
+type UseThrottleReturn<Args extends unknown[], Return> = ((
   this: unknown,
   ...args: Args
 ) => Promise<Return>) & {
   cancel: () => void;
-  runScheduledNow: () => Promise<void>;
   pending: boolean;
 };
 
@@ -28,7 +27,7 @@ export class LoroNoteManager {
   #onUpdate: (snapshot: Uint8Array<ArrayBuffer>) => Promise<void>;
   #eventSource: EventSource | null = null;
   #isSyncing = false;
-  #debouncedPersist: UseDebounceReturn<[], void>;
+  #debouncedPersist: UseThrottleReturn<[], void>;
 
   // Reactive content state - automatically tracked by Svelte
   content = $state("");
@@ -46,11 +45,11 @@ export class LoroNoteManager {
     this.#onUpdate = onUpdate;
 
     // Create debounced persist function
-    this.#debouncedPersist = useDebounce(() => {
+    this.#debouncedPersist = useThrottle(() => {
       this.#persist().catch((e: unknown) => {
         console.error("Failed to persist:", e);
       });
-    }, 500);
+    });
 
     // Subscribe to local changes only
     this.#doc.subscribeLocalUpdates((update) => {

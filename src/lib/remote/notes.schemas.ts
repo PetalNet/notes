@@ -1,6 +1,9 @@
 import { Uint8ArrayFromSelfSchema } from "$lib/schema.ts";
 import { Schema } from "effect";
 
+const GetNoteSchema = Schema.String;
+export const getNoteSchema = GetNoteSchema.pipe(Schema.standardSchemaV1);
+
 const CreateNoteSchema = Schema.Struct({
   title: Schema.String,
   parentId: Schema.String.pipe(Schema.NullOr),

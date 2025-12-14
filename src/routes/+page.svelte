@@ -1,7 +1,11 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { getNoteCount, randomNoteId } from "$lib/remote/notes.remote.ts";
 
-  let { data } = $props();
+  const randomNoteQuery = $derived(randomNoteId());
+  const totalNotesQuery = $derived(getNoteCount());
+  const randomNote = $derived(await randomNoteQuery);
+  const totalNotes = $derived(await totalNotesQuery);
 </script>
 
 <div class="min-h-screen bg-base-100 p-8">
@@ -15,30 +19,30 @@
           <h2 class="card-title text-2xl">Total Notes</h2>
           <div class="flex items-center justify-center py-8">
             <span class="text-6xl font-bold text-primary">
-              {data.totalNotes}
+              {totalNotes}
             </span>
           </div>
         </div>
       </div>
 
       <!-- Random Note Card -->
-      {#if data.randomNote}
+      {#if randomNote}
         <div class="card bg-base-200 shadow-xl">
           <div class="card-body">
             <h2 class="card-title text-2xl">Random Note</h2>
             <div class="py-4">
               <h3 class="mb-2 text-xl font-semibold">
-                {data.randomNote.title}
+                {randomNote.title}
               </h3>
               <p class="text-sm text-base-content/60">
                 Last updated: {new Date(
-                  data.randomNote.updatedAt,
+                  randomNote.updatedAt,
                 ).toLocaleDateString()}
               </p>
             </div>
             <div class="card-actions justify-end">
               <a
-                href={resolve("/notes/[id]", { id: data.randomNote.id })}
+                href={resolve("/notes/[id]", { id: randomNote.id })}
                 class="btn btn-secondary"
               >
                 Open Note
@@ -46,7 +50,7 @@
             </div>
           </div>
         </div>
-      {:else if data.totalNotes === 0}
+      {:else if totalNotes === 0}
         <div class="card bg-base-200 shadow-xl">
           <div class="card-body">
             <h2 class="card-title text-2xl">Get Started</h2>

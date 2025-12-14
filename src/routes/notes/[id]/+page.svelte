@@ -10,29 +10,24 @@
   import { dev } from "$app/environment";
   import Editor from "$lib/components/codemirror/Editor.svelte";
   import { decryptKey } from "$lib/crypto.ts";
-  import { getNotes, updateNote } from "$lib/remote/notes.remote.ts";
+  import { getCurrentUser } from "$lib/remote/accounts.remote.js";
+  import { getNote, updateNote } from "$lib/remote/notes.remote.ts";
   import { unawaited } from "$lib/unawaited.ts";
-  import { FilePlus, Folder } from "@lucide/svelte";
+  import { Folder } from "@lucide/svelte";
 
-  const { data, params } = $props();
+  const { params } = $props();
 
-  const notesListQuery = $derived(getNotes());
   const id = $derived(params.id);
-  const userPrivateKey = $derived(data.user?.privateKeyEncrypted);
-
-  // Derive current manager from the map - reactive to map changes
   const currentManager = $derived(loroManagers.get(id));
-
-  const notesList = $derived(await notesListQuery);
-  const note = $derived(notesList.find((n) => n.id === id));
+  const note = $derived(await getNote(id));
 
   // Derive editor content directly from manager's reactive state
   const editorContent = $derived(currentManager?.content ?? "");
 
   // Single effect: Create manager if needed (async side effect)
-  $effect(() => {
+  $effect.pre(() => {
     // Only create if: we have a note, it's not a folder, and no manager exists
-    if (!note || note.isFolder || currentManager) return;
+    if (note.isFolder || currentManager) return;
 
     // Capture values for async work
     const noteId = id;
@@ -48,9 +43,12 @@
     unawaited(
       (async () => {
         let key: Uint8Array<ArrayBuffer> | undefined;
-        if (userPrivateKey) {
+
+        const user = await getCurrentUser();
+
+        if (user) {
           try {
-            key = await decryptKey(encryptedKey, userPrivateKey);
+            key = await decryptKey(encryptedKey, user.privateKeyEncrypted);
           } catch (e) {
             console.error(
               "Failed to decrypt key for note",
@@ -105,16 +103,15 @@
 </script>
 
 <div class="relative h-full flex-1 overflow-hidden">
-  {#if !(note?.isFolder ?? true)}
+  {#if !note.isFolder}
     <Editor
       content={editorContent}
-      {notesList}
       onchange={(newContent: string) => {
         // Hook in Loro
         currentManager?.updateContent(newContent);
       }}
     />
-  {:else if note?.isFolder}
+  {:else if note.isFolder}
     <div class="flex h-full items-center justify-center text-slate-400">
       <div class="text-center">
         <p class="mb-2 text-xl font-medium">
@@ -122,20 +119,6 @@
           {note.title}
         </p>
         <p class="text-sm">Select a note inside to start editing.</p>
-      </div>
-    </div>
-  {:else}
-    <div class="flex h-full items-center justify-center text-base-content">
-      <div class="text-center">
-        <div
-          class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-base-content/25"
-        >
-          <FilePlus />
-        </div>
-        <p class="mb-2 text-xl font-medium">No note selected</p>
-        <p class="text-sm">
-          Select a note from the sidebar or create a new one.
-        </p>
       </div>
     </div>
   {/if}

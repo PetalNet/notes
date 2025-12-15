@@ -1,5 +1,6 @@
 import { dev } from "$app/environment";
 import { env } from "$env/dynamic/private";
+import { instrumentDrizzleClient } from "@kubiks/otel-drizzle";
 import { drizzle } from "drizzle-orm/libsql";
 import { relations } from "./relations.ts";
 import * as schema from "./schema.ts";
@@ -11,3 +12,4 @@ export const db = drizzle(env["DATABASE_URL"], {
   relations,
   logger: dev,
 });
+instrumentDrizzleClient(db, { dbSystem: "sqlite" });

@@ -29,7 +29,7 @@
     "@oslojs/crypto": "^1.0.1",
     "@oslojs/encoding": "^1.1.0",
     "@sveltejs/adapter-node": "^5.4.0",
-    "@sveltejs/kit": "^2.49.2",
+    "@sveltejs/kit": "^2.49.4",
     "@sveltejs/vite-plugin-svelte": "^6.2.1",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.18",
@@ -85,7 +85,7 @@
     "katex": "^0.16.27",
     "loro-crdt": "^1.10.3",
     "runed": "^0.37.0",
-    "svelte": "^5.45.8",
+    "svelte": "https://pkg.pr.new/svelte@17335",
     "typescript-svelte-plugin": "^0.3.50"
   },
   "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b"

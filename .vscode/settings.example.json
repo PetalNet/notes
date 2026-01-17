@@ -2,7 +2,7 @@
   "files.associations": {
     "*.css": "tailwindcss"
   },
-  "svelte.enable-ts-plugin": true,
+  "svelte.enable-ts-plugin": false,
   "svelte.ask-to-enable-ts-plugin": false,
   "svelte.language-server.runtime": "node",
   "eslint.validate": ["javascript", "typescript", "svelte"],

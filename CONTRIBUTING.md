@@ -10,9 +10,9 @@ Before you can begin contributing, you'll first need to set up the repository.
 
 In order to contribute, you'll need the following software installed and on your `PATH`.
 
-- Node.js: [Download Node.js](https://nodejs.org/en/download/current) with the version specified in our [`nvmrc`](./.nvmrc)
-  - Corepack: [How to Install](https://github.com/nodejs/corepack#manual-installs) (tl;dr: `npm i -g corepack && corepack enable`)
-- Git: [Install](https://git-scm.com/install/)
+- Node.js: [Download Node.js](https://nodejs.org/en/download/current) with the version specified in our [`nvmrc`](./.nvmrc).
+  - Corepack: [How to Install](https://github.com/nodejs/corepack#manual-installs) (TL;DR: `npm i -g corepack && corepack enable`).
+- Git: [Install](https://git-scm.com/install/).
 
 ### Steps
 
@@ -30,6 +30,6 @@ To actually set up the repository, follow these instructions:
 
 ## Helpful Commands
 
-- Run development server: `pnpm dev`
-- Update the database: `pnpm db:push`
-- Inspect the database: `pnpm db:studio`
+- Run development server: `pnpm dev`.
+- Update the database: `pnpm db:push`.
+- Inspect the database: `pnpm db:studio`.

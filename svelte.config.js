@@ -9,22 +9,16 @@ const config = {
   kit: {
     adapter: adapter(),
 
-    experimental: {
-      remoteFunctions: true,
-    },
-
     typescript: {
       config(config) {
-        config["include"] = /** @type {string[]} */ (config["include"]).map(
-          (path) => path.replace("vite.config", "*.config"),
-        );
+        config["include"] = [
+          .../** @type {string[]} */ (config["include"]).map((path) =>
+            path.replace("vite.config", "*.config"),
+          ),
+          // Relative to .svelte-kit/
+          "../.storybook/*.ts",
+        ];
       },
-    },
-  },
-
-  compilerOptions: {
-    experimental: {
-      async: true,
     },
   },
 };

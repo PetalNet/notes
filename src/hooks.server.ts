@@ -8,39 +8,20 @@ const handleAuth: Handle = async ({ event, resolve }) => {
     event.locals.user = undefined;
     event.locals.session = undefined;
 
-    // Redirect to login if accessing protected routes
-    if (!event.route.id?.startsWith("/(auth)")) {
-      return new Response("Redirect", {
-        status: 303,
-        headers: { Location: "/login" },
-      });
-    }
-
     return resolve(event);
   }
 
-  const authData = await auth.validateSessionToken(sessionToken);
+  const { session, user } = await auth.validateSessionToken(sessionToken);
 
-  if (authData.session) {
-    auth.setSessionTokenCookie(
-      event.cookies,
-      sessionToken,
-      authData.session.expiresAt,
-    );
+  if (session) {
+    auth.setSessionTokenCookie(event, sessionToken, session.expiresAt);
   } else {
-    auth.deleteSessionTokenCookie(event.cookies);
-
-    // Redirect to login if session invalid
-    if (!event.route.id?.startsWith("/(auth)")) {
-      return new Response("Redirect", {
-        status: 303,
-        headers: { Location: "/login" },
-      });
-    }
+    auth.deleteSessionTokenCookie(event);
   }
 
-  event.locals.user = authData.user;
-  event.locals.session = authData.session;
+  event.locals.user = user;
+  event.locals.session = session;
+
   return resolve(event);
 };
 

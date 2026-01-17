@@ -7,6 +7,5 @@ export default {
   },
   includeEntryExports: true,
   treatConfigHintsAsErrors: true,
-  ignoreFiles: ["src/lib/types/**/*.ts"],
   ignoreUnresolved: [/\$env\/(?:dynamic|static)\/(?:private|public)/],
 } satisfies KnipConfig;

@@ -1,15 +1,12 @@
-import { sqliteTable, text, integer, blob } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { uint8array } from "./columns.ts";
 
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   username: text("username").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
-  publicKey: blob("public_key", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
-  privateKeyEncrypted: blob("private_key_encrypted", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
+  publicKey: uint8array("public_key").notNull(),
+  privateKeyEncrypted: uint8array("private_key_encrypted").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -29,12 +26,8 @@ export const notes = sqliteTable("notes", {
   ownerId: text("owner_id")
     .notNull()
     .references(() => users.id),
-  encryptedKey: blob("encrypted_key", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
-  loroSnapshot: blob("loro_snapshot", { mode: "buffer" })
-    .$type<Uint8Array<ArrayBuffer>>()
-    .notNull(),
+  encryptedKey: uint8array("encrypted_key").notNull(),
+  loroSnapshot: uint8array("loro_snapshot").notNull(),
   parentId: text("parent_id"),
   isFolder: integer("is_folder", { mode: "boolean" }).notNull().default(false),
   order: integer("order").notNull().default(0),

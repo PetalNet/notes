@@ -1,32 +1,32 @@
 <script lang="ts">
+  import { resolve } from "$app/paths";
+  import { page } from "$app/state";
   import {
-    draggable,
-    dropTargetForElements,
-  } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
+    getNotes,
+    reorderNotes,
+    updateNote,
+  } from "$lib/remote/notes.remote.ts";
+  import type { NoteOrFolder } from "$lib/schema.ts";
+  import { findNode, type TreeNode } from "$lib/utils/tree.ts";
   import {
     attachClosestEdge,
     extractClosestEdge,
     type Edge,
   } from "@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge";
-  import { onMount } from "svelte";
-  import { slide } from "svelte/transition";
-  import { type TreeNode, findNode } from "$lib/utils/tree.ts";
-  import type { NoteOrFolder } from "$lib/schema.ts";
   import {
-    updateNote,
-    reorderNotes,
-    getNotes,
-  } from "$lib/remote/notes.remote.ts";
-  import Self from "./TreeItem.svelte";
+    draggable,
+    dropTargetForElements,
+  } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
   import {
     ChevronRight,
     FileText,
-    FolderOpen,
     FolderClosed,
+    FolderOpen,
   } from "@lucide/svelte";
   import { clsx } from "clsx";
-  import { resolve } from "$app/paths";
-  import { page } from "$app/state";
+  import { onMount } from "svelte";
+  import { slide } from "svelte/transition";
+  import Self from "./TreeItem.svelte";
 
   interface Props {
     item: TreeNode;

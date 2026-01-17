@@ -3,6 +3,7 @@
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
   import { encryptKeyForUser, generateNoteKey } from "$lib/crypto.ts";
+  import { getEncryptedSnapshot } from "$lib/loro.svelte.ts";
   import { logout } from "$lib/remote/accounts.remote.ts";
   import {
     createNote,
@@ -23,6 +24,7 @@
     Plus,
     Trash2,
   } from "@lucide/svelte";
+  import { LoroDoc } from "loro-crdt";
   import { onMount } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import ProfilePicture from "./ProfilePicture.svelte";
@@ -181,13 +183,17 @@
     const noteKey = await generateNoteKey();
 
     // Encrypt note key with user's public key
-    const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
+    const [encryptedKey, encryptedSnapshot] = await Promise.all([
+      encryptKeyForUser(noteKey, publicKey),
+      getEncryptedSnapshot(new LoroDoc(), noteKey),
+    ]);
 
     const newNote = await createNote({
       title,
       encryptedKey,
       parentId,
       isFolder,
+      encryptedSnapshot,
     }).updates(
       // TODO: add optimistic update.
       getNotes(),

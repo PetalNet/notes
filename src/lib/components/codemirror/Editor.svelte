@@ -1,6 +1,8 @@
 <script lang="ts">
   import "katex/dist/katex.min.css";
 
+  import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
+  import { getNotes } from "$lib/remote/notes.remote.ts";
   import { EditorView } from "@codemirror/view";
   import {
     Bold,
@@ -16,32 +18,31 @@
   } from "@lucide/svelte";
   import Codemirror from "./Codemirror.svelte";
   import {
-    coreExtensions,
     boldCommand,
-    italicCommand,
-    strikethroughCommand,
+    bulletListCommand,
     codeCommand,
-    linkCommand,
+    coreExtensions,
     heading1Command,
     heading2Command,
     heading3Command,
-    bulletListCommand,
+    italicCommand,
+    linkCommand,
     orderedListCommand,
+    strikethroughCommand,
   } from "./Editor.ts";
   import Toolbar from "./Toolbar.svelte";
-  import { wikilinksExtension } from "$lib/editor/wikilinks.ts";
-  import type { NoteOrFolder } from "$lib/schema.ts";
 
   interface Props {
     content: string;
     onchange: (newContent: string) => void;
-    notesList?: NoteOrFolder[];
   }
 
-  let { content, onchange, notesList = [] }: Props = $props();
+  let { content, onchange }: Props = $props();
 
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
+
+  const notesListQuery = $derived(getNotes());
 
   /** Custom theme */
   const editorTheme = EditorView.theme({
@@ -100,7 +101,7 @@
 
   const extensions = $derived([
     coreExtensions,
-    wikilinksExtension.of({ notesList }),
+    wikilinksExtension.of({ notesList: await notesListQuery }),
     // Update listener
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -117,6 +118,7 @@
 
   // Update content if it changes externally (from Loro)
   $effect(() => {
+    if (!(editorView as EditorView | undefined)) return;
     if (content !== editorView.state.doc.toString()) {
       console.debug("[Prosemark] External content update");
       editorView.dispatch({

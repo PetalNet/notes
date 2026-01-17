@@ -1,5 +1,5 @@
-import type { Handle } from "@sveltejs/kit";
 import * as auth from "$lib/server/auth";
+import type { Handle } from "@sveltejs/kit";
 
 const handleAuth: Handle = async ({ event, resolve }) => {
   const sessionToken = event.cookies.get(auth.sessionCookieName);
@@ -37,6 +37,14 @@ const handleAuth: Handle = async ({ event, resolve }) => {
         headers: { Location: "/login" },
       });
     }
+  }
+
+  // Redirect to home if accessing auth routes while logged in
+  if (event.route.id?.startsWith("/(auth)")) {
+    return new Response("Redirect", {
+      status: 303,
+      headers: { Location: "/" },
+    });
   }
 
   event.locals.user = authData.user;

@@ -1,15 +1,15 @@
-import {
-  Decoration,
-  ViewPlugin,
-  MatchDecorator,
-  EditorView,
-  WidgetType,
-  type ViewUpdate,
-} from "@codemirror/view";
-import type { RangeSet } from "@codemirror/state";
 import { goto } from "$app/navigation";
 import { resolve } from "$app/paths";
 import type { NoteOrFolder } from "$lib/schema.ts";
+import type { RangeSet } from "@codemirror/state";
+import {
+  Decoration,
+  EditorView,
+  MatchDecorator,
+  ViewPlugin,
+  WidgetType,
+  type ViewUpdate,
+} from "@codemirror/view";
 
 class WikilinkWidget extends WidgetType {
   title: string;
@@ -32,6 +32,7 @@ class WikilinkWidget extends WidgetType {
       if (targetNote) {
         goto(resolve("/notes/[id]", { id: targetNote.id }));
       } else {
+        // TODO: Show a toast notification?
         console.debug("Note not found:", this.title);
         // Optional: Create note if not found?
       }

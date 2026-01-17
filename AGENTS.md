@@ -84,7 +84,7 @@ src/
 │   ├── types/              # TypeScript types
 │   ├── utils/              # Shared utilities
 │   ├── crypto.ts           # Crypto utils
-│   ├── loro.ts             # Loro CRDT
+│   ├── loro.svelte.ts             # Loro CRDT
 │   ├── schema.ts           # Shared Effect Schema
 │   └── unawaited.ts        # Unawaited promise handler
 ├── routes/
@@ -155,7 +155,7 @@ Wrap in `$derived` for reactivity.
 
 ```svelte
 <script lang="ts">
-  import { getNote } from "$lib/remote/notes.remote";
+  import { getNote } from "$lib/remote/notes.remote.ts";
   let { noteId } = $props();
   let noteQuery = $derived(getNote(noteId));
   let note = $derived(await noteQuery);
@@ -185,8 +185,8 @@ async function handleSubmit() {
 In SSR, module state is shared across requests.
 **Instead:**
 
-- Use `createContext` for component-scoped state.
-- Pass data via `props`.
+- Use `createContext` for globally-scoped state.
+- Pass state via `props` for component-scoped state.
 
 ### Optimistic UI
 

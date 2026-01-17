@@ -1,5 +1,5 @@
 import { resolve } from "$app/paths";
-import { form, getRequestEvent } from "$app/server";
+import { form, getRequestEvent, query } from "$app/server";
 import * as auth from "$lib/server/auth.ts";
 import { db } from "$lib/server/db/index.ts";
 import * as table from "$lib/server/db/schema.ts";
@@ -91,3 +91,18 @@ export const logout = form(
     redirect(302, resolve("/login"));
   },
 );
+
+export const getCurrentUser = query(() => {
+  const {
+    locals: { user },
+  } = getRequestEvent();
+
+  return user !== undefined
+    ? {
+        id: user.id,
+        username: user.username,
+        publicKey: user.publicKey,
+        privateKeyEncrypted: user.privateKeyEncrypted,
+      }
+    : undefined;
+});

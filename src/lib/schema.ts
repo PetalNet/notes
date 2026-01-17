@@ -12,7 +12,6 @@ export const Uint8ArrayFromBase64Schema =
 interface NoteBase {
   id: string;
   title: string;
-  content: string;
   ownerId: string;
   encryptedKey: Uint8Array<ArrayBuffer>;
   parentId: string | null;
@@ -23,6 +22,7 @@ interface NoteBase {
 
 export interface Note extends NoteBase {
   loroSnapshot: Uint8Array<ArrayBuffer>;
+  content: string;
   isFolder: false;
 }
 export interface Folder extends NoteBase {

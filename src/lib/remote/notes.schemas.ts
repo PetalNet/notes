@@ -1,11 +1,15 @@
 import { Uint8ArrayFromSelfSchema } from "$lib/schema.ts";
 import { Schema } from "effect";
 
+const GetNoteSchema = Schema.String;
+export const getNoteSchema = GetNoteSchema.pipe(Schema.standardSchemaV1);
+
 const CreateNoteSchema = Schema.Struct({
   title: Schema.String,
   parentId: Schema.String.pipe(Schema.NullOr),
   isFolder: Schema.Boolean,
   encryptedKey: Uint8ArrayFromSelfSchema,
+  encryptedSnapshot: Uint8ArrayFromSelfSchema,
 });
 export const createNoteSchema = CreateNoteSchema.pipe(Schema.standardSchemaV1);
 

@@ -5,7 +5,6 @@ import { Schema } from "effect";
 import diff from "fast-diff";
 import { LoroDoc, type LoroText } from "loro-crdt";
 import { useThrottle } from "runed";
-import { unawaited } from "./unawaited.ts";
 
 type UseThrottleReturn<Args extends unknown[], Return> = ((
   this: unknown,
@@ -59,7 +58,8 @@ export class LoroNoteManager {
       this.content = this.getContent();
 
       // Debounced persist
-      unawaited(this.#debouncedPersist());
+      // eslint-disable-next-line no-void
+      void this.#debouncedPersist();
 
       // Send update if syncing
       if (this.#isSyncing) {

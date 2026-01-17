@@ -42,6 +42,8 @@
   // svelte-ignore non_reactive_update
   let editorView: EditorView;
 
+  const notesListQuery = $derived(getNotes());
+
   /** Custom theme */
   const editorTheme = EditorView.theme({
     "&": {
@@ -97,11 +99,9 @@
     },
   });
 
-  const notesList = $derived(await getNotes());
-
   const extensions = $derived([
     coreExtensions,
-    wikilinksExtension.of({ notesList }),
+    wikilinksExtension.of({ notesList: await notesListQuery }),
     // Update listener
     EditorView.updateListener.of((update) => {
       if (update.docChanged) {
@@ -118,6 +118,7 @@
 
   // Update content if it changes externally (from Loro)
   $effect(() => {
+    if (!(editorView as EditorView | undefined)) return;
     if (content !== editorView.state.doc.toString()) {
       console.debug("[Prosemark] External content update");
       editorView.dispatch({

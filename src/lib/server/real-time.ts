@@ -9,10 +9,11 @@ export function addClient(
   if (!clients.has(noteId)) {
     clients.set(noteId, new Set());
   }
-  clients.get(noteId)?.add(controller);
+  const client = clients.get(noteId);
+  client?.add(controller);
 
   console.debug(
-    `Client added to note ${noteId}. Total clients: ${(clients.get(noteId)?.size ?? 0).toFixed()}`,
+    `Client added to note ${noteId}. Total clients: ${(client?.size ?? 0).toFixed()}`,
   );
 }
 

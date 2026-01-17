@@ -1,3 +1,4 @@
+test-results
 node_modules
 
 # Output
@@ -26,3 +27,8 @@ vite.config.ts.timestamp-*
 *.db
 
 .vscode/settings.json
+
+*storybook.log
+storybook-static
+
+coverage/

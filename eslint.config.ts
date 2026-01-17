@@ -17,8 +17,7 @@ export default defineConfig(
   ...svelte.configs.recommended,
   {
     linterOptions: {
-      reportUnusedDisableDirectives: "error",
-      reportUnusedInlineConfigs: "error",
+      reportUnusedInlineConfigs: "warn",
     },
   },
   {
@@ -93,6 +92,12 @@ export default defineConfig(
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
+    },
+  },
+  {
+    files: ["**/+{layout,page}.server.ts", "**/+server.ts"],
+    rules: {
+      "@typescript-eslint/explicit-function-return-type": "off",
     },
   },
   {

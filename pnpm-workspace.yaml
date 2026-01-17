@@ -1,8 +1,12 @@
+allowBuilds:
+  "@tailwindcss/oxide@4.1.18": true
+  esbuild@0.25.12 || 0.27.2: true
+
 engineStrict: true
 
-onlyBuiltDependencies:
-  - "@swc/core"
-  - "@tailwindcss/oxide"
-  - better-sqlite3
-  - esbuild
-  - msgpackr-extract
+overrides:
+  drizzle-orm>@types/mssql: "-"
+  drizzle-orm>mssql: "-"
+  drizzle-kit>esbuild: 0.27.2
+
+strictDepBuilds: true

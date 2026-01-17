@@ -6,7 +6,7 @@
     "module": "preserve",
     "moduleResolution": "bundler",
     "target": "esnext",
-    "types": [],
+    "types": ["@vitest/browser-playwright", "node"],
     "allowImportingTsExtensions": true,
 
     // Other Outputs
@@ -38,9 +38,6 @@
       {
         "name": "typescript-svelte-plugin",
         "assumeIsSvelteProject": true
-      },
-      {
-        "name": "@effect/language-service"
       }
     ]
   }

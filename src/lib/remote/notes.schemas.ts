@@ -4,6 +4,7 @@ import { Schema } from "effect";
 const CreateNoteSchema = Schema.Struct({
   title: Schema.String,
   parentId: Schema.String.pipe(Schema.NullOr),
+  loroSnapshot: Uint8ArrayFromSelfSchema,
   isFolder: Schema.Boolean,
   encryptedKey: Uint8ArrayFromSelfSchema,
 });

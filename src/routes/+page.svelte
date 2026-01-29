@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { handleCreateNote } from "$lib/remote/create-note.js";
 
   let { data } = $props();
 </script>
@@ -57,8 +58,20 @@
               </p>
             </div>
             <div class="card-actions justify-end">
-              <a href={resolve("/notes")} class="btn btn-accent"
-                >Create New Note</a
+              <button
+                class="btn btn-accent"
+                onclick={async () => {
+                  if (data.user === undefined) {
+                    throw new Error("Cannot create note whilst logged out.");
+                  }
+
+                  await handleCreateNote(
+                    "An Untitled Note",
+                    null,
+                    false,
+                    data.user,
+                  );
+                }}>Create New Note</button
               >
             </div>
           </div>

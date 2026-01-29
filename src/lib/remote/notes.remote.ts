@@ -11,8 +11,6 @@ import {
   reorderNotesSchema,
   updateNoteSchema,
 } from "./notes.schemas.ts";
-import { LoroDoc } from "loro-crdt";
-import { getEncryptedSnapshot } from "$lib/loro.ts";
 
 export const getNotes = query(async (): Promise<NoteOrFolder[]> => {
   const { user } = requireLogin();
@@ -42,16 +40,14 @@ export const createNote = command(
     encryptedKey,
     parentId,
     isFolder,
+    loroSnapshot,
   }): Promise<Omit<NoteOrFolder, "content">> => {
     const { user } = requireLogin();
 
     try {
       const id = crypto.randomUUID();
 
-      const loroSnapshot = await getEncryptedSnapshot(
-        new LoroDoc(),
-        encryptedKey,
-      );
+      const now = new Date();
 
       await db.insert(notes).values({
         id,
@@ -61,8 +57,8 @@ export const createNote = command(
         loroSnapshot,
         parentId,
         isFolder,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: now,
+        updatedAt: now,
       } satisfies typeof notes.$inferInsert);
 
       const [note] = await db.select().from(notes).where(eq(notes.id, id));

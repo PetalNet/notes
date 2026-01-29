@@ -2,10 +2,8 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { page } from "$app/state";
-  import { encryptKeyForUser, generateNoteKey } from "$lib/crypto.ts";
   import { logout } from "$lib/remote/accounts.remote.ts";
   import {
-    createNote,
     deleteNote,
     getNotes,
     reorderNotes,
@@ -27,6 +25,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import ProfilePicture from "./ProfilePicture.svelte";
   import TreeItem from "./TreeItem.svelte";
+    import { handleCreateNote } from "$lib/remote/create-note";
 
   interface ContextState {
     x: number;
@@ -171,33 +170,6 @@
     );
   }
 
-  async function handleCreateNote(
-    title: string,
-    parentId: string | null,
-    isFolder: boolean,
-    publicKey: Uint8Array<ArrayBuffer>,
-  ): Promise<void> {
-    // Generate AES key for the note
-    const noteKey = await generateNoteKey();
-
-    // Encrypt note key with user's public key
-    const encryptedKey = await encryptKeyForUser(noteKey, publicKey);
-
-    const newNote = await createNote({
-      title,
-      encryptedKey,
-      parentId,
-      isFolder,
-    }).updates(
-      // TODO: add optimistic update.
-      getNotes(),
-    );
-
-    if (!isFolder) {
-      goto(resolve("/notes/[id]", { id: newNote.id }));
-    }
-  }
-
   $effect(() => {
     if (renamingId && !renameModal.open) {
       renameModal.showModal();
@@ -243,7 +215,7 @@
           throw new Error("Cannot create note whilst logged out.");
         }
 
-        await handleCreateNote("Untitled Note", null, false, user.publicKey);
+        await handleCreateNote("Untitled Note", null, false, user);
       }}
       class="btn"><FilePlus /> Note</button
     >
@@ -253,7 +225,7 @@
           throw new Error("Cannot create folder whilst logged out.");
         }
 
-        await handleCreateNote("New Folder", null, true, user.publicKey);
+        await handleCreateNote("New Folder", null, true, user);
       }}
       class="btn"><FolderPlus /> Folder</button
     >
@@ -313,7 +285,7 @@
             "An Untitled Note",
             clickedId,
             false,
-            user.publicKey,
+            user,
           );
 
           closeContextMenu();

@@ -25,7 +25,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import ProfilePicture from "./ProfilePicture.svelte";
   import TreeItem from "./TreeItem.svelte";
-    import { handleCreateNote } from "$lib/remote/create-note";
+  import { handleCreateNote } from "$lib/remote/create-note";
 
   interface ContextState {
     x: number;
@@ -281,12 +281,7 @@
             throw new Error("Cannot create note whilst logged out.");
           }
 
-          await handleCreateNote(
-            "An Untitled Note",
-            clickedId,
-            false,
-            user,
-          );
+          await handleCreateNote("An Untitled Note", clickedId, false, user);
 
           closeContextMenu();
         }}><Plus /> New Note Inside</button

@@ -7,12 +7,10 @@
   import { unawaited } from "$lib/unawaited.ts";
   import { decryptKey } from "$lib/crypto.ts";
   import { FilePlus, Folder } from "@lucide/svelte";
-
-  const { data } = $props();
+  import { getUser } from "$lib/remote/user.remote.js";
 
   const notesListQuery = $derived(getNotes());
   let id = $derived(page.params.id);
-  const userPrivateKey = $derived(data.user?.privateKeyEncrypted);
 
   let loroManager = $state<LoroNoteManager>();
   // TODO: Use codemirror-server-render to SSR the editor
@@ -33,6 +31,7 @@
       (async (signal) => {
         if (id && note && !note.isFolder) {
           let key: Uint8Array<ArrayBuffer> | undefined;
+          const userPrivateKey = (await getUser())?.privateKeyEncrypted;
           if (userPrivateKey) {
             try {
               key = await decryptKey(note.encryptedKey, userPrivateKey);

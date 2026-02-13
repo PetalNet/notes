@@ -1,8 +1,13 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-  import { handleCreateNote } from "$lib/remote/create-note.js";
+  import { handleCreateNote } from "$lib/remote/create-note.ts";
+  import { getStats } from "$lib/remote/stats.remote.ts";
+  import { getUser } from "$lib/remote/user.remote.ts";
 
-  let { data } = $props();
+  const userQuery = $derived(getUser());
+  const statsQuery = $derived(getStats());
+  const user = $derived(await userQuery);
+  const stats = $derived(await statsQuery);
 </script>
 
 <div class="min-h-screen bg-base-100 p-8">
@@ -16,30 +21,30 @@
           <h2 class="card-title text-2xl">Total Notes</h2>
           <div class="flex items-center justify-center py-8">
             <span class="text-6xl font-bold text-primary">
-              {data.totalNotes}
+              {stats.totalNotes}
             </span>
           </div>
         </div>
       </div>
 
       <!-- Random Note Card -->
-      {#if data.randomNote}
+      {#if stats.randomNote}
         <div class="card bg-base-200 shadow-xl">
           <div class="card-body">
             <h2 class="card-title text-2xl">Random Note</h2>
             <div class="py-4">
               <h3 class="mb-2 text-xl font-semibold">
-                {data.randomNote.title}
+                {stats.randomNote.title}
               </h3>
               <p class="text-sm text-base-content/60">
                 Last updated: {new Date(
-                  data.randomNote.updatedAt,
+                  stats.randomNote.updatedAt,
                 ).toLocaleDateString()}
               </p>
             </div>
             <div class="card-actions justify-end">
               <a
-                href={resolve("/notes/[id]", { id: data.randomNote.id })}
+                href={resolve("/notes/[id]", { id: stats.randomNote.id })}
                 class="btn btn-secondary"
               >
                 Open Note
@@ -47,7 +52,7 @@
             </div>
           </div>
         </div>
-      {:else if data.totalNotes === 0}
+      {:else if stats.totalNotes === 0}
         <div class="card bg-base-200 shadow-xl">
           <div class="card-body">
             <h2 class="card-title text-2xl">Get Started</h2>
@@ -61,16 +66,11 @@
               <button
                 class="btn btn-accent"
                 onclick={async () => {
-                  if (data.user === undefined) {
+                  if (user === undefined) {
                     throw new Error("Cannot create note whilst logged out.");
                   }
 
-                  await handleCreateNote(
-                    "An Untitled Note",
-                    null,
-                    false,
-                    data.user,
-                  );
+                  await handleCreateNote("An Untitled Note", null, false, user);
                 }}>Create New Note</button
               >
             </div>

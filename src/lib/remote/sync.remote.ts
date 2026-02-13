@@ -8,8 +8,9 @@ import { Schema } from "effect";
 import { syncSchema, syncSchemaJson } from "./notes.schemas.ts";
 
 export const sync = command(syncSchema, async ({ noteId, updates }) => {
-  const { locals } = getRequestEvent();
-  const user = locals.user;
+  const {
+    locals: { user },
+  } = getRequestEvent();
 
   if (!user) error(401, "Unauthorized");
 

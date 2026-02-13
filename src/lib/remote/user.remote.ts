@@ -1,17 +1,16 @@
-import type { User } from "$lib/schema.ts";
+import { getRequestEvent, query } from "$app/server";
+import type { User } from "$lib/schema";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema.ts";
 import { eq } from "drizzle-orm";
 
-export interface Data {
-  user: User | undefined;
-}
-
-export const load = async ({ locals }): Promise<Data> => {
-  const localUser = locals.user;
+export const getUser = query(async (): Promise<User | undefined> => {
+  const {
+    locals: { user: localUser },
+  } = getRequestEvent();
 
   if (!localUser) {
-    return { user: undefined };
+    return undefined;
   }
   const [user] = await db
     .select({
@@ -23,5 +22,5 @@ export const load = async ({ locals }): Promise<Data> => {
     .from(table.users)
     .where(eq(table.users.id, localUser.id));
 
-  return { user };
-};
+  return user;
+});

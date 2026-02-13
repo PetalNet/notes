@@ -34,6 +34,6 @@ export type NoteOrFolder = Note | Folder;
 export interface User {
   id: string;
   username: string;
-  publicKey: Uint8Array<ArrayBuffer>; // TODO: This breaks devalue, should do a repro
+  publicKey: Uint8Array<ArrayBuffer>;
   privateKeyEncrypted: Uint8Array<ArrayBuffer>;
 }
